@@ -48,7 +48,9 @@ int main(int argc, char **argv)
 #endif\n\
 ";
 
-  tmp[0] = '\0';
+  /* the vtcon patches (termios by packet, PTY:, job control): tell this
+     build from the 48.2 it is based on */
+  strcpy(tmp, "UP-Term");
 
 #ifdef NOTRAP
   if (tmp[0])
