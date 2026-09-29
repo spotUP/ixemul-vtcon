@@ -1,1 +1,3 @@
 build*/
+compat/*.o
+compat/libixcompat.a
