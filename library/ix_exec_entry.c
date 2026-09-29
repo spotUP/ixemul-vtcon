@@ -45,6 +45,7 @@
 
 #define _KERNEL
 #include "ixemul.h"
+#include "__vtcon.h"
 #include "kprintf.h"
 #include <sys/wait.h>
 #include <string.h>
@@ -98,6 +99,8 @@ ix_exec_entry (int argc, char **argv, char **environ, int *real_errno,
          in the calling program. However, this setting guarantees that 
          the user area entry is valid for getenv() calls. */
       u.u_environ = &environ;
+
+      __vtcon_init ();
 
       /* If this process is traced (under debugger control)
 	 then cause a sigtrap.  */

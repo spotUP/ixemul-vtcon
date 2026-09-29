@@ -184,6 +184,10 @@ int __read(struct file *f, char *buf, int len)
 
   /* Normal path begins here */
 
+  /* a background job reading its terminal stops (SIGTTIN) */
+  if (__vtcon (f) && __vtcon_bg (f, SIGTTIN) < 0)
+    return -1;
+
   omask = syscall (SYS_sigsetmask, ~0);
   __get_file (f);
   

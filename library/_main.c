@@ -62,6 +62,7 @@
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
+#include "__vtcon.h"
 
 #include <dos/var.h>
 #include <workbench/startup.h>
@@ -380,6 +381,10 @@ _main (union { char *_aline; struct WBStartup *_wb_msg; } a1,
      in the calling program. However, this setting guarantees that 
      the user area entry is valid for getenv() calls. */
   u.u_environ = &env;
+
+  /* SIGWINCH's input handler is installed when a program catches it
+     (kern_sig.c, 80.1); the vtcon console is asked about at once */
+  __vtcon_init ();
 
   /* init the uid/gid handling NP */ 
 
