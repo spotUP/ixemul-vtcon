@@ -618,6 +618,31 @@ compatible_startup (void *code, int argc, char **argv)
       *cp++ = '\n';
       *cp = 0;
 
+      /* A native program reads its environment as the process's local
+         variables, as a Shell gives it, not from environ: the entries that
+         are not the global value already become local variables. (vtcon:
+         vsh started by GNU screen saw neither TERM=screen nor WINDOW.) */
+      if (u.u_environ && *u.u_environ)
+        {
+          char **ep, name[128], global[256];
+
+          for (ep = *u.u_environ; *ep; ep++)
+            {
+              char *eq = strchr (*ep, '=');
+              int n = eq ? eq - *ep : 0;
+
+              if (n <= 0 || n >= (int)sizeof (name))
+                continue;
+              memcpy (name, *ep, n);
+              name[n] = 0;
+              /* the same as the global one: nothing to add */
+              if (GetVar (name, global, sizeof (global), GVF_GLOBAL_ONLY) >= 0 &&
+                  strlen (eq + 1) < sizeof (global) - 1 && !strcmp (global, eq + 1))
+                continue;
+              SetVar (name, eq + 1, -1, GVF_LOCAL_ONLY);
+            }
+        }
+
       KPRINTF (("BCPL cmd line = [%s]\n", al));
 
       /* problem with RunCommand: the allocated signal mask is not reset
