@@ -288,8 +288,10 @@ sendmsg (int s, const struct msghdr *msg, int flags)
   int ostat, rc;
   usetup;
 
-  if (!fp || fp->f_type == DTYPE_USOCKET)
+  if (!fp)
     return -1;
+  if (fp->f_type == DTYPE_USOCKET)
+    return unp_sendmsg(s, msg, flags);
 
   ostat = u.p_stat;
   u.p_stat = SWAIT;
@@ -348,8 +350,10 @@ recvmsg (int s, struct msghdr *msg, int flags)
   int ostat, rc;
   usetup;
 
-  if (!fp || fp->f_type == DTYPE_USOCKET)
+  if (!fp)
     return -1;
+  if (fp->f_type == DTYPE_USOCKET)
+    return unp_recvmsg(s, msg, flags);
 
   ostat = u.p_stat;
   u.p_stat = SWAIT;

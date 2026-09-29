@@ -22,11 +22,16 @@
 
 #define UNIX_SOCKET_SIZE 5120
 
+/* descriptors in flight (sendmsg SCM_RIGHTS), taken by the next recvmsg */
+#define UNIX_SOCKET_RIGHTS 8
+
 struct sock_stream {
   char  buffer[UNIX_SOCKET_SIZE];
   char  *reader, *writer;
   short flags;
   struct Task *task;
+  struct file *rights[UNIX_SOCKET_RIGHTS];
+  short nrights;
 };
 
 struct ix_unix_name {

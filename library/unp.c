@@ -69,6 +69,7 @@ init_stream(void)
       s->reader = s->writer = s->buffer;
       s->flags = 0;
       s->task = 0;
+      s->nrights = 0;
     }
   return s;
 }
@@ -181,6 +182,13 @@ static void close_stream(struct file *f, int read_stream, int from_close)
       (*ss)->flags |= (read_stream ? UNF_NO_READER : UNF_NO_WRITER);
       if (stream_is_closed(*ss))
         {
+          /* descriptors sent and never received: their reference goes */
+          while ((*ss)->nrights > 0)
+            {
+              struct file *r = (*ss)->rights[--(*ss)->nrights];
+              if (r->f_close)
+                (*r->f_close)(r);
+            }
           kfree(*ss);
           *ss = NULL;
         }
@@ -441,6 +449,136 @@ int unp_connect(int s, const struct sockaddr *name, int namelen)
       errno_return(ECONNREFUSED, -1);
     }
   return 0;
+}
+
+/*
+ * sendmsg/recvmsg on a local socket: the data of the iovecs through the
+ * stream, and SCM_RIGHTS -- descriptors passed to the other process (GNU
+ * screen hands its backend the attaching terminal this way, tmux too).
+ * An ixemul file is a shared struct file: passing one is a reference
+ * queued on the stream, and a new descriptor for it in the receiver.
+ * Network sockets (DTYPE_SOCKET) cannot be passed. (vtcon P7.1)
+ */
+int unp_sendmsg(int s, const struct msghdr *msg, int flags)
+{
+  usetup;
+  struct file *f = u.u_ofile[s], *fr[UNIX_SOCKET_RIGHTS];
+  int nr = 0, i, total = 0, n;
+  struct cmsghdr *cm;
+
+  if (f->f_sock->state != UNS_ACCEPTED)
+    errno_return(ENOTCONN, -1);
+  /* the descriptors first: they must be there when the data is */
+  if (msg->msg_control && msg->msg_controllen >= sizeof(struct cmsghdr))
+    for (cm = CMSG_FIRSTHDR(msg); cm; cm = CMSG_NXTHDR((struct msghdr *)msg, cm))
+      {
+        int *fds = (int *)CMSG_DATA(cm);
+        int k = (cm->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+
+        if (cm->cmsg_level != SOL_SOCKET || cm->cmsg_type != SCM_RIGHTS)
+          continue;
+        for (i = 0; i < k; i++)
+          {
+            struct file *p = (fds[i] >= 0 && fds[i] < NOFILE) ? u.u_ofile[fds[i]] : NULL;
+
+            if (p == NULL || p->f_type == DTYPE_SOCKET || nr == UNIX_SOCKET_RIGHTS)
+              errno_return(p == NULL ? EBADF : EINVAL, -1);
+            fr[nr++] = p;
+          }
+      }
+  if (nr)
+    {
+      struct sock_stream *ss = get_stream(f, FALSE);
+
+      if (ss == NULL || (ss->flags & UNF_NO_READER))
+        {
+          release_stream(ss);
+          errno_return(EPIPE, -1);
+        }
+      if (ss->nrights + nr > UNIX_SOCKET_RIGHTS)
+        {
+          release_stream(ss);
+          errno_return(ETOOMANYREFS, -1);
+        }
+      ix_lock_base();
+      for (i = 0; i < nr; i++)
+        {
+          fr[i]->f_count++;
+          ss->rights[ss->nrights++] = fr[i];
+        }
+      ix_unlock_base();
+      release_stream(ss);
+    }
+  for (i = 0; i < msg->msg_iovlen; i++)
+    {
+      if (msg->msg_iov[i].iov_len == 0)
+        continue;
+      n = stream_write(f, msg->msg_iov[i].iov_base, msg->msg_iov[i].iov_len);
+      if (n < 0)
+        return total ? total : -1;
+      total += n;
+    }
+  return total;
+}
+
+int unp_recvmsg(int s, struct msghdr *msg, int flags)
+{
+  usetup;
+  struct file *f = u.u_ofile[s];
+  int i, n, total = 0;
+  struct sock_stream *ss;
+
+  if (f->f_sock->state != UNS_ACCEPTED)
+    errno_return(ENOTCONN, -1);
+  /* the data (one read, as a stream socket gives what is there) */
+  for (i = 0; i < msg->msg_iovlen; i++)
+    if (msg->msg_iov[i].iov_len)
+      {
+        n = stream_read(f, msg->msg_iov[i].iov_base, msg->msg_iov[i].iov_len);
+        if (n < 0)
+          return -1;
+        total = n;
+        break;
+      }
+  msg->msg_flags = 0;
+  /* and the descriptors that came with it */
+  ss = get_stream(f, TRUE);
+  if (ss && ss->nrights && msg->msg_control &&
+      msg->msg_controllen >= CMSG_LEN(ss->nrights * sizeof(int)))
+    {
+      struct cmsghdr *cm = CMSG_FIRSTHDR(msg);
+      int *fds = (int *)CMSG_DATA(cm), k = 0;
+
+      while (k < ss->nrights)
+        {
+          int fd;
+
+          if (ufalloc(0, &fd))
+            break;
+          u.u_ofile[fd] = ss->rights[k];  /* its reference comes with it */
+          u.u_pofile[fd] = 0;
+          if (fd > u.u_lastfile)
+            u.u_lastfile = fd;
+          fds[k++] = fd;
+        }
+      /* what did not fit in the descriptor table is dropped */
+      for (i = k; i < ss->nrights; i++)
+        if (ss->rights[i]->f_close)
+          (*ss->rights[i]->f_close)(ss->rights[i]);
+      ss->nrights = 0;
+      cm->cmsg_level = SOL_SOCKET;
+      cm->cmsg_type = SCM_RIGHTS;
+      cm->cmsg_len = CMSG_LEN(k * sizeof(int));
+      msg->msg_controllen = cm->cmsg_len;
+    }
+  else
+    {
+      if (ss && ss->nrights && msg->msg_control)
+        msg->msg_flags |= MSG_CTRUNC;
+      msg->msg_controllen = 0;
+    }
+  release_stream(ss);
+  return total;
 }
 
 int unp_send(int s, const void *buf, int len, int flags)
