@@ -474,6 +474,11 @@ struct user {
 
 	/* Process-private ACTION_WAIT_CHAR state. Appended to preserve offsets. */
 	struct ix_fselect_state	*u_fselect_states;
+
+	/* talks to a vtcon console (see __vtcon.c): its CTRL_E and CTRL_F
+	   breaks are the console's ^\ and ^Z (SIGQUIT, SIGTSTP). Last, so
+	   no earlier offset moves. */
+	int			u_vtcon;
 };
 
 /* flag codes */

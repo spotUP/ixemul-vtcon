@@ -25,6 +25,8 @@ int __vtcon_packet(struct file *f, long action, void *arg, long arg3)
 
 int __vtcon(struct file *f)
 {
+  usetup;
+
   if (!(f->f_ttyflags & IXTTY_VTCON_KNOWN))
     {
       struct termios t;
@@ -32,7 +34,10 @@ int __vtcon(struct file *f)
       f->f_ttyflags |= IXTTY_VTCON_KNOWN;
       if (IsInteractive (CTOBPTR (f->f_fh)) &&
           __vtcon_packet (f, ACTION_VTCON_TCGETA, &t, 0))
-        f->f_ttyflags |= IXTTY_VTCON;
+        {
+          f->f_ttyflags |= IXTTY_VTCON;
+          u.u_vtcon = 1;
+        }
     }
   return (f->f_ttyflags & IXTTY_VTCON) != 0;
 }
