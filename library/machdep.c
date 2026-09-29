@@ -232,7 +232,24 @@ sig_launch (void)
       me->tc_SigRecvd &= ~SIGBREAKF_CTRL_C;
       u.u_lastrcvsig &= ~SIGBREAKF_CTRL_C;
     }
-  else if (newsigs && (u.p_sigcatch & sigmsg))
+  /* a vtcon console sends its ^\ and ^Z keys (VQUIT, VSUSP) as the CTRL_E
+   * and CTRL_F breaks (vtcon: handler/vtcon_packets.h): to the foreground
+   * process group as SIGQUIT and SIGTSTP, as CTRL_C is SIGINT above */
+  if (u.u_vtcon && !(u.p_sigcatch & sigmsg) &&
+      (newsigs & (SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F)))
+    {
+      struct Process *proc = (struct Process *)(u.u_session ? u.u_session->pgrp : (int)me);
+
+      if ((newsigs & SIGBREAKF_CTRL_E) && !(u.p_sigignore & sigmask(SIGQUIT)))
+        _psignalgrp(proc, SIGQUIT);
+      if ((newsigs & SIGBREAKF_CTRL_F) && !(u.p_sigignore & sigmask(SIGTSTP)))
+        _psignalgrp(proc, SIGTSTP);
+      me->tc_SigRecvd &= ~(SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F);
+      u.u_lastrcvsig &= ~(SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F);
+      newsigs &= ~(SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F);
+    }
+
+  if (newsigs && (u.p_sigcatch & sigmsg))
     {
       /* if possible, deliver the signal directly to get a code argument */
       if (!(u.p_flag & STRC) && !(u.p_sigmask & sigmsg))

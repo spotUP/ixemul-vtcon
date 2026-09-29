@@ -418,6 +418,11 @@ struct user {
         short                   u_segment_no;   /* segment number (0-2) */
         long                    u_segment_ptr;
 	struct ixnode		u_detached_node;
+
+	/* talks to a vtcon console (see __vtcon.c): its CTRL_E and CTRL_F
+	   breaks are the console's ^\ and ^Z (SIGQUIT, SIGTSTP). Last, so
+	   no earlier offset moves. */
+	int			u_vtcon;
 };
 
 /* flag codes */
