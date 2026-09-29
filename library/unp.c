@@ -362,9 +362,15 @@ error:
       f = u.u_ofile[fd];
       client->server = f;
       client->state = UNS_ACCEPTED;
-      sa->sun_family = AF_UNIX;
-      strcpy(sa->sun_path, un->path);
-      sa->sun_len = *namelen = 3 + strlen(sa->sun_path);
+      /* the peer's address only when asked for: accept(s, 0, 0) is legal,
+         and writing through the NULL name put the path over exec's low
+         memory (SysBase at 4) -- the machine froze (vtcon P7) */
+      if (sa && namelen)
+        {
+          sa->sun_family = AF_UNIX;
+          strcpy(sa->sun_path, un->path);
+          sa->sun_len = *namelen = 3 + strlen(sa->sun_path);
+        }
     }
   ix_wakeup((u_int)client);
   syscall (SYS_sigsetmask, omask);
