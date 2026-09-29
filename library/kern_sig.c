@@ -644,6 +644,14 @@ _psignal(struct Task *t, int sig)	/* MAY be called in Supervisor/Interrupt  !*/
   struct user *p = getuser(t);
   int mask;
 
+  /* only an ixemul process has signal state: the parent of a program an
+     Amiga shell started is none, and a stop sends it SIGCHLD
+     (stopped_process_handler). _psignalgrp and kill() check this; the
+     direct callers did not. (Suspected in a rig reboot under vsh; the
+     cause there was vsh's, this check stays as the invariant.) */
+  if (p == NULL || ((int)p & 1))
+    return;
+
 
   mask = sigmask(sig);
 
