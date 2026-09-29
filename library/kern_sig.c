@@ -508,26 +508,61 @@ kill(pid_t pid, int signo)
       return (0);
     }
 
-  /* signalling process groups is not (yet) implemented */  
-  errno = ESRCH;
-  KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
-  return -1;
+  /* a negative pid is a process group */
+  return killpg(-pid, signo);
 }
 
-/* ARGSUSED */
+static int sigprocessgrp(struct Process *proc, int pgrp, int signal, int test);
+
+/* Is a process of group pgrp in the tree under proc? */
+static int group_in_tree(struct Process *proc, int pgrp)
+{
+  struct Process *p;
+
+  if (getuser(proc) == NULL)
+    return 0;
+  if (getuser(proc)->p_pgrp == pgrp)
+    return 1;
+  for (p = getuser(proc)->p_cptr; p; p = getuser(p)->p_osptr)
+    if (group_in_tree(p, pgrp))
+      return 1;
+  return 0;
+}
+
+/*
+ * Signal every process of group pgid in the caller's process tree (the
+ * shell's jobs: fg and bg send SIGCONT this way). It was not implemented
+ * and always failed with ESRCH, so tcsh's fg said "No such job".
+ */
 int
 killpg(int pgid, int signo)
 {
+  struct Process *root = (struct Process *)FindTask(0), *p;
   usetup;
 
-  if ((unsigned) signo >= NSIG)
-    errno = EINVAL;
-  else
-    errno = ESRCH;
-  KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
-
-  /* signalling process groups is not (yet) implemented */  
-  return -1;
+  if ((unsigned) signo >= NSIG || pgid <= 0)
+    {
+      errno = EINVAL;
+      return -1;
+    }
+  /* the top of the process tree, as _psignalgrp finds it */
+  for (p = getuser(root)->p_pptr; p && p != (struct Process *)1; p = getuser(p)->p_pptr)
+    {
+      if (getuser(p) == NULL)
+        break;
+      root = p;
+    }
+  Forbid();
+  if (!group_in_tree(root, pgid))
+    {
+      Permit();
+      errno = ESRCH;
+      return -1;
+    }
+  if (signo && sigprocessgrp(root, pgid, signo, 1))
+    sigprocessgrp(root, pgid, signo, 0);
+  Permit();
+  return 0;
 }
 
 /*
@@ -668,6 +703,13 @@ _psignal(struct Task *t, int sig)	/* MAY be called in Supervisor/Interrupt  !*/
    * then no further action is necessary.
    */
   if (p->p_stat == SSTOP && (p->p_flag & STRC))
+    return;
+
+  /*
+   * A process stopped by job control stays stopped: only SIGCONT (and
+   * SIGKILL) wake it; other signals wait in p_sig until it runs again.
+   */
+  if (p->p_stat == SSTOP && sig != SIGCONT && sig != SIGKILL)
     return;
 
   setrun(t);
@@ -839,17 +881,24 @@ restart:
 	   */
 	  if (mask & stopsigmask) 
 	    {
-#if notyet
-	      if (p->p_flag&STRC ||
-		  (p->p_pgru.pg_jobc == 0 && mask & ttystopsigmask))
-		break;	/* == ignore */
-	      u.p_xstat = sig;
-	      stop(p);
-	      if ((u.p_pptr->p_flag & SNOCLDSTOP) == 0)
-		_psignal(u.p_pptr, SIGCHLD);
-	      swtch();
-#endif
-	      break;
+	      /*
+	       * Job control: stop here until SIGCONT, the way a traced
+	       * process stops (stopped_process_handler tells the parent
+	       * with SIGCHLD, so wait4(WUNTRACED) sees it). The signal is
+	       * taken first; it is not delivered again after the stop.
+	       */
+	      p->p_sig &= ~mask;
+	      p->p_xstat = sig;
+	      if (sr & 0x2000)
+		{
+		  p->u_mask_state = 0;
+		  sendsig(p, (sig_t)stopped_process_handler, 0, 0, 0, 0);
+		  return -1;  /* stop in the context of the task */
+		}
+	      p->u_regs = NULL;
+	      p->u_fpregs = NULL;
+	      stopped_process_handler ();
+	      continue;
 	    } 
           else if (mask & defaultignmask)
 	    {
@@ -1016,12 +1065,15 @@ void _psignalgrp(struct Process *proc, int signal)
     return;
   p = getuser(proc)->p_pptr;
 
-  /* traverse to the top of the process-tree */
+  /* traverse to the top of the ixemul process tree: a parent that is no
+     ixemul process (the AmigaDOS Shell that started tcsh) ends it. This
+     returned there without signalling anyone, so no group signal reached
+     a shell's jobs: ^Z (and ^C) typed at a job under tcsh did nothing. */
   while (p && p != (struct Process *)1)
     {
-      ok = p;
       if (getuser(p) == NULL)
-        return;
+        break;
+      ok = p;
       p = getuser(p)->p_pptr;
     }
   if (sigprocessgrp(ok, getuser(proc)->p_pgrp, signal, 1))
