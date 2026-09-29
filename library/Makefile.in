@@ -100,10 +100,10 @@ $(LIB) :	a4.o __.o ah.o ii.o jo.o pr.o ss.o tz.o $(OBJ_OTHERS)
 		$(RANLIB) $@
 
 ixemul.library:	$(OBJ_N) $(IXLIBS)
-		$(CC) -s $(LINKFLAGS) $(OBJ_N) $(IXLIBS) $(LIBS) -o $@
+		$(CC) -s $(LINKFLAGS) $(OBJ_N) -Wl,--start-group $(IXLIBS) $(LIBS) -Wl,--end-group -o $@
 
 ixemul.trace:	$(OBJ_T) $(IXLIBS)
-		$(CC) -s $(LINKFLAGS) $(OBJ_T) $(IXLIBS) $(LIBS) -o $@
+		$(CC) -s $(LINKFLAGS) $(OBJ_T) -Wl,--start-group $(IXLIBS) $(LIBS) -Wl,--end-group -o $@
 
 ixemul.debug:	$(OBJ_N) $(IXLIBS)
 		$(CC) -g $(LINKFLAGS) $(OBJ_N) $(IXLIBS) $(LIBS) -o $@
@@ -182,19 +182,17 @@ tracecntl.o:	tracecntl.c
 tracecntl.ot:	tracecntl.c
 		$(CC) $(ALL_CFLAGS) -DTRACE_LIBRARY -ffixed-a4 -c $< -o $@
 
-ix_internals.h:	create_header
-		./create_header >$@
-
-create_header:	create_header.c $(srcdir)/../include/user.h ixemul.h
-		gcc $(CFLAGS) $(INCS) $(OTHER_CFLAGS) $(DEFS) $< -o $@
-		chmod u+x $@
+ix_internals.h:	create_header.c $(srcdir)/../include/user.h ixemul.h
+		$(CC) $(ALL_CFLAGS) -S $< -o create_header.s
+		(printf '/* Generated from create_header.c by the cross compiler. DO NOT EDIT! */\n\n'; \
+		 sed -n 's/^->\([A-Za-z_0-9]*\) \(.*\)$$/#define \1 \2/p' create_header.s) >$@
 
 ii.o tz.o:	version.h
 
 # Use native compiler, which may not understand some CFLAGS
 # So force the defines of CPU and FPU via $DEF_CPU_FPU
 parse_version:	parse_version.c
-		gcc $(CFLAGS) $(OTHER_CFLAGS) $(DEF_CPU_FPU) $(DEFS) $< -o $@
+		gcc $(DEF_CPU_FPU) $(DEFS) $< -o $@
 		chmod u+x $@
 
 version.h:	parse_version $(srcdir)/../version.in

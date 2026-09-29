@@ -23,8 +23,8 @@
 
 int __obsolete_ssystem(char *argline)
 {
-  ix_panic ("ssystem() is no longer supported.
-See the README document for more information.
+  ix_panic ("ssystem() is no longer supported.\n\
+See the README document for more information.\n\
 If you are using gcc, then replace gcc with gccv.");
   exit (EXIT_FAILURE);
 }

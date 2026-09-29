@@ -108,15 +108,13 @@ a4.c:		$(SRC_A4)
 az.c:		$(SRC)
 		@$(catenate)
 
-ix_internals.h: create_header
-		./create_header >$@
-
-create_header:	create_header.c $(srcdir)/../include/user.h ixnet.h
-		gcc $(CFLAGS) $(INCS) $(OTHER_CFLAGS) $(DEFS) $< -o $@
-		chmod u+x $@
+ix_internals.h:	create_header.c $(srcdir)/../include/user.h ixnet.h
+		$(CC) $(ALL_CFLAGS) -S $< -o create_header.s
+		(printf '/* Generated from create_header.c by the cross compiler. DO NOT EDIT! */\n\n'; \
+		 sed -n 's/^->\([A-Za-z_0-9]*\) \(.*\)$$/#define \1 \2/p' create_header.s) >$@
 
 parse_version:	parse_version.c
-		gcc $(CFLAGS) $(OTHER_CFLAGS) -Dmc$(CPU) $(DEF_FPU) $(DEFS) $< -o $@
+		gcc -Dmc$(CPU) $(DEF_FPU) $(DEFS) $< -o $@
 		chmod u+x $@
 
 version.h:	parse_version $(srcdir)/../version.in

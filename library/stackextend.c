@@ -282,9 +282,9 @@ static void pushframe(ULONG requiredstack, struct StackSwapStruct *sss, sigset_t
   *u.u_stk_limit = (char *)(sf + 1) + stk_safezone + u.u_stk_argbt;
 
   /* prepare StackSwapStruct */
-  (void *)sss->stk_Pointer = (void *)sf->upper;
+  sss->stk_Pointer = (APTR)sf->upper;
   sss->stk_Lower = sf + 1;
-  (ULONG)sss->stk_Upper = (ULONG)sf->upper;
+  sss->stk_Upper = (ULONG)sf->upper;
 
   /* Update stack statistics. */
   u.u_stk_current += (char *)sf->upper - (char *)(sf + 1);
@@ -399,13 +399,13 @@ static void popframes(struct stackframe *sf, struct StackSwapStruct *sss)
   if (sf->next != NULL)
   {
     sss->stk_Lower = sf->next + 1;
-    (ULONG)sss->stk_Upper = (ULONG)sf->next->upper;
+    sss->stk_Upper = (ULONG)sf->next->upper;
     *u.u_stk_limit = (char *)(sf->next + 1) + stk_safezone + u.u_stk_argbt;
   }
   else
   {
     sss->stk_Lower = u.u_tc_splower;
-    (ULONG)sss->stk_Upper = (ULONG)u.u_tc_spupper;
+    sss->stk_Upper = (ULONG)u.u_tc_spupper;
     *u.u_stk_limit = (char *)u.u_org_lower + stk_safezone + u.u_stk_argbt;
   }
   sf2 = u.u_stk_spare;

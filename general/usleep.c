@@ -42,7 +42,6 @@ void usleep(u_int useconds)
 	struct itimerval itv, oitv;
 	struct sigvec vec, ovec;
 	long omask;
-	static void usleephandler(void);
 
 	itp = &itv;
 	if (!useconds)

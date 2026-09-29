@@ -1,14 +1,21 @@
-#include <sys/types.h>
-#include <sys/syscall.h>
-
+/* A program for the machine that builds ixemul (a cross build runs it
+ * there): only ixemul's syscall list, not its system headers. */
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+enum {
+#define SYSTEM_CALL(func, vec) SYS_##func = vec,
+#include "sys/syscall.def"
+#undef SYSTEM_CALL
+};
 
 struct syscall {
   char *name;
   int   vec;
 } syscalls[] = {
 #define SYSTEM_CALL(func,vec) { #func, vec},
-#include <sys/syscall.def>
+#include "sys/syscall.def"
 #undef SYSTEM_CALL
 };
 

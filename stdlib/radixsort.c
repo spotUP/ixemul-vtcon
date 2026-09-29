@@ -112,6 +112,8 @@ typedef struct _stack {
  * the simple sort as soon as possible.  Takes linear time relative to
  * the number of bytes in the strings.
  */
+static void shellsort();
+
 int radixsort(const unsigned char **l1, int nmemb, const unsigned char *tab,
               unsigned endbyte)
 {
@@ -123,7 +125,6 @@ int radixsort(const unsigned char **l1, int nmemb, const unsigned char *tab,
 	CONTEXT *stack, *stackp;
 	int c[NBUCKETS + 1], max;
 	u_char ltab[NBUCKETS];
-	static void shellsort();
 
 	if (nmemb <= 1)
 		return(0);

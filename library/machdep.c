@@ -388,13 +388,13 @@ sig_exit (unsigned int code)
 	 pipelining of a 68040 the SP was already updated before Enforcer could
 	 read the value of the SP. More nops may be needed for the 68060 CPU. */
 
-      asm ("movel %0,d0
-            addw  #700,sp
-            movel d0,0xdeaddead
-            nop
-            addqw #2,sp
-            movel d0,0xdeaddead
-            nop
+      asm ("movel %0,d0\n\
+            addw  #700,sp\n\
+            movel d0,0xdeaddead\n\
+            nop\n\
+            addqw #2,sp\n\
+            movel d0,0xdeaddead\n\
+            nop\n\
             addaw #-702,sp" : /* no output */ : "a" (code));
     }
   
@@ -508,18 +508,18 @@ setrun (struct Task *t)
    *       return from a kill() to yourself, before the signal handler had a
    *       chance to react accordingly to the signal..
    */
-  asm volatile (" 
-    movel a5,a0
-    lea	  L_get_sr,a5
-    movel 4:w,a6
-    jsr	  a6@(-0x1e)
-    movel a1,%0
-    bra	  L_skip
-L_get_sr:
-    movew sp@,a1	| get sr register from the calling function
-    rte
-L_skip:
-    movel a0,a5
+  asm volatile (" \n\
+    movel a5,a0\n\
+    lea	  L_get_sr,a5\n\
+    movel 4:w,a6\n\
+    jsr	  a6@(-0x1e)\n\
+    movel a1,%0\n\
+    bra	  L_skip\n\
+L_get_sr:\n\
+    movew sp@,a1	| get sr register from the calling function\n\
+    rte\n\
+L_skip:\n\
+    movel a0,a5\n\
 	" : "=g" (sr) : : "a0", "a1", "a6");
 
   /* Don't force context switch if:

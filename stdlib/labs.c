@@ -26,7 +26,7 @@ static char sccsid[] = "@(#)labs.c	5.2 (Berkeley) 5/17/90";
 
 #include <stdlib.h>
 
-long const
+long
 labs(long j)
 {
 	return(j < 0 ? -j : j);

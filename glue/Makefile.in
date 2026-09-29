@@ -77,7 +77,7 @@ $(LIB_P):	gen_glue
 		rm -f *.o
 
 gen_glue:	gen_glue.c $(srcdir)/../include/sys/syscall.def
-		$(CC) $(ALL_CFLAGS) $< -o $@
+		gcc -iquote $(srcdir)/../include $< -o $@
 
 clean:
 		rm -rf *baserel*

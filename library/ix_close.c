@@ -206,7 +206,7 @@ ix_close (struct ixemul_base *ixbase)
 #ifndef NOTRAP
   /* delay this until here, since the above called functions need access
    * to the user area. */
-  getuser(me) = ix_u->u_otrap_data;
+  setuser(me, ix_u->u_otrap_data);
 #endif
 
   kfree (((char *)ix_u) - ix_u->u_a4_pointers_size * 4);

@@ -83,7 +83,7 @@ CPU-FPU-TYPES =	68000.soft-float notrap.soft-float \
 #                        This can be used for debugging with a debugger other
 #                        than gdb.
 
-OTHER_CFLAGS = -static -fomit-frame-pointer -Wall
+OTHER_CFLAGS = -static -fomit-frame-pointer -Wall -std=gnu89
 
 
 ###############################################

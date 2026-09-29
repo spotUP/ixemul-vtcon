@@ -97,7 +97,7 @@ ix_open (struct ixemul_base *ixbase)
 
       KPRINTF (("ix_open: ix_u = $%lx, ix_open @$lx\n", ix_u, ix_open));
 
-      getuser(me) = ix_u;
+      setuser(me, ix_u);
 
 #ifndef NOTRAP
       /* The stackframe of the 68010 is identical to the 68020! */
@@ -220,7 +220,7 @@ ix_open (struct ixemul_base *ixbase)
       all_free ();
 #ifndef NOTRAP
       me->tc_TrapCode = ix_u->u_otrap_code;
-      getuser(me) = ix_u->u_otrap_data;
+      setuser(me, ix_u->u_otrap_data);
 #endif
 
       kfree (tmp);
