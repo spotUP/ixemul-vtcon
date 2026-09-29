@@ -199,7 +199,13 @@ static void resolve_name(struct lockinfo *info, int (*last_func)(), void *last_a
           SetIoErr(4242); /* special special ;-) */
           return;
         }
-      if (is_pseudoterminal(name))
+      /* terminals: /dev/ptyXY, /dev/ttyXY, and the process's own (the name
+         arrives as dev:tty when slashes are translated; ttyname says
+         /dev/tty for a console: stat() of it failed with ENOENT, and
+         GNU screen refused "Cannot access '/dev/tty'"). A Lock of "*" has
+         no meaning. */
+      if (is_pseudoterminal(name) || !strcmp(name, "/dev/tty") || !strcmp(name, "dev:tty") ||
+          !strcasecmp(name, "console:") || !strcasecmp(name, "/console"))
         {
           SetIoErr(5252);	/* special special ;-) */
           return;
@@ -209,9 +215,7 @@ static void resolve_name(struct lockinfo *info, int (*last_func)(), void *last_a
           SetIoErr(6262); /* another special special (the root directory) */
           return;
         }
-  
-      if (!strcasecmp(name, "console:") || !strcasecmp(name, "/console") || !strcmp(name, "/dev/tty"))
-        name = "*";
+
       bzero(&PI, sizeof(PI));
     }
 
