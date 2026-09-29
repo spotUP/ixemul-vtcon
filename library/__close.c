@@ -17,6 +17,13 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  *
+ * UP-Term (ixemul-vtcon) 2026/10/05
+ *
+ *   /dev/pty and /dev/tty map to vtcon's PTY: (open.c), so the FIFO: pty
+ *   bookkeeping (is_pty_name, ix_ptys) and the ACTION_STACK wakeup are gone.
+ *   On a vtcon console a pending WAIT_CHAR of this process is ended by a
+ *   newer one from the same task instead.
+ *
  * Revision 1.6  2026/08/29  ChatGPT modifications (JJ)
  *
  *   Release process-private ACTION_WAIT_CHAR state when the current process
@@ -80,29 +87,14 @@
 #include "kprintf.h"
 #include "select.h"
 #include <string.h>
-
-#ifndef ACTION_STACK
-#define ACTION_STACK 2002L
-#endif
+#include "__vtcon.h"
 
 /* --- Close path ---------------------------------------------------------- */
-
-static int
-is_pty_name(const char *name)
-{
-  if (!name)
-    return 0;
-
-  if (strncmp(name, "/fifo/pty", 9) != 0)
-    return 0;
-
-  return strlen(name) >= 18;
-}
 
 /*
  * __close() is responsible for:
  *   - Decrementing f_count and only closing when it reaches zero
- *   - Cleaning up select()/FIFO state for PTYs
+ *   - Cleaning up this process's select() state
  *   - Updating filesystem metadata if marked dirty
  *   - Handling deferred unlink (FUNLINK)
  *   - Releasing filename storage correctly
@@ -138,15 +130,14 @@ __close(struct file *f)
       if (!local_ref)
         {
           /*
-           * Preserve the historical PTY wakeup only for the global final
-           * close.  On a non-final local close, let ACTION_WAIT_CHAR finish
-           * normally rather than injecting input into a still-shared PTY.
+           * A WAIT_CHAR of this process still out would hold the close
+           * for up to its 10 s. On a vtcon console (XCON:, PTY:) a newer
+           * WAIT_CHAR from the same task ends it at once (the handler keeps
+           * one waiter per task), without putting input into the line.
            */
-          if (f->f_count == 1 && f->f_fh && is_pty_name(f->f_name) &&
-              select_sp->sp_Pkt.dp_Port)
+          if (select_sp->sp_Pkt.dp_Port && f->f_fh && __vtcon(f))
             {
-              SendPacket3(f, __srwport, ACTION_STACK,
-                          f->f_fh->fh_Arg1, (int)"\n", 1);
+              SendPacket1(f, __srwport, ACTION_WAIT_CHAR, 0);
               __wait_sync_packet(&f->f_sp);
             }
 
@@ -166,24 +157,7 @@ __close(struct file *f)
 
   if (!(f->f_flags & FEXTOPEN))
     {
-      __Close(CTOBPTR(f->f_fh));
-
-      if (is_pty_name(f->f_name))
-        {
-          int i = (f->f_name[9] - 'p') * 16 +
-                  f->f_name[10] -
-                  (f->f_name[10] >= 'a' ? 'a' - 10 : '0');
-
-          char mask = (f->f_name[17] == 'm'
-                       ? IX_PTY_MASTER
-                       : IX_PTY_SLAVE);
-
-          ix.ix_ptys[i] &= ~(mask & IX_PTY_OPEN);
-          ix.ix_ptys[i] |=  (mask & IX_PTY_CLOSE);
-
-          if (!(ix.ix_ptys[i] & IX_PTY_OPEN))
-            ix.ix_ptys[i] = 0;
-        }
+      __Close (CTOBPTR (f->f_fh));
     }
 
   if (f->f_flags & FUNLINK)
