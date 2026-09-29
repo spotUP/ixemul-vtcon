@@ -69,9 +69,13 @@ int __write(struct file *f, char *buf, int len)
     return __do_sync_write(f, buf, len);
 
   /* a vtcon console does OPOST itself: the buffer goes in one packet
-     (line by line, a full-screen redraw was a packet per line) */
+     (line by line, a full-screen redraw was a packet per line). A
+     background job writing it with TOSTOP set stops first (SIGTTOU). */
   if (__vtcon(f))
-    return __do_sync_write(f, buf, len);
+    {
+      __vtcon_bg(f, SIGTTOU);
+      return __do_sync_write(f, buf, len);
+    }
 
   /* write the buffer line by line, otherwise the user isn't able to stop
      the console output until the whole buffer was flushed to the console */

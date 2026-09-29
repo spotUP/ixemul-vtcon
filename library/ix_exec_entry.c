@@ -36,6 +36,7 @@
 
 #define _KERNEL
 #include "ixemul.h"
+#include "__vtcon.h"
 #include "kprintf.h"
 #include <sys/wait.h>
 #include <string.h>
@@ -91,6 +92,7 @@ ix_exec_entry (int argc, char **argv, char **environ, int *real_errno,
       u.u_environ = &environ;
 
       __ix_install_sigwinch ();
+      __vtcon_init ();
 
       /* If this process is traced (under debugger control)
 	 then cause a sigtrap.  */

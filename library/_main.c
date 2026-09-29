@@ -38,6 +38,7 @@
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
+#include "__vtcon.h"
 
 #include <dos/var.h>
 #include <workbench/startup.h>
@@ -342,6 +343,7 @@ _main (union { char *_aline; struct WBStartup *_wb_msg; } a1,
   u.u_environ = &env;
 
   __ix_install_sigwinch ();
+  __vtcon_init ();
   
   /* init the uid/gid handling NP */ 
 

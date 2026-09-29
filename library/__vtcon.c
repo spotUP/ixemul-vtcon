@@ -100,3 +100,57 @@ void __vtcon_winch(struct Task *t)
     }
   Permit();
 }
+
+/* A process of a background group reads its terminal, or writes it with
+ * TOSTOP set: SIGTTIN / SIGTTOU for its group, which stops it (BSD
+ * ttread/ttwrite). The stop is taken when the task is switched in again
+ * (machdep.c's launch code), so it yields a tick; after SIGCONT it looks
+ * again, as it may still be in the background (bg). Returns 0 to go on
+ * with the I/O, -1 (errno EIO) for a read whose signal is ignored or
+ * blocked; such a write goes through, as on BSD. Call before the I/O
+ * masks signals. */
+int __vtcon_bg(struct file *f, int sig)
+{
+  usetup;
+
+  for (;;)
+    {
+      if (!u.u_session || !u.u_session->pgrp || u.p_pgrp == u.u_session->pgrp)
+        return 0;   /* no job control, or in the foreground */
+      if (sig == SIGTTOU)
+        {
+          struct termios t;
+
+          if (!__vtcon_packet (f, ACTION_VTCON_TCGETA, &t, 0) || !(t.c_lflag & TOSTOP))
+            return 0;
+        }
+      if (((u.p_sigignore | u.p_sigmask) & sigmask(sig)) || (u.p_flag & SVFORK))
+        {
+          if (sig == SIGTTOU)
+            return 0;
+          errno = EIO;
+          return -1;
+        }
+      _psignalgrp ((struct Process *)FindTask (0), sig);
+      Delay (1);
+    }
+}
+
+/* At program start: is the program on a vtcon terminal? Asked of fds 0-2
+ * now, not at the first tty I/O: until u_vtcon is set, a sleep does not
+ * wake for the ^Z and ^\ breaks, and a program sleeping before its first
+ * read stopped only when the sleep ended (rig: ^Z to "sleep 2; read"
+ * took 2 s, and what was typed meanwhile went to the job). */
+void __vtcon_init(void)
+{
+  usetup;
+  int fd;
+
+  for (fd = 0; fd < 3; fd++)
+    {
+      struct file *f = u.u_ofile[fd];
+
+      if (f && f->f_type == DTYPE_FILE && f->f_fh)
+        __vtcon (f);
+    }
+}
