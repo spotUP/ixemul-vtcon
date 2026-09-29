@@ -29,6 +29,7 @@
 
 #define _KERNEL
 #include "ixemul.h"
+#include "__vtcon.h"
 #include "kprintf.h"
 
 #define __time_req (u.u_time_req)
@@ -84,6 +85,8 @@ tsleep(caddr_t waitchan, char *wmesg, int timo)
   sm.sm_signal = u.u_sleep_sig;
 
   wait_sigs =  (1 << sm.sm_signal) | SIGBREAKF_CTRL_C;
+  if (u.u_vtcon)   /* a vtcon console's ^\ and ^Z wake a sleeper too */
+    wait_sigs |= SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F;
   
   if (timo)
     {
@@ -109,6 +112,7 @@ tsleep(caddr_t waitchan, char *wmesg, int timo)
       struct Process *proc = (struct Process *)(u.u_session ? u.u_session->pgrp : getpid());
       _psignalgrp(proc, SIGINT);
     }
+  __vtcon_breaks(res);
   SetSignal (0, res);
   res = CURSIG (&u) ? -1 : 0;
 

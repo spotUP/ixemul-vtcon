@@ -11,5 +11,6 @@
 
 int __vtcon_packet(struct file *f, long action, void *arg, long arg3);
 int __vtcon(struct file *f);
+unsigned long __vtcon_breaks(unsigned long breaks);
 
 #endif

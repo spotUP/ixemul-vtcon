@@ -42,6 +42,7 @@
 
 #define _KERNEL
 #include "ixemul.h"
+#include "__vtcon.h"
 #include <sys/wait.h>
 #include "kprintf.h"
 
@@ -235,19 +236,13 @@ sig_launch (void)
   /* a vtcon console sends its ^\ and ^Z keys (VQUIT, VSUSP) as the CTRL_E
    * and CTRL_F breaks (vtcon: handler/vtcon_packets.h): to the foreground
    * process group as SIGQUIT and SIGTSTP, as CTRL_C is SIGINT above */
-  if (u.u_vtcon && !(u.p_sigcatch & sigmsg) &&
-      (newsigs & (SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F)))
-    {
-      struct Process *proc = (struct Process *)(u.u_session ? u.u_session->pgrp : (int)me);
+  {
+    unsigned long used = __vtcon_breaks(newsigs);
 
-      if ((newsigs & SIGBREAKF_CTRL_E) && !(u.p_sigignore & sigmask(SIGQUIT)))
-        _psignalgrp(proc, SIGQUIT);
-      if ((newsigs & SIGBREAKF_CTRL_F) && !(u.p_sigignore & sigmask(SIGTSTP)))
-        _psignalgrp(proc, SIGTSTP);
-      me->tc_SigRecvd &= ~(SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F);
-      u.u_lastrcvsig &= ~(SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F);
-      newsigs &= ~(SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F);
-    }
+    me->tc_SigRecvd &= ~used;
+    u.u_lastrcvsig &= ~used;
+    newsigs &= ~used;
+  }
 
   if (newsigs && (u.p_sigcatch & sigmsg))
     {
