@@ -59,6 +59,8 @@ struct tty_glue {
 #define IXTTY_ONLCR		0x00000008
 #define IXTTY_RAW		0x00000010
 #define IXTTY_PKT		0x00000020  /* TIOCPKT replacement */
+#define IXTTY_VTCON		0x00000040  /* the console runs the line discipline (vtcon) */
+#define IXTTY_VTCON_KNOWN	0x00000080  /* ... and that has been asked */
 
 /* this will hold basic information about a file, but contrairy to
  * Unix, it will also hold its name */

@@ -57,6 +57,7 @@
 
 #define _KERNEL
 #include "ixemul.h"
+#include "__vtcon.h"
 #include "kprintf.h"
 
 /* --- Internal helpers ---------------------------------------------------- */
@@ -238,6 +239,11 @@ int __write(struct file *f, const char *buf, int len)
    */
 
   if (!IsInteractive(CTOBPTR(f->f_fh))) /* if not interactive */
+    return __do_sync_write(f, buf, len);
+
+  /* a vtcon console does OPOST itself: the buffer goes in one packet
+     (line by line, a full-screen redraw was a packet per line) */
+  if (__vtcon(f))
     return __do_sync_write(f, buf, len);
 
   /* ----------------------------------------------------------------------- */

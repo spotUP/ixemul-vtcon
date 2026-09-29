@@ -51,6 +51,7 @@
 
 #define _KERNEL
 #include "ixemul.h"
+#include "__vtcon.h"
 #include "kprintf.h"
 
 /*
@@ -253,8 +254,10 @@ int __read(struct file *f, char *buf, int len)
 	}
    }
 
-  /* Do not access f after dropping the active file reference. */
-  ttyflags = f->f_ttyflags;
+  /* Do not access f after dropping the active file reference. A vtcon
+     console runs the line discipline itself (ICRNL, INLCR): no
+     translation here on top of it. */
+  ttyflags = __vtcon (f) ? 0 : f->f_ttyflags;
   __release_file (f);
   syscall (SYS_sigsetmask, omask);
   errno = err;

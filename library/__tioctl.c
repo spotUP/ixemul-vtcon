@@ -86,6 +86,7 @@
 
 #define _KERNEL
 #include "ixemul.h"
+#include "__vtcon.h"
 #include "kprintf.h"
 #include <string.h>
 #include <sgtty.h>
@@ -385,6 +386,13 @@ __tioctl(struct file *f, unsigned int cmd, unsigned int inout,
           }
 
         t = (struct termios *)arg;
+
+        if (__vtcon (f) && __vtcon_packet (f, ACTION_VTCON_TCGETA, t, 0))
+          {
+            result = 0;
+            break;
+          }
+
         t->c_iflag = IGNBRK | IGNPAR | IXON;
 	if (f->f_ttyflags & IXTTY_ICRNL)
 	  t->c_iflag |= ICRNL;
@@ -436,7 +444,7 @@ __tioctl(struct file *f, unsigned int cmd, unsigned int inout,
       {
         struct termios *t;
         int makeraw;
-        
+
         if (arg == 0)
           {
             err = EFAULT;
@@ -444,6 +452,16 @@ __tioctl(struct file *f, unsigned int cmd, unsigned int inout,
           }
 
         t = (struct termios *)arg;
+
+        /* the console's line discipline takes the whole termios */
+        if (__vtcon (f) &&
+            __vtcon_packet (f, ACTION_VTCON_TCSETA, t,
+                            cmd == TIOCSETA ? TCSANOW : cmd == TIOCSETAW ? TCSADRAIN : TCSAFLUSH))
+          {
+            result = 0;
+            break;
+          }
+
         makeraw = (t->c_lflag & (ICANON | ECHO)) != (ICANON | ECHO);
 	/* the only thing that counts so far.. if ICANON is disabled,        
 	 * we disable ECHO too, no matter what the user wanted, and 
@@ -559,6 +577,11 @@ __tioctl(struct file *f, unsigned int cmd, unsigned int inout,
           }
 
         ws = (struct winsize *)arg;
+	if (__vtcon (f) && __vtcon_packet (f, ACTION_VTCON_GWINSZ, ws, 0))
+	  {
+	    result = 0;
+	    break;
+	  }
         result = tty_get_winsize(f, ws);
 	break;
       }
@@ -660,7 +683,18 @@ __tioctl(struct file *f, unsigned int cmd, unsigned int inout,
       }
 
     case TIOCSWINSZ:
-      /* Window resizing is not implemented; silently ignored. */
+      /* a pty master sets the size (vtcon's PTY:); the foreground process
+         group learns it, as on Unix. A window's size stays the window's. */
+      if (__vtcon (f))
+        {
+          __vtcon_packet (f, ACTION_VTCON_SWINSZ, (void *)arg, 0);
+          if (u.u_session)   /* pgrp holds the group's Process (machdep.c does the same) */
+            _psignalgrp ((struct Process *)u.u_session->pgrp, SIGWINCH);
+          result = 0;
+          break;
+        }
+
+      /* any other console: resizing the window is not implemented */
       /* fall through */
     default:
       /* --- Default: ignored but successful ------------------------------- */

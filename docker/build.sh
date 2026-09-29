@@ -25,5 +25,9 @@ docker run --rm --platform linux/amd64 \
     CC="$cc" CPP="m68k-amigaos-gcc -I/inlines/include -idirafter /ix/compat-include -idirafter /ndk -E" \
       sh /ix/configure --host=m68k-amigaos --target=m68k-amigaos --build=i686-pc-linux-gnu >configure.log &&
     make CPU-FPU-TYPES="68020.68881" OTHER_CFLAGS="-static -fomit-frame-pointer -Wall" \
-      RANLIB=m68k-amigaos-ranlib AR=m68k-amigaos-ar CC="$cc" >make.log 2>&1'
+      RANLIB=m68k-amigaos-ranlib AR=m68k-amigaos-ar CC="$cc" \
+      $(for d in glue stack static net db; do for b in 68000.soft-float.baserel 68020.soft-float.baserel32 68000.soft-float.no-baserel; do echo $d.$b; done; done) \
+      ixnet.68020.soft-float.amigaos \
+      $(for d in general string stdlib stdio library; do echo $d.68020.68881.amigaos; done) \
+      >make.log 2>&1'
 ls -l build295/library/68020/68881/amigaos/ixemul.library build295/ixnet/68020/amigaos/ixnet.library
