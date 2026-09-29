@@ -42,6 +42,7 @@
 
 #define _KERNEL
 #include "ixemul.h"
+#include "__vtcon.h"
 #include "kprintf.h"
 #include <string.h>
 #include <sgtty.h>
@@ -92,6 +93,12 @@ __tioctl(struct file *f, unsigned int cmd, unsigned int inout,
         struct termios *t = (struct termios *)arg;
         unsigned char *cp;
 
+        if (__vtcon (f) && __vtcon_packet (f, ACTION_VTCON_TCGETA, t, 0))
+          {
+            result = 0;
+            break;
+          }
+
         t->c_iflag = IGNBRK | IGNPAR | IXON;
 	if (f->f_ttyflags & IXTTY_ICRNL)
 	  t->c_iflag |= ICRNL;
@@ -136,6 +143,15 @@ __tioctl(struct file *f, unsigned int cmd, unsigned int inout,
       {
         struct termios *t = (struct termios *)arg;
         int makeraw;
+
+        /* the console's line discipline takes the whole termios */
+        if (__vtcon (f) &&
+            __vtcon_packet (f, ACTION_VTCON_TCSETA, t,
+                            cmd == TIOCSETA ? TCSANOW : cmd == TIOCSETAW ? TCSADRAIN : TCSAFLUSH))
+          {
+            result = 0;
+            break;
+          }
         
         makeraw = (t->c_lflag & (ICANON | ECHO)) != (ICANON | ECHO);
 	/* the only thing that counts so far.. if ICANON is disabled,        
@@ -219,6 +235,12 @@ __tioctl(struct file *f, unsigned int cmd, unsigned int inout,
 	struct IOStdReq *ios;
 	struct InfoData *info;
 
+	if (__vtcon (f) && __vtcon_packet (f, ACTION_VTCON_GWINSZ, ws, 0))
+	  {
+	    result = 0;
+	    break;
+	  }
+
 	info = alloca (sizeof (struct InfoData) + 2);
 	info = LONG_ALIGN (info);
 	bzero (info, sizeof (struct InfoData));
@@ -295,7 +317,16 @@ __tioctl(struct file *f, unsigned int cmd, unsigned int inout,
       }
 
     case TIOCSWINSZ:
-      /* should I really try to resize the window ?? */
+      /* a pty master sets the size (vtcon's PTY:); the foreground process
+         group learns it, as on Unix. A window's size stays the window's. */
+      if (__vtcon (f))
+        {
+          __vtcon_packet (f, ACTION_VTCON_SWINSZ, (void *)arg, 0);
+          if (u.u_session)   /* pgrp holds the group's Process (machdep.c does the same) */
+            _psignalgrp ((struct Process *)u.u_session->pgrp, SIGWINCH);
+          result = 0;
+          break;
+        }
 
     default:
       /* this is no error, but nevertheless we don't take any actions.. */      

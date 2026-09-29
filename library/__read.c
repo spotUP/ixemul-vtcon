@@ -29,6 +29,7 @@
 
 #define _KERNEL
 #include "ixemul.h"
+#include "__vtcon.h"
 #include "kprintf.h"
 
 /*
@@ -123,7 +124,7 @@ int __read(struct file *f, char *buf, int len)
    * normal CR->NL conversion, so we only do that transformation when in
    * raw mode.
    */
-  if (res > 0 && 
+  if (res > 0 && !__vtcon (f) &&
       ((f->f_ttyflags & IXTTY_INLCR) ||
        ((f->f_ttyflags & IXTTY_RAW) && (f->f_ttyflags & IXTTY_ICRNL))))
     {
