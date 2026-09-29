@@ -81,12 +81,12 @@ static int show_msg(char *title, const char *msg, va_list ap, char *gadgetformat
 
   if (ixemulbase && (ix.ix_flags & ix_create_enforcer_hit) && has_68020_or_up)
     {
-      asm ("movel #0,d0
-            move.l d0,0xdeaddead
-            nop
-            add.l #2,sp
-            move.l d0,0xdeaddead
-            nop
+      asm ("movel #0,d0\n\
+            move.l d0,0xdeaddead\n\
+            nop\n\
+            add.l #2,sp\n\
+            move.l d0,0xdeaddead\n\
+            nop\n\
             sub.l #2,sp" : /* no output */ : );
     }
   me->tc_Flags = old_flags;

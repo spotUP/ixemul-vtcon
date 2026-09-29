@@ -736,18 +736,18 @@ issig(struct user *p)	/* called in SUPERVISOR */
 
   KPRINTF(("issig(task=%lx)\n", FindTask(0)));
 
-  asm volatile (" 
-    movel a5,a0
-    lea	  Lget_sr,a5
-    movel 4:w,a6
-    jsr	  a6@(-0x1e)
-    movel a1,%0
-    bra	  Lskip
-Lget_sr:
-    movew sp@,a1	| get sr register from the calling function
-    rte
-Lskip:
-    movel a0,a5
+  asm volatile (" \n\
+    movel a5,a0\n\
+    lea	  Lget_sr,a5\n\
+    movel 4:w,a6\n\
+    jsr	  a6@(-0x1e)\n\
+    movel a1,%0\n\
+    bra	  Lskip\n\
+Lget_sr:\n\
+    movew sp@,a1	| get sr register from the calling function\n\
+    rte\n\
+Lskip:\n\
+    movel a0,a5\n\
 	" : "=g" (sr) : : "a0", "a1", "a6");
 
   if (p->u_mask_state)
@@ -845,7 +845,7 @@ restart:
        */
       switch ((int)p->u_signal[sig]) 
         {
-	case SIG_DFL:
+	case 0: /* SIG_DFL, (void (*)(int))0: a pointer is not a case label */
 #if notyet
 	  /*
 	   * Don't take default actions on system processes.
@@ -886,7 +886,7 @@ restart:
 	    return (sig);
 	  /*NOTREACHED*/
 
-	case SIG_IGN:
+	case 1: /* SIG_IGN, (void (*)(int))1 */
 	  /*
 	   * Masking above should prevent us ever trying
 	   * to take action on an ignored signal other

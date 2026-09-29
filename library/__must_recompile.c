@@ -4,7 +4,7 @@
 
 void __must_recompile (void)
 {
-  ix_panic ("Obsolete ixemul.library syscall number used.
+  ix_panic ("Obsolete ixemul.library syscall number used.\n\
 Relink program with current ixemul crt0.o and libc.a.");
   exit (EXIT_FAILURE);
 }

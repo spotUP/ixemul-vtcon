@@ -870,6 +870,7 @@ _tcp_ioctl (struct file *fp, int cmd, int inout, int arglen, caddr_t data)
 		/* we really don't have to bother the library with cmds we can't even
 		 * map over...
 		 */
+		break;
 	    }
 	    err = SOCK_ioctl(fp->f_so,cmd,data);
 	break;
@@ -1057,6 +1058,8 @@ struct inetmsg {
     ULONG   id;
 };
 
+static int init_d(int *, char ***);
+
 int
 init_inet_daemon(int *argc, char ***argv)
 {
@@ -1068,7 +1071,6 @@ init_inet_daemon(int *argc, char ***argv)
     int sock;
 
     if (network_protocol == IX_NETWORK_AS225) {
-	static int init_d(int *, char ***);
 	return init_d(argc,argv);
     }
     else if (network_protocol == IX_NETWORK_AMITCP) {

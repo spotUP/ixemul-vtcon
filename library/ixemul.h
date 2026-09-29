@@ -290,8 +290,10 @@ extern char *ixfakebase;
 
 #ifdef NOTRAP
 #define getuser(p)	  ((struct user *)(((struct Process *)(p))->pr_Task.tc_UserData))
+#define setuser(p, u)	  (((struct Process *)(p))->pr_Task.tc_UserData = (APTR)(u))
 #else
 #define getuser(p)        ((struct user *)(((struct Process *)(p))->pr_Task.tc_TrapData))
+#define setuser(p, u)     (((struct Process *)(p))->pr_Task.tc_TrapData = (APTR)(u))
 #endif
 
 struct user *safe_getuser(struct Process *);

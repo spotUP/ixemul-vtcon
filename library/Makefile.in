@@ -1,21 +1,18 @@
 #### Start of system configuration section. ####
 
-# Correct srcdir/topdir based on actual build behavior:
-# Makefile *lives* in ixemul/library/
-# but make *runs* it inside ixemul/library/CPU/FPU/OS/
-# Therefore:
-#   srcdir = ixemul/library
-#   topdir = ixemul
+srcdir =	@srcdir@
 
-
-# True source roots (used when Makefile is executed inside CPU/FPU/OS subdirs)
-true_srcdir = ../../..
-true_topdir = ../../../..
-
-srcdir = $(true_srcdir)
+# configure run in the source tree gives srcdir "."; make runs this file
+# inside library/CPU/FPU/OS, three levels down. Out of the tree (the Docker
+# build in build295/) srcdir is the source's library/ directory itself.
+ifeq ($(srcdir),.)
+srcdir = ../../..
+endif
+true_srcdir = $(srcdir)
+true_topdir = $(srcdir)/..
 topdir = $(true_topdir)
 
-VPATH :=	$(srcdir) $(true_srcdir)
+VPATH :=	$(srcdir)
 
 # Common prefix for machine-independent installed files.
 prefix =	@prefix@
@@ -120,10 +117,10 @@ $(LIB) :	a4.o __.o ah.o ii.o jo.o pr.o ss.o tz.o $(OBJ_OTHERS)
 		$(RANLIB) $@
 
 ixemul.library:	$(OBJ_N) $(IXLIBS)
-		$(CC) -s $(LINKFLAGS) $(OBJ_N) $(IXLIBS) $(LIBS) -o $@
+		$(CC) -s $(LINKFLAGS) $(OBJ_N) -Wl,--start-group $(IXLIBS) $(LIBS) -Wl,--end-group -o $@
 
 ixemul.trace:	$(OBJ_T) $(IXLIBS)
-		$(CC) -s $(LINKFLAGS) $(OBJ_T) $(IXLIBS) $(LIBS) -o $@
+		$(CC) -s $(LINKFLAGS) $(OBJ_T) -Wl,--start-group $(IXLIBS) $(LIBS) -Wl,--end-group -o $@
 
 ixemul.debug:	$(OBJ_N) $(IXLIBS)
 		$(CC) -g $(LINKFLAGS) $(OBJ_N) $(IXLIBS) $(LIBS) -o $@
@@ -211,12 +208,13 @@ tracecntl.o:	$(true_srcdir)/tracecntl.c
 tracecntl.ot:	$(true_srcdir)/tracecntl.c
 				$(CC) $(ALL_CFLAGS) -DTRACE_LIBRARY -ffixed-a4 -c $< -o $@
 
-ix_internals.h:	create_header
-				./create_header >$@
-
-create_header:	$(true_srcdir)/create_header.c $(true_srcdir)/../include/user.h $(true_srcdir)/ixemul.h
-				gcc $(CFLAGS) $(INCS) -I$(true_srcdir) $(OTHER_CFLAGS) $(DEFS) $< -o $@
-				chmod u+x $@
+# create_header prints struct user's offsets: compiled to assembly by the
+# cross compiler and read back, so the offsets are the m68k ones (a host
+# gcc would print its own).
+ix_internals.h:	$(true_srcdir)/create_header.c $(true_srcdir)/../include/user.h $(true_srcdir)/ixemul.h
+				$(CC) $(ALL_CFLAGS) -I$(true_srcdir) -S $< -o create_header.s
+				(printf '/* Generated from create_header.c by the cross compiler. DO NOT EDIT! */\n\n'; \
+				 sed -n 's/^->\([A-Za-z_0-9]*\) \(.*\)$$/#define \1 \2/p' create_header.s) >$@
 
 ii.o tz.o:		version.h
 
@@ -224,7 +222,7 @@ ii.o tz.o:		version.h
 # So force the defines of CPU and FPU via $DEF_CPU_FPU
 
 parse_version: $(true_srcdir)/parse_version.c
-				gcc $(CFLAGS) $(OTHER_CFLAGS) $(DEF_CPU_FPU) $(DEFS) $< -o $@
+				gcc $(DEF_CPU_FPU) $(DEFS) $< -o $@
 				chmod u+x $@
 
 # version.in is located in the same directory as parse_version,

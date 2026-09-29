@@ -15,19 +15,19 @@ mulu (unsigned long U, unsigned long V)
 {
   register unsigned long result asm("d0");
 
-  asm volatile ("
-    movel	%1,d0
-    movel	%2,d1
-    movel	d0,d2
-    movel	d1,d3
-    swap	d2
-    swap	d3
-    mulu	d1,d2
-    mulu	d0,d3
-    mulu	d1,d0
-    addw	d3,d2
-    swap	d2
-    clrw	d2
+  asm volatile ("\n\
+    movel	%1,d0\n\
+    movel	%2,d1\n\
+    movel	d0,d2\n\
+    movel	d1,d3\n\
+    swap	d2\n\
+    swap	d3\n\
+    mulu	d1,d2\n\
+    mulu	d0,d3\n\
+    mulu	d1,d0\n\
+    addw	d3,d2\n\
+    swap	d2\n\
+    clrw	d2\n\
     addl	d2,d0"
     : "=r" (result)
     : "g" (U), "g" (V)

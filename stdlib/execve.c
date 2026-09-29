@@ -720,7 +720,7 @@ compatible_startup (void *code, int argc, char **argv)
       me->pr_Task.tc_TrapCode = u.u_otrap_code;
 #endif
       old_trapdata = getuser(me);
-      getuser(me) = 0;
+      setuser(me, 0);
       Permit();
 
       {
@@ -739,7 +739,7 @@ compatible_startup (void *code, int argc, char **argv)
          (the recent addition of an ix_sleep() at the end of a vfork'd
           process makes it necessary to reinstall the signalling facilities!) */
       Forbid();
-      getuser(me) = old_trapdata;
+      setuser(me, old_trapdata);
 #ifndef NOTRAP
       me->pr_Task.tc_TrapCode = old_trapcode;
 #endif
