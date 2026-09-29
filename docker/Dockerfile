@@ -32,3 +32,9 @@ RUN touch /src/gcc/gcc/c-parse.gperf /src/gcc/gcc/configure && \
     make all-gcc MAKEINFO=true CFLAGS_FOR_TARGET=-noixemul && \
     make -C gcc install-common install-headers install-libgcc install-driver install-cpp MAKEINFO=true \
       CFLAGS_FOR_TARGET=-noixemul   # install-normal without the manuals
+# install-libgcc copies libgcc.a without running the target ranlib
+RUN find $PREFIX/lib/gcc-lib -name 'libgcc*.a' -exec m68k-amigaos-ranlib {} \;
+# GG's fd2inline 1.11 inline headers (OS 3.1), the ones gcc 2.95 was paired
+# with (NDK 3.2's use variadic macros gcc 2.95 cannot parse)
+ADD https://codewiz.org/pub/systemshock/fileareas/GeekGadgets/fd2inline-1.11-bin.tgz /tmp/fd2inline.tgz
+RUN mkdir -p /inlines && tar xzf /tmp/fd2inline.tgz -C /inlines include && rm /tmp/fd2inline.tgz
