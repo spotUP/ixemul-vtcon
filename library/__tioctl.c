@@ -321,9 +321,11 @@ __tioctl(struct file *f, unsigned int cmd, unsigned int inout,
          group learns it, as on Unix. A window's size stays the window's. */
       if (__vtcon (f))
         {
-          __vtcon_packet (f, ACTION_VTCON_SWINSZ, (void *)arg, 0);
-          if (u.u_session)   /* pgrp holds the group's Process (machdep.c does the same) */
-            _psignalgrp ((struct Process *)u.u_session->pgrp, SIGWINCH);
+          /* PTY: answers whom the new size is for: a process on the
+             slave (0 when the size did not change). Not the caller's own
+             group: the caller holds the master, its terminal is another. */
+          if (__vtcon_packet (f, ACTION_VTCON_SWINSZ, (void *)arg, 0))
+            __vtcon_winch ((struct Task *)LastError (f));
           result = 0;
           break;
         }

@@ -65,3 +65,38 @@ unsigned long __vtcon_breaks(unsigned long breaks)
     _psignalgrp(proc, SIGTSTP);
   return breaks;
 }
+
+/* Does t still exist (running, ready or waiting)? Under Forbid. */
+static int task_exists(struct Task *t)
+{
+  struct Node *n;
+
+  if (t == SysBase->ThisTask)
+    return 1;
+  for (n = SysBase->TaskReady.lh_Head; n->ln_Succ; n = n->ln_Succ)
+    if (n == &t->tc_Node)
+      return 1;
+  for (n = SysBase->TaskWait.lh_Head; n->ln_Succ; n = n->ln_Succ)
+    if (n == &t->tc_Node)
+      return 1;
+  return 0;
+}
+
+/* SIGWINCH for a terminal whose size its pty master set: t is a process
+ * on the slave (vtcon's PTY: names its break target), the signal goes to
+ * its foreground process group, as a Unix tty sends it. A task that is
+ * gone or no ixemul process gets nothing. */
+void __vtcon_winch(struct Task *t)
+{
+  struct user *tu;
+
+  if (!t)
+    return;
+  Forbid();
+  if (task_exists(t) && t->tc_Node.ln_Type == NT_PROCESS && (tu = getuser(t)) != NULL)
+    {
+      struct Process *grp = tu->u_session ? (struct Process *)tu->u_session->pgrp : NULL;
+      _psignalgrp(grp ? grp : (struct Process *)t, SIGWINCH);
+    }
+  Permit();
+}

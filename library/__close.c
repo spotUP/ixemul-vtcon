@@ -28,6 +28,7 @@
 #include "ixemul.h"
 #include "kprintf.h"
 #include "select.h"
+#include "__vtcon.h"
 
 #ifndef ACTION_STACK
 // From rexx/rexxio.h
@@ -41,9 +42,11 @@ __close(struct file *f)
     {
       usetup;
 
-      if (!memcmp(f->f_name, "/fifo/pty", 9) && SELPKT_IN_USE(f))
+      /* a select's WAIT_CHAR still out would hold the close for up to its
+         10 s: on a vtcon console (XCON:, PTY:) a newer WAIT_CHAR ends it */
+      if (SELPKT_IN_USE(f) && __vtcon(f))
         {
-          SendPacket3(f, __srwport, ACTION_STACK, f->f_fh->fh_Arg1, (int)"\n", 1);
+          SendPacket1(f, __srwport, ACTION_WAIT_CHAR, 0);
           __wait_sync_packet(&f->f_sp);
         }
       __wait_select_packet((struct StandardPacket *)&f->f_select_sp);
@@ -59,17 +62,6 @@ __close(struct file *f)
   if (!(f->f_flags & FEXTOPEN))
     {
       __Close (CTOBPTR (f->f_fh));
-
-      if (!memcmp(f->f_name, "/fifo/pty", 9))
-        {
-	  int i = (f->f_name[9] - 'p') * 16 + f->f_name[10] - (f->f_name[10] >= 'a' ? 'a' - 10 : '0');
-      	  char mask = (f->f_name[17] == 'm' ? IX_PTY_MASTER : IX_PTY_SLAVE);
-	  
-	  ix.ix_ptys[i] &= ~(mask & IX_PTY_OPEN);
-	  ix.ix_ptys[i] |= mask & IX_PTY_CLOSE;
-	  if (!(ix.ix_ptys[i] & IX_PTY_OPEN))
-	    ix.ix_ptys[i] = 0;  /* both slave and master are closed, so free this pty */
-        }
     }
 
   if (f->f_flags & FUNLINK)

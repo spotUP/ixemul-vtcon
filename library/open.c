@@ -56,8 +56,7 @@ open(char *name, int mode, int perms)
   BPTR fh;
   int late_stat;
   int omask, error;
-  char ptymask = 0;
-  int ptyindex = 0;
+  char ptyname[12];
   int amode = 0, i;
   usetup;
 
@@ -170,24 +169,18 @@ open(char *name, int mode, int perms)
     name = "*";
   else if ((i = is_pseudoterminal(name)))
     {
-      char *orig_name = name;
-      char mask;
-
-      name = "/fifo/ptyXX/rweksm";
-      memcpy(name + 7, orig_name + i + 1, 4);
-      name[17] = (orig_name[i] == 'p' ? 'm' : 'c');
-      mask = (name[17] == 'm' ? IX_PTY_MASTER : IX_PTY_SLAVE) | IX_PTY_CLOSE;
-      ptyindex = (name[9] - 'p') * 16 + name[10] - (name[10] >= 'a' ? 'a' - 10 : '0');
-      ix_lock_base();
-      if (ix.ix_ptys[ptyindex] & mask)
-        {
-          ix_unlock_base();
-          error = EIO;
-          goto error;
-        }
-      ptymask = mask;
-      ix.ix_ptys[ptyindex] |= (mask & IX_PTY_OPEN); /* mark pty in use */
-      ix_unlock_base();
+      /* vtcon's PTY: (UP-Term): /dev/ptyXY is the master PTY:XY/m and
+         /dev/ttyXY its slave PTY:XY/s, with a real line discipline
+         between them. The handler allows one master per pair, so a
+         program scanning for a free pty sees the busy ones fail. (The
+         FIFO: mapping this replaces wrote the name into a string literal
+         that every opener shared.) */
+      strcpy(ptyname, "PTY:XY/m");
+      ptyname[4] = name[i + 3];
+      ptyname[5] = name[i + 4];
+      if (name[i] == 't')
+        ptyname[7] = 's';
+      name = ptyname;
     }
 
   do
@@ -293,12 +286,6 @@ error:
 
   /* free the file */
   u.u_ofile[fd] = 0;
-  if (ptymask)
-    {
-      ix_lock_base();
-      ix.ix_ptys[ptyindex] &= ~(ptymask & IX_PTY_OPEN);
-      ix_unlock_base();
-    }
   f->f_count--;
   syscall (SYS_sigsetmask, omask);
   errno = error;
