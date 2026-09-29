@@ -398,7 +398,9 @@ int unp_connect(int s, const struct sockaddr *name, int namelen)
     errno_return(EOPNOTSUPP, -1);
   if (us->to_server || us->from_server)
     errno_return(EISCONN, -1);
-  strcpy(us->path, path);
+  /* the path marks a socket as connected or bound: only once it is
+     (a failed connect left it set, and a bind of the same socket then
+     failed with EINVAL -- GNU screen probes with connect, then binds) */
   ix_lock_base();
   un = find_unix_name(path);
   if (un == NULL)
@@ -411,6 +413,7 @@ int unp_connect(int s, const struct sockaddr *name, int namelen)
       ix_unlock_base();
       errno_return(ECONNREFUSED, -1);
     }
+  strcpy(us->path, path);
   us->to_server = init_stream();
   if (us->to_server)
     us->from_server = init_stream();
@@ -419,6 +422,7 @@ int unp_connect(int s, const struct sockaddr *name, int namelen)
       if (us->to_server)
         kfree(us->to_server);
       us->to_server = NULL;
+      us->path[0] = 0;
       ix_unlock_base();
       errno_return(ENOMEM, -1);
     }
@@ -446,6 +450,7 @@ int unp_connect(int s, const struct sockaddr *name, int namelen)
       kfree(us->to_server);
       kfree(us->from_server);
       us->to_server = us->from_server = NULL;
+      us->path[0] = 0;
       errno_return(ECONNREFUSED, -1);
     }
   return 0;
