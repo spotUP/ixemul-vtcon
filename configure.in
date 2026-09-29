@@ -1,0 +1,18 @@
+dnl Process this file with autoconf to produce a configure script.
+dnl
+AC_INIT(libsrc/crt0.c)
+AC_CANONICAL_SYSTEM
+
+AC_PROG_INSTALL
+AC_PROG_CC
+AC_PROG_AWK
+AC_CHECK_TOOL(RANLIB, ranlib, :)
+AC_CHECK_TOOL(AR, ar, :)
+AC_ARFLAGS
+AC_CHECK_HEADER(inline/exec.h, , \
+  [echo -e "configure: error, <inline/exec.h> not found which is needed to compile ixemul.\nYou need to install the fd2inline package."; exit 1])
+
+AC_OUTPUT(Makefile general/Makefile library/Makefile libsrc/Makefile
+	  static/Makefile stdio/Makefile stdlib/Makefile string/Makefile
+	  ixnet/Makefile stack/Makefile net/Makefile db/Makefile glue/Makefile
+	  utils/Makefile man/Makefile)

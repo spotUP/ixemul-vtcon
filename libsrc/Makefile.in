@@ -1,0 +1,114 @@
+#### Start of system configuration section. ####
+
+srcdir =	@srcdir@
+VPATH =		@srcdir@
+
+# Common prefix for machine-independent installed files.
+prefix =	@prefix@
+
+# Common prefix for machine-dependent installed files.
+exec_prefix =	@exec_prefix@
+
+bindir =	$(exec_prefix)/bin
+libdir =	$(exec_prefix)/Sys/libs
+
+INSTALL =	@INSTALL@
+INSTALL_DATA =	@INSTALL_DATA@
+
+CC =		@CC@
+
+CFLAGS =	@CFLAGS@
+LDFLAGS =	@LDFLAGS@
+
+RANLIB =	@RANLIB@
+AR = @AR@
+RM =		rm -f
+
+#### End system configuration section ####
+
+# For now we only build one CPU/FPU flavor of libc.a, which is the most generic version.
+
+CPUDIR		= 68000
+FPUDIR		= soft-float
+
+FLAVOR_CFLAGS =
+OTHER_CFLAGS =	-fomit-frame-pointer
+ALL_CFLAGS =	$(CFLAGS) $(FLAVOR_CFLAGS) $(OTHER_CFLAGS) $(INCS) $(DEFS)
+
+DEFS =
+INCS =		-I$(srcdir) -I$(srcdir)/../library -I$(srcdir)/../include -I. -I/p
+SHELL =		/bin/sh
+
+.c.o:
+		$(CC) $(ALL_CFLAGS) -c $< -o $@
+
+SRC =		v1.c
+
+OBJ =		$(SRC:.c=.o)
+
+# 'glue' must be the first item in this list!
+LIBS =		glue static stack net db
+
+NOBASELIBS :=	$(foreach d, $(LIBS),../$(d)/no-baserel/lib$(d).a)
+BASELIBS :=	$(foreach d, $(LIBS),../$(d)/baserel/lib$(d).a)
+LBASELIBS :=	$(foreach d, $(LIBS),../$(d)/baserel32/lib$(d).a)
+
+all:		libc.a libc_p.a libbc.a libb32c.a crt0.o lcrt0.o bcrt0.o rcrt0.o \
+		mcrt0.o gcrt0.o scrt0.o
+
+crt0.o:		crt0.c version.h
+		$(CC) $(CFLAGS) $(OTHER_CFLAGS) $(INCS) -c -DCRT0 $< -o $@
+
+bcrt0.o:	crt0.c version.h
+		$(CC) $(CFLAGS) $(OTHER_CFLAGS) -fbaserel -DBASECRT0 $(INCS) -c $< -o $@
+
+rcrt0.o:	crt0.c version.h
+		$(CC) $(CFLAGS) $(OTHER_CFLAGS) -fbaserel -DBASECRT0 -DRCRT0 $(INCS) -c $< -o $@
+
+lcrt0.o:	crt0.c version.h
+		$(CC) $(CFLAGS) $(OTHER_CFLAGS) -m68020 -fbaserel32 -DBASECRT0 -DLBASE $(INCS) -c $< -o $@
+
+scrt0.o:	crt0.c version.h
+		$(CC) $(CFLAGS) $(OTHER_CFLAGS) -m68020 -fbaserel32 -DBASECRT0 -DRCRT0 -DLBASE $(INCS) -c $< -o $@
+
+mcrt0.o:	crt0.c version.h gmon.c gmon.h
+		$(CC) $(CFLAGS) $(OTHER_CFLAGS) $(INCS) -c -DMCRT0 -fno-omit-frame-pointer $< -o $@
+
+gcrt0.o:	mcrt0.o
+		cp $< $@
+
+define createlib
+	$(RM) -r $@ tempobj
+	@mkdir tempobj
+	cp $(OBJ) tempobj
+	cp $< $@
+	@(cd tempobj; for i in $(filter-out $< $(OBJ),$^) ; do echo extracting library $$i ; $(AR) x ../$$i ; done)
+	(cd tempobj; $(AR) q ../$@ *.o)
+	$(RANLIB) $@
+	$(RM) -r tempobj
+endef
+
+libc.a libc_p.a libbc.a libb32c.a: $(OBJ)
+
+libc.a:		$(NOBASELIBS)
+		$(createlib)
+
+libc_p.a:	$(NOBASELIBS:%glue.a=%glue_p.a)
+		$(createlib)
+
+libbc.a:	$(BASELIBS)
+		$(createlib)
+
+libb32c.a:	$(LBASELIBS)
+		$(createlib)
+
+version.h:	$(srcdir)/../library/parse_version.c $(srcdir)/../version.in
+		gcc -o parse_version $<
+		./parse_version $(srcdir) >$@
+		rm -f parse_version
+
+clean:
+		rm -rf tempobj *.[oa]
+
+clobber:	clean
+		rm -f Makefile version.h
