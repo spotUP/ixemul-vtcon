@@ -32,6 +32,7 @@
 
 #define _KERNEL
 #include "ixemul.h"
+#include "__vtcon.h"
 #include "kprintf.h"
 #include <sys/ioctl.h>
 
@@ -89,6 +90,19 @@ __fioctl(struct file *f, unsigned int cmd, unsigned int inout,
 	/* if the docs would all speak the same language... some
 	 * say, that the timeout should be in 1/50s, others say
 	 * its actually in micro/s.. who knows.. */
+	/* a vtcon console or PTY: knows the count (libevent sizes its reads
+	   with it; 1 at a time split a terminal's answers, UP-Term) */
+	if (__vtcon (f))
+	  {
+	    long n = __vtcon_nread (f);
+
+	    if (n >= 0)
+	      {
+	        *pt = n;
+	        result = 0;
+	        goto ret;
+	      }
+	  }
 	*pt = WaitForChar(CTOBPTR(f->f_fh), 0) != 0;
 	result = 0;
         goto ret;

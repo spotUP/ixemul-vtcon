@@ -8,9 +8,11 @@
 #define ACTION_VTCON_TCSETA 0x7656  /* Arg2 struct termios *, Arg3 TCSANOW/DRAIN/FLUSH */
 #define ACTION_VTCON_GWINSZ 0x7657  /* Arg2 struct winsize * to fill */
 #define ACTION_VTCON_SWINSZ 0x7658  /* Arg2 struct winsize * (a pty master's) */
+#define ACTION_VTCON_NREAD  0x765A  /* Res1: bytes a Read would get now */
 
 int __vtcon_packet(struct file *f, long action, void *arg, long arg3);
 int __vtcon(struct file *f);
+long __vtcon_nread(struct file *f);
 unsigned long __vtcon_breaks(unsigned long breaks);
 void __vtcon_winch(struct Task *t);
 int __vtcon_bg(struct file *f, int sig);

@@ -160,6 +160,7 @@ static int exponent __P((char *, int, int));
 #define	SHORTINT	0x040		/* short integer */
 #define	ZEROPAD		0x080		/* zero (as opposed to blank) pad */
 #define FPT		0x100		/* Floating point number */
+#define	CHARINT		0x200		/* char (C99 hh) */
 int
 vfprintf(fp, fmt0, ap)
 	FILE *fp;
@@ -253,11 +254,13 @@ vfprintf(fp, fmt0, ap)
 	(flags&QUADINT ? va_arg(ap, quad_t) : \
 	    flags&LONGINT ? va_arg(ap, long) : \
 	    flags&SHORTINT ? (long)(short)va_arg(ap, int) : \
+	    flags&CHARINT ? (long)(signed char)va_arg(ap, int) : \
 	    (long)va_arg(ap, int))
 #define	UARG() \
 	(flags&QUADINT ? va_arg(ap, u_quad_t) : \
 	    flags&LONGINT ? va_arg(ap, u_long) : \
 	    flags&SHORTINT ? (u_long)(u_short)va_arg(ap, int) : \
+	    flags&CHARINT ? (u_long)(u_char)va_arg(ap, int) : \
 	    (u_long)va_arg(ap, u_int))
 
 	/* sorry, fprintf(read_only_file, "") returns EOF, not 0 */
@@ -368,7 +371,20 @@ reswitch:	switch (ch) {
 			goto rflag;
 #endif
 		case 'h':
-			flags |= SHORTINT;
+			if (*fmt == 'h') {
+				fmt++;
+				flags |= CHARINT;
+			} else
+				flags |= SHORTINT;
+			goto rflag;
+		/* C99 (UP-Term: tmux prints sizes with %zu): size_t and
+		   ptrdiff_t are longs here, intmax_t a quad */
+		case 'z':
+		case 't':
+			flags |= LONGINT;
+			goto rflag;
+		case 'j':
+			flags |= QUADINT;
 			goto rflag;
 		case 'l':
 			if (*fmt == 'l') {
@@ -471,6 +487,8 @@ reswitch:	switch (ch) {
 				*va_arg(ap, long *) = ret;
 			else if (flags & SHORTINT)
 				*va_arg(ap, short *) = ret;
+			else if (flags & CHARINT)
+				*va_arg(ap, signed char *) = ret;
 			else
 				*va_arg(ap, int *) = ret;
 			continue;	/* no output */
