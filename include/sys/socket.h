@@ -140,6 +140,20 @@ typedef int socklen_t;
 typedef u_char sa_family_t;
 #endif
 
+/* shutdown()'s how, POSIX names (UP-Term) */
+#define	SHUT_RD		0
+#define	SHUT_WR		1
+#define	SHUT_RDWR	2
+
+/* RFC 3493: storage for any address this system knows (UP-Term) */
+struct sockaddr_storage {
+	u_char	ss_len;
+	u_char	ss_family;
+	char	__ss_pad1[6];
+	long long __ss_align;
+	char	__ss_pad2[112];
+};
+
 struct sockaddr {
 	u_char	sa_len;			/* total length */
 	u_char	sa_family;		/* address family */
@@ -297,7 +311,7 @@ struct cmsghdr {
 	(((caddr_t)(cmsg) + (cmsg)->cmsg_len + sizeof(struct cmsghdr) > \
 	    (mhdr)->msg_control + (mhdr)->msg_controllen) ? \
 	    (struct cmsghdr *)NULL : \
-	    (struct cmsghdr *)((caddr_t)(cmsg) + ALIGN((cmsg)->cmsg_len)))
+	    (struct cmsghdr *)((caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len)))
 
 #define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
 

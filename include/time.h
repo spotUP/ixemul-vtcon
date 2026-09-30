@@ -87,6 +87,7 @@ __BEGIN_DECLS
 char *asctime __P((const struct tm *));
 clock_t clock __P((void));
 char *ctime __P((const time_t *));
+char *ctime_r __P((const time_t *, char *));	/* libixcompat.a (UP-Term) */
 double difftime __P((time_t, time_t));
 struct tm *gmtime __P((const time_t *));
 struct tm *localtime __P((const time_t *));

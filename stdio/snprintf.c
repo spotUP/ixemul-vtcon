@@ -65,9 +65,17 @@ snprintf(str, n, fmt, va_alist)
 #endif
 {
 	int ret;
+	char scratch;
 	va_list ap;
 	FILE f;
 
+	/* C99: size 0 writes nothing (str may be NULL) and still returns the
+	   length the whole output needs -- how asprintf and friends measure
+	   (4.4BSD returned EOF: tmux took it for "out of memory"; UP-Term) */
+	if (n == 0) {
+		str = &scratch;
+		n = 1;
+	}
 	if ((int)n < 1)
 		return (EOF);
 #if __STDC__

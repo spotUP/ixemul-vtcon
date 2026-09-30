@@ -45,8 +45,16 @@ typedef _BSD_VA_LIST_	va_list;
 #define	__va_promote(type) \
 	(((sizeof(type) + sizeof(int) - 1) / sizeof(int)) * sizeof(int))
 
+#if defined(__GNUC__) && __GNUC__ >= 3
+/* the first unnamed argument from the compiler: &last is not the argument
+   slot once gcc optimises (gcc 6 -O2: vsnprintf got garbage; UP-Term).
+   The same pointer, so va_list stays the char * the library takes. */
+#define	va_start(ap, last) \
+	((ap) = (char *)__builtin_next_arg(last))
+#else
 #define	va_start(ap, last) \
 	(ap = ((char *)&(last) + sizeof(last)))
+#endif
 
 #ifdef _KERNEL
 #define	va_arg(ap, type) \
@@ -60,5 +68,8 @@ typedef _BSD_VA_LIST_	va_list;
 #endif
 
 #define	va_end(ap)	((void) 0)
+
+/* C99: va_list is a pointer here, so a copy is an assignment (UP-Term) */
+#define	va_copy(dst, src)	((dst) = (src))
 
 #endif /* !_M68K_STDARG_H_ */

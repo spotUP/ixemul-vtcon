@@ -69,7 +69,15 @@ int	sigprocmask __P((int, const sigset_t *, sigset_t *));
 int	sigsuspend __P((const sigset_t *));
 
 #if defined(__GNUC__) && defined(__STDC__)
-extern __inline int sigaddset(sigset_t *set, int signo) {
+/* gnu89's extern inline: inlined here, the library has the real ones. A
+ * C99 compiler (gcc 5 and later) would emit a definition in every file
+ * that includes this -- "multiple definition of sigaddset" (UP-Term) */
+#ifdef __GNUC_STDC_INLINE__
+#define	__IX_EXTERN_INLINE	extern __inline __attribute__((__gnu_inline__))
+#else
+#define	__IX_EXTERN_INLINE	extern __inline
+#endif
+__IX_EXTERN_INLINE int sigaddset(sigset_t *set, int signo) {
 	extern int errno;
 
 	if (signo <= 0 || signo >= _NSIG) {
@@ -80,7 +88,7 @@ extern __inline int sigaddset(sigset_t *set, int signo) {
 	return (0);
 }
 
-extern __inline int sigdelset(sigset_t *set, int signo) {
+__IX_EXTERN_INLINE int sigdelset(sigset_t *set, int signo) {
 	extern int errno;
 
 	if (signo <= 0 || signo >= _NSIG) {
@@ -91,7 +99,7 @@ extern __inline int sigdelset(sigset_t *set, int signo) {
 	return (0);
 }
 
-extern __inline int sigismember(const sigset_t *set, int signo) {
+__IX_EXTERN_INLINE int sigismember(const sigset_t *set, int signo) {
 	extern int errno;
 
 	if (signo <= 0 || signo >= _NSIG) {

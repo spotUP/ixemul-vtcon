@@ -60,6 +60,11 @@
 #define	LONG_MAX	0x7fffffffL	/* max value for a long */
 #define	LONG_MIN	(-0x7fffffffL-1)	/* min value for a long */
 
+/* C99 (UP-Term) */
+#define	ULLONG_MAX	0xffffffffffffffffULL	/* max value for an unsigned long long */
+#define	LLONG_MAX	0x7fffffffffffffffLL	/* max value for a long long */
+#define	LLONG_MIN	(-0x7fffffffffffffffLL-1)	/* min value for a long long */
+
 #if !defined(_ANSI_SOURCE)
 #define SSIZE_MAX	INT_MAX		/* max value for a ssize_t */
 

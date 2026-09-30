@@ -60,9 +60,12 @@ struct timeval {
  * Structure defined by POSIX.4 to be like a timeval.
  */
 struct timespec {
-	time_t	ts_sec;		/* seconds */
-	long	ts_nsec;	/* and nanoseconds */
+	time_t	tv_sec;		/* seconds (POSIX name; UP-Term) */
+	long	tv_nsec;	/* and nanoseconds */
 };
+/* the 4.4BSD-Lite names ixemul used, for code written against them */
+#define	ts_sec	tv_sec
+#define	ts_nsec	tv_nsec
 
 #define	TIMEVAL_TO_TIMESPEC(tv, ts) {					\
 	(ts)->ts_sec = (tv)->tv_sec;					\

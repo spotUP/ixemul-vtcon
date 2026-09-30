@@ -38,6 +38,11 @@
 #ifndef _RESOLV_H_
 #define	_RESOLV_H_
 
+/* MAXDNAME below: as later BSDs, not left to every includer (UP-Term) */
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/nameser.h>
+
 /*
  * revision information.  this is the release date in YYYYMMDD format.
  * it can change every day so the right thing to do with it is use it
