@@ -423,6 +423,16 @@ struct user {
 	   breaks are the console's ^\ and ^Z (SIGQUIT, SIGTSTP). Last, so
 	   no earlier offset moves. */
 	int			u_vtcon;
+
+	/* UP-Term: freed small blocks of this process, by size class (16, 32,
+	   ... MCACHE_MAX bytes), reused by malloc without the buddy system, its
+	   lock or Forbid. They stay on the malloc list, so the exit still frees
+	   them. Emptied when the malloc list changes (vfork_own_malloc). */
+#define MCACHE_MAX	512
+#define MCACHE_CLASSES	(MCACHE_MAX / 16)
+#define MCACHE_DEPTH	64
+	void			*u_mcache[MCACHE_CLASSES];
+	unsigned short		u_mcount[MCACHE_CLASSES];
 };
 
 /* flag codes */

@@ -92,6 +92,30 @@ malloc (size_t size)
 
   /* guarantee long sizes (so we can use CopyMemQuick in realloc) */
   size = (size + 3) & ~3; /* next highest multiple of 4 */
+
+  /* small: a whole size class, and first from this process's cache of freed
+     blocks (UP-Term: the buddy path cost ~200 us a call on a 68020, and tmux
+     makes thousands of calls at start-up) */
+  if (size <= MCACHE_MAX)
+    {
+      int c;
+
+      size = (size + 15) & ~15;
+      if (size == 0)
+        size = 16;
+      c = (size >> 4) - 1;
+      /* Forbid: a signal handler (run when the task is next switched in)
+         must not find the cache half changed */
+      Forbid ();
+      if ((res = (struct mem_block *) u.u_mcache[c]))
+        {
+          u.u_mcache[c] = *(void **) &res->realblock;
+          u.u_mcount[c]--;
+          Permit ();
+          return &res->realblock;
+        }
+      Permit ();
+    }
   
   /* include management information */
   res = (struct mem_block *) b_alloc(size + sizeof (struct mem_block), 0); /* not MEMF_PUBLIC ! */
@@ -179,6 +203,24 @@ free (void *mem)
       syscall (SYS_exit, 20);
     }
 
+  /* a small block of a size class goes to this process's cache (malloc
+     above); it stays on the malloc list */
+  if (block->size <= MCACHE_MAX && !(block->size & 15) && block->size != 0)
+    {
+      int c = (block->size >> 4) - 1;
+
+      Forbid ();
+      if (u.u_mcount[c] < MCACHE_DEPTH)
+        {
+          *(void **) &block->realblock = u.u_mcache[c];
+          u.u_mcache[c] = block;
+          u.u_mcount[c]++;
+          Permit ();
+          return;
+        }
+      Permit ();
+    }
+
   Forbid ();
   ixremove ((struct ixlist *)&mem_list, (struct ixnode *) block);
   Permit ();
@@ -187,6 +229,16 @@ free (void *mem)
   b_free(block, block->size + sizeof (struct mem_block));
 }
 
+
+/* Forget the cached blocks (they belong to a malloc list that is freed or
+   is no longer ours: all_free, vfork_own_malloc). */
+void mcache_empty (void)
+{
+  usetup;
+
+  bzero (u.u_mcache, sizeof (u.u_mcache));
+  bzero (u.u_mcount, sizeof (u.u_mcount));
+}
 
 void all_free (void)
 {
@@ -209,6 +261,7 @@ void all_free (void)
 
   /* this makes it possible to call all_free() more than once */
   ixnewlist ((struct ixlist *)&own_mem_list);
+  mcache_empty ();
 }
 
 void *
