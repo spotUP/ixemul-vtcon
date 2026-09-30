@@ -66,6 +66,10 @@ struct timespec {
 	long	tv_nsec;	/* nanoseconds */
 };
 #endif
+/* the 4.4BSD-Lite names ixemul used before 80.x, for code written
+   against them (UP-Term) */
+#define	ts_sec	tv_sec
+#define	ts_nsec	tv_nsec
 
 #define	TIMEVAL_TO_TIMESPEC(tv, ts) {					\
 	(ts)->tv_sec = (tv)->tv_sec;					\

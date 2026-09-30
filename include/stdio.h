@@ -239,6 +239,9 @@ int	 fscanf __P((FILE *, const char *, ...));
 int	 fseek __P((FILE *, long, int));
 int	 fsetpos __P((FILE *, const fpos_t *));
 long	 ftell __P((FILE *));
+/* libixcompat.a (UP-Term): off_t is a long here */
+int	 fseeko __P((FILE *, off_t, int));
+off_t	 ftello __P((FILE *));
 size_t	 fwrite __P((const void *, size_t, size_t, FILE *));
 int	 getc __P((FILE *));
 int	 getchar __P((void));

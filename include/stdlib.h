@@ -202,6 +202,9 @@ quad_t	 qabs __P((quad_t));
 qdiv_t	 qdiv __P((quad_t, quad_t));
 quad_t	 strtoq __P((const char *, char **, int));
 u_quad_t strtouq __P((const char *, char **, int));
+/* libixcompat.a (UP-Term) */
+long long strtoll __P((const char *, char **, int));
+unsigned long long strtoull __P((const char *, char **, int));
 
 double	 drand48 __P((void));
 double	 erand48 __P((unsigned short[3]));

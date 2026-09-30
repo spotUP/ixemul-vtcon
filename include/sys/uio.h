@@ -66,6 +66,9 @@ struct uio {
   * Limits
   */
 #define UIO_MAXIOV	1024		/* max 1K of iov's */
+#ifndef IOV_MAX
+#define IOV_MAX		UIO_MAXIOV	/* POSIX name (UP-Term) */
+#endif
 #define UIO_SMALLIOV	8		/* 8 on stack, else malloc */
 
 #include <sys/cdefs.h>

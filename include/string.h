@@ -71,6 +71,7 @@ int	 strcoll __P((const char *, const char *));
 char	*strcpy __P((char *, const char *));
 size_t	 strcspn __P((const char *, const char *));
 char	*strerror __P((int));
+char	*strsignal __P((int));	/* libixcompat.a (UP-Term) */
 size_t	 strlen __P((const char *));
 size_t   strnlen __P((const char *, size_t));
 char    *stpcpy __P((char *, const char *));

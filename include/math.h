@@ -80,6 +80,7 @@ double	exp __P((double));
 double	fabs __P((double));
 double	floor __P((double));
 double	fmod __P((double, double));
+double	round __P((double));	/* libixcompat.a (UP-Term) */
 double	frexp __P((double, int *));
 double	ldexp __P((double, int));
 double	log __P((double));

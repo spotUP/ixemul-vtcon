@@ -204,6 +204,8 @@ extern	 int optreset;
 int	 getsubopt __P((char **, char * const *, char **));
 extern	 char *suboptarg;		/* getsubopt(3) external variable */
 #endif /* !_POSIX_SOURCE */
+/* libixcompat.a (UP-Term): the running program's own file, to exec it again */
+void	 ix_self_path __P((char *, int, const char *));
 __END_DECLS
 
 #endif /* !_UNISTD_H_ */

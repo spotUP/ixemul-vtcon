@@ -153,6 +153,11 @@ extern int *ixemul_errno;
 
 #define	EFTYPE		79		/* Inappropriate file type or format */
 
+/* POSIX codes ixemul 48.2 never sets but programs return and compare
+ * (tmux's imsg); FreeBSD's numbers (UP-Term) */
+#define	EOVERFLOW	84		/* Value too large to be stored in data type */
+#define	EBADMSG		89		/* Bad message */
+
 #ifdef _KERNEL
 /* pseudo-errors returned inside kernel to modify return to process */
 #define	ERESTART	-1		/* restart syscall */
