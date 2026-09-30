@@ -128,7 +128,9 @@ __pclose (struct file *f)
       else
         {
           if (ss->task)
-            Signal(ss->task, 1UL << u.u_pipe_sig);
+            Signal(ss->task, 1UL << getuser(ss->task)->u_pipe_sig);
+          if (ss->wtask)
+            Signal(ss->wtask, 1UL << getuser(ss->wtask)->u_pipe_sig);
           ix_wakeup ((u_int)ss);
         }
     }

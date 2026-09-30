@@ -41,6 +41,7 @@
 #include <netinet/in.h>
 #include <machine/param.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "select.h"
 
 #define can_read(ss)  (ss->reader != ss->writer)
@@ -69,7 +70,9 @@ init_stream(void)
       s->reader = s->writer = s->buffer;
       s->flags = 0;
       s->task = 0;
+      s->wtask = 0;
       s->nrights = 0;
+      s->written = s->readn = 0;
     }
   return s;
 }
@@ -195,7 +198,9 @@ static void close_stream(struct file *f, int read_stream, int from_close)
       else
         {
           if ((*ss)->task)
-            Signal((*ss)->task, 1UL << u.u_pipe_sig);
+            Signal((*ss)->task, 1UL << getuser((*ss)->task)->u_pipe_sig);
+          if ((*ss)->wtask)
+            Signal((*ss)->wtask, 1UL << getuser((*ss)->wtask)->u_pipe_sig);
           ix_wakeup ((u_int)*ss);
         }
     }
@@ -447,8 +452,15 @@ int unp_connect(int s, const struct sockaddr *name, int namelen)
   un = find_unix_name(path);
   if (un == NULL)
     {
+      struct stat st;
+
       ix_unlock_base();
-      errno_return(EADDRNOTAVAIL, -1);
+      /* as POSIX says: no file there is ENOENT, a file (a socket left
+         behind, its server gone) with nobody listening ECONNREFUSED --
+         tmux starts its server on either, and on nothing else (UP-Term) */
+      if (syscall(SYS_stat, path, &st) == 0)
+        errno_return(ECONNREFUSED, -1);
+      errno_return(ENOENT, -1);
     }
   if (un->queue_size == un->queue_index)
     {
@@ -551,6 +563,7 @@ int unp_sendmsg(int s, const struct msghdr *msg, int flags)
       for (i = 0; i < nr; i++)
         {
           fr[i]->f_count++;
+          ss->right_at[ss->nrights] = ss->written;  /* its message starts here */
           ss->rights[ss->nrights++] = fr[i];
         }
       ix_unlock_base();
@@ -572,31 +585,53 @@ int unp_recvmsg(int s, struct msghdr *msg, int flags)
 {
   usetup;
   struct file *f = u.u_ofile[s];
-  int i, n, total = 0;
+  int i, n = 0, total = 0, limit = -1, deliver, fit, k = 0;
   struct sock_stream *ss;
 
   if (f->f_sock->state != UNS_ACCEPTED)
     errno_return(ENOTCONN, -1);
-  /* the data (one read, as a stream socket gives what is there) */
+  /* the data (one read, as a stream socket gives what is there), but not
+     past the start of the next passed descriptor's message: that message
+     comes with its descriptor in a later recvmsg */
+  ss = get_stream(f, TRUE);
+  if (ss)
+    for (i = 0; i < ss->nrights; i++)
+      if (ss->right_at[i] > ss->readn)
+        {
+          limit = ss->right_at[i] - ss->readn;
+          break;
+        }
+  release_stream(ss);
   for (i = 0; i < msg->msg_iovlen; i++)
     if (msg->msg_iov[i].iov_len)
       {
-        n = stream_read(f, msg->msg_iov[i].iov_base, msg->msg_iov[i].iov_len);
+        int len = msg->msg_iov[i].iov_len;
+
+        if (limit >= 0 && len > limit)
+          len = limit;
+        n = stream_read(f, msg->msg_iov[i].iov_base, len);
         if (n < 0)
           return -1;
         total = n;
         break;
       }
   msg->msg_flags = 0;
-  /* and the descriptors that came with it */
+  /* the descriptors whose message this read began (at EOF: all of them) */
   ss = get_stream(f, TRUE);
-  if (ss && ss->nrights && msg->msg_control &&
-      msg->msg_controllen >= CMSG_LEN(ss->nrights * sizeof(int)))
+  deliver = 0;
+  if (ss)
+    while (deliver < ss->nrights &&
+           (ss->right_at[deliver] < ss->readn || (n == 0 && ss->right_at[deliver] <= ss->readn)))
+      deliver++;
+  fit = 0;
+  if (msg->msg_control && msg->msg_controllen >= CMSG_LEN(sizeof(int)))
+    fit = (msg->msg_controllen - CMSG_LEN(0)) / sizeof(int);
+  if (deliver)
     {
       struct cmsghdr *cm = CMSG_FIRSTHDR(msg);
-      int *fds = (int *)CMSG_DATA(cm), k = 0;
+      int *fds = fit ? (int *)CMSG_DATA(cm) : NULL;
 
-      while (k < ss->nrights)
+      while (k < deliver && k < fit)
         {
           int fd;
 
@@ -608,22 +643,30 @@ int unp_recvmsg(int s, struct msghdr *msg, int flags)
             u.u_lastfile = fd;
           fds[k++] = fd;
         }
-      /* what did not fit in the descriptor table is dropped */
-      for (i = k; i < ss->nrights; i++)
+      /* what did not fit is closed, as BSD does (MSG_CTRUNC) */
+      for (i = k; i < deliver; i++)
         if (ss->rights[i]->f_close)
           (*ss->rights[i]->f_close)(ss->rights[i]);
-      ss->nrights = 0;
+      if (k < deliver)
+        msg->msg_flags |= MSG_CTRUNC;
+      for (i = deliver; i < ss->nrights; i++)
+        {
+          ss->rights[i - deliver] = ss->rights[i];
+          ss->right_at[i - deliver] = ss->right_at[i];
+        }
+      ss->nrights -= deliver;
+    }
+  if (k)
+    {
+      struct cmsghdr *cm = CMSG_FIRSTHDR(msg);
+
       cm->cmsg_level = SOL_SOCKET;
       cm->cmsg_type = SCM_RIGHTS;
       cm->cmsg_len = CMSG_LEN(k * sizeof(int));
       msg->msg_controllen = cm->cmsg_len;
     }
   else
-    {
-      if (ss && ss->nrights && msg->msg_control)
-        msg->msg_flags |= MSG_CTRUNC;
-      msg->msg_controllen = 0;
-    }
+    msg->msg_controllen = 0;
   release_stream(ss);
   return total;
 }
@@ -752,6 +795,7 @@ stream_read (struct file *f, char *buf, int len)
 	  int do_read = len < avail ? len : avail;
 
 	  really_read += do_read;
+	  ss->readn += do_read;
 	  bcopy (ss->reader, buf, do_read);
 	  ss->reader += do_read;
 	  len -= do_read;
@@ -766,14 +810,15 @@ stream_read (struct file *f, char *buf, int len)
 	  int do_read = len < avail ? len : avail;
 
 	  really_read += do_read;
+	  ss->readn += do_read;
 	  bcopy (ss->reader, buf, do_read);
 	  ss->reader += do_read;
 	  len -= do_read;
 	  buf += do_read;
 	}
       Forbid();
-      if (ss->task)
-        Signal(ss->task, 1 << getuser(ss->task)->u_pipe_sig);
+      if (ss->wtask)
+        Signal(ss->wtask, 1 << getuser(ss->wtask)->u_pipe_sig);
       Permit();
 
       ix_wakeup((u_int)ss);
@@ -861,6 +906,7 @@ stream_write (struct file *f, const char *buf, int len)
 	  do_write = len < avail ? len : avail;
 
 	  really_written += do_write;
+	  ss->written += do_write;
 	  bcopy (buf, ss->writer, do_write);
 	  len -= do_write;
 	  buf += do_write;
@@ -875,6 +921,7 @@ stream_write (struct file *f, const char *buf, int len)
 	  int do_write = len < avail ? len : avail;
 
 	  really_written += do_write;
+	  ss->written += do_write;
 	  bcopy (buf, ss->writer, do_write);
 	  ss->writer += do_write;
 	  len -= do_write;
@@ -1003,8 +1050,10 @@ int unp_select(struct file *f, int select_cmd, int io_mode, fd_set *ignored, u_l
     }
   if (select_cmd == SELCMD_CHECK || select_cmd == SELCMD_POLL)
     {
-      if (select_cmd == SELCMD_CHECK && ss->task == FindTask(0))
+      if (select_cmd == SELCMD_CHECK && io_mode == SELMODE_IN && ss->task == FindTask(0))
         ss->task = NULL;
+      if (select_cmd == SELCMD_CHECK && io_mode == SELMODE_OUT && ss->wtask == FindTask(0))
+        ss->wtask = NULL;
       /* we support both, read and write checks (hey, something new ;-)) */
       if (io_mode == SELMODE_IN)
 	return can_read(ss) || (ss->flags & UNF_NO_WRITER);
@@ -1012,13 +1061,18 @@ int unp_select(struct file *f, int select_cmd, int io_mode, fd_set *ignored, u_l
 	return can_write(ss) || (ss->flags & UNF_NO_READER);
       return 0;
     }
-  ss->task = FindTask(0);
   if (io_mode == SELMODE_IN)
-    if (can_read(ss) || (ss->flags & UNF_NO_WRITER))
-      Signal(ss->task, 1 << u.u_pipe_sig);
+    {
+      ss->task = FindTask(0);
+      if (can_read(ss) || (ss->flags & UNF_NO_WRITER))
+        Signal(ss->task, 1 << u.u_pipe_sig);
+    }
   if (io_mode == SELMODE_OUT)
-    if (can_write(ss) || (ss->flags & UNF_NO_READER))
-      Signal(ss->task, 1 << u.u_pipe_sig);
+    {
+      ss->wtask = FindTask(0);
+      if (can_write(ss) || (ss->flags & UNF_NO_READER))
+        Signal(ss->wtask, 1 << u.u_pipe_sig);
+    }
   return 1 << u.u_pipe_sig;
 }
 

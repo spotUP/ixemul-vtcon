@@ -29,9 +29,19 @@ struct sock_stream {
   char  buffer[UNIX_SOCKET_SIZE];
   char  *reader, *writer;
   short flags;
-  struct Task *task;
+  struct Task *task;             /* waiting to read (in select) */
+  struct Task *wtask;            /* waiting to write: a reader and a writer in
+                                    two processes wait on one stream, and one
+                                    slot for both let each take the other's
+                                    wake-up -- tmux's client slept for ever
+                                    (UP-Term) */
   struct file *rights[UNIX_SOCKET_RIGHTS];
   short nrights;
+  /* bytes that went through, and where in them each passed descriptor's
+     message starts: a recvmsg reads up to the next one and delivers the
+     descriptors whose message it began (as BSD keeps records; UP-Term) */
+  u_long written, readn;
+  u_long right_at[UNIX_SOCKET_RIGHTS];
 };
 
 struct ix_unix_name {
