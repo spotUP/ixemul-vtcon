@@ -194,9 +194,22 @@ __ix_cli_parse(struct Process *this_proc, long alen, char *_aptr,
 	  if ((fh = Input ()))
 	    {
 	      init_file(fin, fh, "<Standard Input>");
-	      fin->f_flags |= FREAD;
-	      fin->f_ttyflags = IXTTY_ICRNL;
-	      fin->f_write = 0;
+	      /* a console is a terminal: on Unix its fd 0, 1 and 2 are one
+	         read/write open. tmux draws on a dup of stdin, and select()
+	         dropped a descriptor without f_write from its write set, so
+	         it waited for ever (UP-Term). A file or a pipe keeps its
+	         one direction. */
+	      if (IsInteractive (fh))
+	        {
+	          fin->f_flags |= FREAD|FWRITE;
+	          fin->f_ttyflags = IXTTY_ICRNL | IXTTY_OPOST | IXTTY_ONLCR;
+	        }
+	      else
+	        {
+	          fin->f_flags |= FREAD;
+	          fin->f_ttyflags = IXTTY_ICRNL;
+	          fin->f_write = 0;
+	        }
 	    }
 	  else
 	    {
@@ -207,9 +220,17 @@ __ix_cli_parse(struct Process *this_proc, long alen, char *_aptr,
 	  if ((fh = Output ()))
 	    {
 	      init_file(fout, fh, "<Standard Output>");
-	      fout->f_flags |= FWRITE;
-	      fout->f_ttyflags = IXTTY_OPOST | IXTTY_ONLCR;
-	      fout->f_read  = 0;
+	      if (IsInteractive (fh))
+	        {
+	          fout->f_flags |= FREAD|FWRITE;
+	          fout->f_ttyflags = IXTTY_ICRNL | IXTTY_OPOST | IXTTY_ONLCR;
+	        }
+	      else
+	        {
+	          fout->f_flags |= FWRITE;
+	          fout->f_ttyflags = IXTTY_OPOST | IXTTY_ONLCR;
+	          fout->f_read  = 0;
+	        }
 	    }
 	  else
 	    {

@@ -283,7 +283,14 @@ ix_select(int nfd, fd_set *ifd, fd_set *ofd, fd_set *efd, struct timeval *timeou
   p->p_wmesg = 0;
   p->p_stat = ostat;
   if (recv_wait_sigs == (u_long)-1)
-    return -1;
+    {
+      /* ixnet's waitselect failed: bsdsocket's WaitSelect was interrupted
+         (it has no descriptors of ours to fail on). POSIX says EINTR; errno
+         was left as it was, and libevent reported "select: undefined error:
+         0" (vtcon: the tmux client) */
+      *(p->u_errno) = EINTR;
+      return -1;
+    }
   /* need special processing for ^C here, as that is completely disabled
      when we're SSLEEPing */
   if (recv_wait_sigs & SIGBREAKF_CTRL_C)
