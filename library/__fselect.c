@@ -274,6 +274,16 @@ __fselect (struct file *f, int select_cmd, int io_mode,
    */
   if (select_cmd == SELCMD_PREPARE)
     {
+      /* a write never blocks here, so CHECK says yes -- but select() Wait()s
+         between PREPARE and CHECK, and with nothing to wake it a select
+         for writing only slept until its timeout, or for ever (vtcon:
+         tmux's output through libevent never went out). Wake it now: the
+         select port's signal with no packet on it is harmless. */
+      if (io_mode == SELMODE_OUT)
+        {
+          SetSignal (1L << __selport->mp_SigBit, 1L << __selport->mp_SigBit);
+          return 1 << __selport->mp_SigBit;
+        }
       if (io_mode != SELMODE_IN)
         return 0;
 

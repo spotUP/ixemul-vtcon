@@ -1081,9 +1081,15 @@ select_callback_error:
 	p->p_wmesg = 0;
 	p->p_stat = ostat;
 
-	/* If NET_waitselect/Wait returned error sentinel, propagate error. */
+	/* ixnet's waitselect failed: bsdsocket's WaitSelect was interrupted
+	 * (it has no descriptors of ours to fail on). POSIX says EINTR; errno
+	 * was left as it was, and libevent reported "select: undefined error:
+	 * 0" (UP-Term: the tmux client). */
 	if (recv_wait_sigs == (u_long)-1)
+	{
+		*(p->u_errno) = EINTR;
 		return -1;
+	}
 
 	/* Restore historical behavior: translate CTRL-C (SIGBREAKF_CTRL_C)
 	 * into a SIGINT delivered to the process, as original implementation did.
