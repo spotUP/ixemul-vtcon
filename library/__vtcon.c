@@ -23,6 +23,18 @@ int __vtcon_packet(struct file *f, long action, void *arg, long arg3)
   return LastResult (f) != 0;
 }
 
+/* FIONREAD on a vtcon console or PTY:: the bytes a read would get now, or
+   -1 when the handler does not know the packet (an older vtcon) */
+long __vtcon_nread(struct file *f)
+{
+  usetup;
+
+  LastResult (f) = 0; LastError (f) = 0;
+  SendPacket3 (f, __srwport, ACTION_VTCON_NREAD, f->f_fh->fh_Arg1, 0, 0);
+  __wait_sync_packet (&f->f_sp);
+  return LastError (f) ? -1 : LastResult (f);
+}
+
 int __vtcon(struct file *f)
 {
   usetup;
