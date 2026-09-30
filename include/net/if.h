@@ -222,3 +222,8 @@ struct	ifnet *ifnet;
 struct	ifaddr *ifa_ifwithaddr(), *ifa_ifwithnet();
 struct	ifaddr *ifa_ifwithdstaddr();
 #endif _KERNEL
+
+#ifndef KERNEL
+/* libixcompat.a (UP-Term) */
+unsigned int if_nametoindex(const char *);
+#endif

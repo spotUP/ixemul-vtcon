@@ -233,6 +233,8 @@ int
 socketpair (int domain, int type, int protocol, int sv[2])
 {
   usetup;
+  if (domain == PF_UNIX)
+    return unp_socketpair(domain, type, protocol, sv);
   errno = EPFNOSUPPORT;
   KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
   return -1;

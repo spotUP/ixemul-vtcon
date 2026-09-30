@@ -385,6 +385,48 @@ error:
   return fd;
 }
 
+/*
+ * socketpair(AF_UNIX, SOCK_STREAM): two connected sockets at once, as
+ * accept() makes them -- one unix_socket with its two streams, the first
+ * descriptor the connecting end, the second the accepted one (us->server).
+ * No name and no listener: connect() sleeps until an accept, so the pair
+ * cannot be made that way in one process. (vtcon: libevent's signal pipe,
+ * tmux's client and server)
+ */
+int unp_socketpair(int domain, int type, int protocol, int sv[2])
+{
+  usetup;
+  struct unix_socket *us;
+  int fd0, fd1;
+
+  fd0 = unp_socket(domain, type, protocol, NULL);
+  if (fd0 == -1)
+    return -1;
+  us = u.u_ofile[fd0]->f_sock;
+  ix_lock_base();
+  us->to_server = init_stream();
+  if (us->to_server)
+    us->from_server = init_stream();
+  ix_unlock_base();
+  if (!us->from_server)
+    {
+      syscall (SYS_close, fd0);
+      errno_return(ENOMEM, -1);
+    }
+  strcpy(us->path, "(socketpair)");  /* marks both ends connected */
+  fd1 = unp_socket(domain, type, protocol, us);
+  if (fd1 == -1)
+    {
+      syscall (SYS_close, fd0);
+      return -1;
+    }
+  us->server = u.u_ofile[fd1];
+  us->state = UNS_ACCEPTED;
+  sv[0] = fd0;
+  sv[1] = fd1;
+  return 0;
+}
+
 int unp_connect(int s, const struct sockaddr *name, int namelen)
 {
   usetup;

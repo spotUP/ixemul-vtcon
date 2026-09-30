@@ -90,6 +90,9 @@ char *ctime __P((const time_t *));
 double difftime __P((time_t, time_t));
 struct tm *gmtime __P((const time_t *));
 struct tm *localtime __P((const time_t *));
+/* libixcompat.a (UP-Term) */
+struct tm *gmtime_r __P((const time_t *, struct tm *));
+struct tm *localtime_r __P((const time_t *, struct tm *));
 time_t mktime __P((struct tm *));
 size_t strftime __P((char *, size_t, const char *, const struct tm *));
 time_t time __P((time_t *));

@@ -128,6 +128,18 @@ struct	linger {
  * Structure used by kernel to store most
  * addresses.
  */
+/* POSIX names for the types ixemul's calls use: lengths are int here
+ * (accept(int, struct sockaddr *, int *)), families a byte (UP-Term:
+ * libevent and tmux declare with them) */
+#ifndef _SOCKLEN_T_DECLARED
+#define _SOCKLEN_T_DECLARED
+typedef int socklen_t;
+#endif
+#ifndef _SA_FAMILY_T_DECLARED
+#define _SA_FAMILY_T_DECLARED
+typedef u_char sa_family_t;
+#endif
+
 struct sockaddr {
 	u_char	sa_len;			/* total length */
 	u_char	sa_family;		/* address family */

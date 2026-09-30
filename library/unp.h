@@ -10,6 +10,7 @@ int unp_socket (int domain, int type, int protocol, struct unix_socket *sock);
 int unp_bind   (int s, const struct sockaddr *name, int namelen);
 int unp_listen (int s, int backlog);
 int unp_accept (int s, struct sockaddr *name, int *namelen);
+int unp_socketpair (int domain, int type, int protocol, int sv[2]);
 int unp_connect(int s, const struct sockaddr *name, int namelen);
 struct msghdr;
 int unp_sendmsg(int s, const struct msghdr *msg, int flags);
