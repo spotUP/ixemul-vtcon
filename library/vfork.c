@@ -134,6 +134,7 @@
 #include "version.h"
 
 void vfork_own_malloc ();
+void mcache_empty (void);
 void volatile vfork_longjmp (jmp_buf, int);
 void ruadd(struct rusage *ru, struct rusage *ru2);
 void send_death_msg(struct user *mu);
@@ -524,8 +525,10 @@ vfork_own_malloc (void)
     {
       char **parent_environ = *p->u_environ;
       
-      /* switch to our memory list (which is initialized by OpenLibrary) */
+      /* switch to our memory list (which is initialized by OpenLibrary);
+         the blocks cached so far are the parent's list's */
       p->u_mdp = (void *)&p->u_md;
+      mcache_empty ();
       /* dupvec now uses malloc() on our list */
       p->u_environ = (char ***) malloc (4);
       *p->u_environ = dupvec (parent_environ);
