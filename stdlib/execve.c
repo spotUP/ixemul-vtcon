@@ -819,9 +819,19 @@ dup2_BPTR (int fd)
   id = syscall(SYS_fcntl, fd, F_EXTERNALIZE, 0);
   if (id >= 0)
     {
+      struct Process *me = (struct Process *) FindTask (0);
+      APTR win = me->pr_WindowPtr;
+      BPTR bp;
+
       sprintf (name, "IXPIPE:%x", (unsigned int)id);
-      /* 0x4242 is a magic packet understood by IXPIPE: to F_INTERNALIZE id */
-      return Open (name, 0x4242);
+      /* 0x4242 is a magic packet understood by IXPIPE: to F_INTERNALIZE id.
+         Not mounted: fail quietly (the caller then keeps its own stream)
+         instead of stopping on an "insert volume IXPIPE:" requester
+         (vtcon: GNU screen's printcmd starting vsh). */
+      me->pr_WindowPtr = (APTR) -1;
+      bp = Open (name, 0x4242);
+      me->pr_WindowPtr = win;
+      return bp;
     }
 
   return 0;
