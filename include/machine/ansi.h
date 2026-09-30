@@ -58,7 +58,15 @@
  */
 #define	_BSD_CLOCK_T_	unsigned long		/* clock() */
 #define	_BSD_PTRDIFF_T_	int			/* ptr1 - ptr2 */
+#if defined(__GNUC__) && __GNUC__ >= 3 && defined(__SIZE_TYPE__)
+/* the compiler's own (unsigned int with gcc 6 for m68k-amigaos): the same
+   32 bits as unsigned long, but %zu and gcc's <stddef.h> agree with it
+   (UP-Term; every %zu was a -Wformat warning). gcc 2.95, which builds the
+   library, keeps unsigned long. */
+#define	_BSD_SIZE_T_	__SIZE_TYPE__		/* sizeof() */
+#else
 #define	_BSD_SIZE_T_	unsigned long		/* sizeof() */
+#endif
 #define	_BSD_SSIZE_T_	int			/* byte count or error */
 #define	_BSD_TIME_T_	long			/* time() */
 #if defined(__GNUC__) && (__GNUC__ >= 3)
