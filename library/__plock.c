@@ -111,7 +111,11 @@ __plock (const char *file_name, int (*last_func)(), void *last_arg)
    * /sys -> sys: conversion in place */
   info->name = info->buf;
   strcpy(info->name + 1, file_name);
-  info->is_root = u.u_is_root;
+  /* with the current directory at "/", a relative name is a name under
+   * the root; a name with a device part (SYS:C) is absolute already --
+   * prefixed it became "/SYS:C" and every Amiga path failed after
+   * chdir("/") (UP-Term, 2026-10-02) */
+  info->is_root = u.u_is_root && !index(file_name, ':');
   if (info->is_root)
     info->name[0] = '/';
   else
