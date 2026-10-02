@@ -64,13 +64,13 @@ __fioctl(struct file *f, unsigned int cmd, unsigned int inout,
 	     * a pipe, could be a normal file. Lets try to seek to
 	     * the eof, if we can, we know, how many characters there
 	     * are to be read. */
-	    this_pos = Seek(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
+	    this_pos = FH_SEEK(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
 
 	    if (this_pos >= 0)
 	      {
 		/* fine, the device seems at least to understand the
 		 * Seek-Packet */
-	        eof_pos = Seek(CTOBPTR(f->f_fh), 0, OFFSET_END);
+	        eof_pos = FH_SEEK(CTOBPTR(f->f_fh), 0, OFFSET_END);
 
 		/* since this was a real seek, the device could have
 		 * signaled an error, if it just can't seek .. */

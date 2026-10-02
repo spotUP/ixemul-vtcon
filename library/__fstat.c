@@ -113,7 +113,7 @@ __fstat(struct file *f)
          don't know yet about ST_PIPEFILE. So console windows claim they're
          plain files... Until this problem is fixed in a majority of
          handlers, do an explicit SEEK here to find those fakers.. */
-      if (is_interactive || Seek(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT) == -1)
+      if (is_interactive || FH_SEEK(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT) == -1)
         st->st_mode = (st->st_mode & ~S_IFREG) | S_IFCHR;
 
       /* some kind of a default-size for directories... */
@@ -136,11 +136,11 @@ __fstat(struct file *f)
     {
       /* ATTENTION: see lseek.c for Bugs in Seek() and ACTION_SEEK ! */
       /* seek to EOF */
-      pos = (is_interactive ? -1 : Seek(CTOBPTR(f->f_fh), 0, OFFSET_END));
+      pos = (is_interactive ? -1 : FH_SEEK(CTOBPTR(f->f_fh), 0, OFFSET_END));
       if (pos >= 0)
         len = Seek(CTOBPTR(f->f_fh), pos, OFFSET_BEGINNING);
       else
-        len = 0;
+        len = -1;
 
       bzero (st, sizeof(struct stat));
 
@@ -152,8 +152,12 @@ __fstat(struct file *f)
 
       if (!(f->f_stb_dirty & FSDF_MODE))
         {
-          st->st_mode = (len >= 0 && !is_interactive) ?
-                        S_IFREG | (0666 & ~u.u_cmask) : S_IFCHR | 0777;
+          /* a stream that neither seeks nor is a terminal is a pipe
+             (PIPE:, IXPIPE:): Unix calls that a FIFO, and programs read
+             it to the end instead of trusting st_size */
+          st->st_mode = is_interactive ? S_IFCHR | 0777 :
+                        len >= 0 ? S_IFREG | (0666 & ~u.u_cmask) :
+                        S_IFIFO | 0600;
         }
 
       st->st_handler = (long)f->f_fh->fh_Type;

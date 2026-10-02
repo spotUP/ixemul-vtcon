@@ -69,6 +69,15 @@
 
 #define HANDLER_NIL(fp) (!(fp)->f_fh->fh_Type)
 
+/* Seek() for a stream that may not seek. A handler without ACTION_SEEK can
+   answer it with 0 and ERROR_ACTION_NOT_KNOWN instead of -1 (the 3.1 PIPE:,
+   queue-handler, does), and the stream then reads as a seekable empty file:
+   fstat() called a pipe a regular file of size 0, so wc -c counted nothing.
+   -1 for that, as for any other failed Seek(); IoErr() still says why. */
+#define FH_SEEK(fh, off, mode) \
+  ({ LONG __r; SetIoErr(0); __r = Seek((fh), (off), (mode)); \
+     if (__r != -1 && IoErr() == ERROR_ACTION_NOT_KNOWN) __r = -1; __r; })
+
 #define CTOBPTR(ptr) (((long)(ptr)) >> 2)
 #define BTOCPTR(ptr) ((void *)((ptr) << 2))
 

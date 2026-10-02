@@ -55,6 +55,15 @@
 #include <limits.h>
 #include <string.h>
 
+/* errno for a failed Seek(): a stream that cannot seek (FH_SEEK in
+   packets.h) is ESPIPE on Unix, not the ENODEV ERROR_ACTION_NOT_KNOWN maps to */
+static inline int
+__seek_errno (void)
+{
+  long e = IoErr ();
+  return e == ERROR_ACTION_NOT_KNOWN ? ESPIPE : __ioerr_to_errno (e);
+}
+
 static inline int
 __extend_file (struct file *f, int add_to_eof, int *err)
 {
@@ -150,9 +159,9 @@ lseek (int fd, off_t off, int dir)
           /* NEW: fast path for SEEK_CUR + off == 0 */
           if (dir == SEEK_CUR && off == 0)
             {
-              res = Seek(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
+              res = FH_SEEK(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
               if (res == -1)
-                err = __ioerr_to_errno(IoErr());
+                err = __seek_errno();
               else
                 err = 0;
               goto done_file;
@@ -165,16 +174,16 @@ lseek (int fd, off_t off, int dir)
               break;
 
             case SEEK_CUR:
-              previous_pos = Seek(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
+              previous_pos = FH_SEEK(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
               if (previous_pos == -1)
-                err = __ioerr_to_errno(IoErr());
+                err = __seek_errno();
               break;
 
             case SEEK_END:
               Seek(CTOBPTR(f->f_fh), 0, OFFSET_END);
-              previous_pos = Seek(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
+              previous_pos = FH_SEEK(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
               if (previous_pos == -1)
-                err = __ioerr_to_errno(IoErr());
+                err = __seek_errno();
               break;
             }
 
@@ -198,12 +207,12 @@ lseek (int fd, off_t off, int dir)
             {
               shouldbe_pos = (int)(previous_pos + off);
 
-              res = Seek(CTOBPTR(f->f_fh), off, dir - 1);
+              res = FH_SEEK(CTOBPTR(f->f_fh), off, dir - 1);
               if (res == -1 && IoErr() == ERROR_SEEK_ERROR)
                 res = Seek(CTOBPTR(f->f_fh), 0, OFFSET_END);
 
               if (res == -1)
-                err = __ioerr_to_errno(IoErr());
+                err = __seek_errno();
               else
                 {
                   err = 0;
@@ -212,7 +221,7 @@ lseek (int fd, off_t off, int dir)
                     {
                       res = Seek(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
                       if (res == -1)
-                        err = __ioerr_to_errno(IoErr());
+                        err = __seek_errno();
 
                       if (res >= 0 && res < shouldbe_pos &&
                           (f->f_flags & FWRITE))
