@@ -83,17 +83,17 @@ extern int	_toupper __P ((int));
 #endif
 __END_DECLS
 
-#define	isdigit(c)	((_ctype_ + 1)[(unsigned char)c] & _N)
-#define	islower(c)	((_ctype_ + 1)[(unsigned char)c] & _L)
-#define	isspace(c)	((_ctype_ + 1)[(unsigned char)c] & _S)
-#define	ispunct(c)	((_ctype_ + 1)[(unsigned char)c] & _P)
-#define	isupper(c)	((_ctype_ + 1)[(unsigned char)c] & _U)
-#define	isalpha(c)	((_ctype_ + 1)[(unsigned char)c] & (_U|_L))
-#define	isxdigit(c)	((_ctype_ + 1)[(unsigned char)c] & (_N|_X))
-#define	isalnum(c)	((_ctype_ + 1)[(unsigned char)c] & (_U|_L|_N))
-#define	isprint(c)	((_ctype_ + 1)[(unsigned char)c] & (_P|_U|_L|_N|_B))
-#define	isgraph(c)	((_ctype_ + 1)[(unsigned char)c] & (_P|_U|_L|_N))
-#define	iscntrl(c)	((_ctype_ + 1)[(unsigned char)c] & _C)
+#define	isdigit(c)	((_ctype_ + 1)[(unsigned char)(c)] & _N)
+#define	islower(c)	((_ctype_ + 1)[(unsigned char)(c)] & _L)
+#define	isspace(c)	((_ctype_ + 1)[(unsigned char)(c)] & _S)
+#define	ispunct(c)	((_ctype_ + 1)[(unsigned char)(c)] & _P)
+#define	isupper(c)	((_ctype_ + 1)[(unsigned char)(c)] & _U)
+#define	isalpha(c)	((_ctype_ + 1)[(unsigned char)(c)] & (_U|_L))
+#define	isxdigit(c)	((_ctype_ + 1)[(unsigned char)(c)] & (_N|_X))
+#define	isalnum(c)	((_ctype_ + 1)[(unsigned char)(c)] & (_U|_L|_N))
+#define	isprint(c)	((_ctype_ + 1)[(unsigned char)(c)] & (_P|_U|_L|_N|_B))
+#define	isgraph(c)	((_ctype_ + 1)[(unsigned char)(c)] & (_P|_U|_L|_N))
+#define	iscntrl(c)	((_ctype_ + 1)[(unsigned char)(c)] & _C)
 #if (defined(__GNUC__) && !defined(__STRICT_ANSI__))
 #define	toupper(c)	( { int _c = (c); islower(_c) ? _c - 'a' + 'A' : _c; } )
 #define	tolower(c)	( { int _c = (c); isupper(_c) ? _c - 'A' + 'a' : _c; } )
@@ -101,7 +101,7 @@ __END_DECLS
 
 #if !defined(_ANSI_SOURCE) && !defined (_POSIX_SOURCE)
 #if notyet
-#define isblank(c)	((_ctype_ + 1)[(unsigned char)c] & _B)
+#define isblank(c)	((_ctype_ + 1)[(unsigned char)(c)] & _B)
 #endif
 #define	isascii(c)	(((c) & ~0177) == 0)
 #define	toascii(c)	((c) & 0177)
