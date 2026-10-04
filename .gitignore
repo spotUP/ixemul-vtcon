@@ -1,4 +1,7 @@
 build*/
 compat/*.o
 compat/libixcompat.a
+compat/test/wide_test
 compat/test/spawnprobe
+compat/newlibwcs/
+compat/test/wcwidth_test

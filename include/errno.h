@@ -157,6 +157,8 @@ extern int *ixemul_errno;
  * (tmux's imsg); FreeBSD's numbers (UP-Term) */
 #define	EOVERFLOW	84		/* Value too large to be stored in data type */
 #define	EBADMSG		89		/* Bad message */
+/* set by libixcompat's UTF-8 conversions (<wchar.h>) */
+#define	EILSEQ		86		/* Illegal byte sequence */
 
 #ifdef _KERNEL
 /* pseudo-errors returned inside kernel to modify return to process */

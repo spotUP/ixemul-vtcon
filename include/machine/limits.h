@@ -39,7 +39,7 @@
 #define _MACHINE_LIMITS_H_
 
 #define	CHAR_BIT	8		/* number of bits in a char */
-#define	MB_LEN_MAX	1		/* no multibyte characters */
+#define	MB_LEN_MAX	4		/* UTF-8 (libixcompat's LC_CTYPE, UP-Term) */
 
 #define	SCHAR_MIN	(-0x7f-1)	/* min value for a signed char */
 #define	SCHAR_MAX	0x7f		/* max value for a signed char */
