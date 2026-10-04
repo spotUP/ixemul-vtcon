@@ -10,7 +10,7 @@ XAR  ?= $(HOME)/opt/amiga/bin/m68k-amigaos-ar
 SDK  ?= $(HOME)/opt/amiga/m68k-amigaos/ixemul
 CPPFLAGS ?=
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o c99.o selfpath.o langinfo.o \
-       spawn.o
+       eprintf.o spawn.o
 
 libixcompat.a: $(OBJS)
 	rm -f $@
