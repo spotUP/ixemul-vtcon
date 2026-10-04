@@ -80,11 +80,19 @@ typedef struct {
 
 #define	RAND_MAX	0x7fffffff
 
-#define	MB_CUR_MAX	1	/* XXX */
+/* The longest character in the current LC_CTYPE: 4 in a UTF-8 locale, 1
+ * in the C locale (libixcompat's setlocale, UP-Term). The library itself
+ * (which includes ixemul.h first) has only the C locale. */
+#ifdef _IXEMUL_H_
+#define	MB_CUR_MAX	1
+#else
+#define	MB_CUR_MAX	((size_t)__ixc_mb_cur_max())
+#endif
 
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
+int	 __ixc_mb_cur_max __P((void));
 void	 abort __P((void));
 int	 abs __P((int));
 int	 atexit __P((void (*)(void)));
