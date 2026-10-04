@@ -1,3 +1,4 @@
 build*/
 compat/*.o
 compat/libixcompat.a
+compat/test/spawnprobe
