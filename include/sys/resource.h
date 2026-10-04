@@ -36,6 +36,8 @@
 #ifndef _RESOURCE_H_
 #define	_RESOURCE_H_
 
+#include <sys/time.h>	/* struct timeval in struct rusage: POSIX needs no prior include (UP-Term) */
+
 /*
  * Process priority specifications to get/setpriority.
  */
