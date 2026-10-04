@@ -46,6 +46,8 @@
  * The maximum length of a name in a directory is MAXNAMLEN.
  */
 
+#include <machine/types.h>	/* u_int32_t ...: POSIX <dirent.h> needs no prior include (UP-Term) */
+
 struct dirent {
 	u_int32_t d_fileno;		/* file number of entry */
 	u_int16_t d_reclen;		/* length of this record */
