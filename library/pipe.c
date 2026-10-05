@@ -218,6 +218,10 @@ __pclose(struct file *f)
         Signal(ss->task,
                1UL << getuser(ss->task)->u_pipe_sig);
       ss->task = NULL;
+      if (ss->wtask != NULL)          /* a writer in select (UP-Term) */
+        Signal(ss->wtask,
+               1UL << getuser(ss->wtask)->u_pipe_sig);
+      ss->wtask = NULL;
       ix_wakeup((u_int)ss);
 
       if ((ss->flags & (UNF_NO_READER | UNF_NO_WRITER)) ==

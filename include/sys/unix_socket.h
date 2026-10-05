@@ -34,6 +34,7 @@
 #ifndef _UNIX_SOCKET_H_
 #define _UNIX_SOCKET_H_
 
+#include <sys/types.h>
 #include <sys/time.h>
 
 struct unix_socket;
@@ -42,11 +43,29 @@ struct Task;
 
 #define UNIX_SOCKET_SIZE 5120
 
+/* descriptors in flight (sendmsg SCM_RIGHTS), taken by the next recvmsg */
+#define UNIX_SOCKET_RIGHTS 8
+
 struct sock_stream {
   char  buffer[UNIX_SOCKET_SIZE];
   char  *reader, *writer;
   short flags;
-  struct Task *task;
+  struct Task *task;             /* waiting to read (in select) */
+  struct Task *wtask;            /* waiting to write: a reader and a writer in
+                                    two processes wait on one stream, and one
+                                    slot for both let each take the other's
+                                    wake-up -- tmux's client slept for ever
+                                    (UP-Term) */
+
+  /* descriptors passed with sendmsg (SCM_RIGHTS), each holding a reference
+     to its struct file until a recvmsg takes it or the stream is freed;
+     the bytes that went through, and where in them each descriptor's
+     message starts: a recvmsg reads up to the next one and delivers the
+     descriptors whose message it began (as BSD keeps records; UP-Term) */
+  struct file *rights[UNIX_SOCKET_RIGHTS];
+  short nrights;
+  u_long written, readn;
+  u_long right_at[UNIX_SOCKET_RIGHTS];
 
   /* One owner reference plus one reference per active operation. */
   int refs;

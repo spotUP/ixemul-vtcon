@@ -317,6 +317,12 @@ struct cmsghdr {
 
 #define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
 
+/* the sizes later BSDs name (GNU screen and tmux pass descriptors with
+   them); cmsghdr is 12 bytes, so no padding on the Amiga (UP-Term) */
+#define	__CMSG_ALIGN(n)		(((n) + sizeof(long) - 1) & ~(sizeof(long) - 1))
+#define	CMSG_SPACE(l)		(__CMSG_ALIGN(sizeof(struct cmsghdr)) + __CMSG_ALIGN(l))
+#define	CMSG_LEN(l)		(__CMSG_ALIGN(sizeof(struct cmsghdr)) + (l))
+
 /* "Socket"-level control message types: */
 #define	SCM_RIGHTS	0x01		/* access rights (array of int) */
 

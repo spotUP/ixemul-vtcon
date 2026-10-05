@@ -18,6 +18,15 @@
  *
  *
  *
+ * UP-Term (ixemul-vtcon) 2026-10-05
+ *
+ *   socketpair(AF_UNIX); sendmsg/recvmsg with SCM_RIGHTS (descriptors ride
+ *   with their message and are dropped with the stream if never received);
+ *   separate select waiters for reading and writing a stream; connect to a
+ *   name nobody listens on is ENOENT (no file) or ECONNREFUSED (a file left
+ *   behind), as POSIX says. Carried over from the 48.2 fork onto 80.1's
+ *   reference-counted streams.
+ *
  * Revision 1.9  2026-08-01  ChatGPT modification  (JJ)
  *
  *   Stage 2 shared sock_stream lifetime support.  Each stream now has one
@@ -146,6 +155,7 @@
 #include <stddef.h>
 #include <limits.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include "select.h"
 
 #define can_read(ss)  (ss->reader != ss->writer)
@@ -161,6 +171,24 @@ signal_select_task(task)
 {
   if (task != NULL)
     Signal(task, 1UL << getuser(task)->u_pipe_sig);
+}
+
+/*
+ * Free a stream. A descriptor passed through it (sendmsg SCM_RIGHTS) and
+ * never received holds a reference to its file: it goes with the stream.
+ */
+static void
+stream_free(ss)
+  struct sock_stream *ss;
+{
+  while (ss->nrights > 0)
+    {
+      struct file *r = ss->rights[--ss->nrights];
+
+      if (r->f_close)
+        (*r->f_close)(r);
+    }
+  kfree(ss);
 }
 
 /*
@@ -188,7 +216,7 @@ stream_drop_reference(ss)
   Permit();
 
   if (free_stream)
-    kfree(ss);
+    stream_free(ss);
 }
 
 static void
@@ -580,6 +608,9 @@ init_stream(void)
       s->reader = s->writer = s->buffer;
       s->flags = 0;
       s->task = NULL;
+      s->wtask = NULL;
+      s->nrights = 0;
+      s->written = s->readn = 0;
       s->refs = 1;                 /* owning pipe or unix_socket */
     }
   return s;
@@ -684,7 +715,7 @@ release_stream(struct sock_stream *ss)
   Permit();
 
   if (free_stream)
-    kfree(ss);
+    stream_free(ss);
 }
 
 
@@ -712,6 +743,7 @@ close_stream(struct file *f, int read_stream)
     {
       ss->flags |= flag;
       signal_select_task(ss->task);
+      signal_select_task(ss->wtask);
       ix_wakeup((u_int)ss);
     }
   Permit();
@@ -1056,11 +1088,17 @@ unp_connect(int s, const struct sockaddr *name, int namelen)
   un = find_unix_name(path);
   if (un == NULL || un->closing)
     {
+      struct stat st;
+
       ix_unlock_base();
       stream_owner_release(to_server);
       stream_owner_release(from_server);
-      us->client_options.so_error = EADDRNOTAVAIL;
-      errno_return(EADDRNOTAVAIL, -1);
+      /* as POSIX says: no file there is ENOENT, a file (a socket left
+         behind, its server gone) with nobody listening ECONNREFUSED --
+         tmux starts its server on either, and on nothing else (UP-Term) */
+      err = syscall(SYS_stat, path, &st) == 0 ? ECONNREFUSED : ENOENT;
+      us->client_options.so_error = err;
+      errno_return(err, -1);
     }
 
   if (un->queue_index == un->queue_size)
@@ -1154,6 +1192,249 @@ unp_connect(int s, const struct sockaddr *name, int namelen)
   unix_socket_unref_locked(us);         /* blocking connect() reference */
   ix_unlock_base();
   return 0;
+}
+
+
+/*
+ * socketpair(AF_UNIX, SOCK_STREAM): two connected sockets at once, as
+ * accept() makes them -- one unix_socket with its two streams, the first
+ * descriptor the connecting end, the second the accepted one (us->server).
+ * No name and no listener: connect() sleeps until an accept, so the pair
+ * cannot be made that way in one process. (UP-Term: libevent's signal
+ * pipe, tmux's client and server)
+ */
+int
+unp_socketpair(int domain, int type, int protocol, int sv[2])
+{
+  usetup;
+  struct unix_socket *us;
+  struct sock_stream *to_server;
+  struct sock_stream *from_server;
+  int fd0, fd1;
+
+  if (sv == NULL)
+    errno_return(EFAULT, -1);
+
+  to_server = init_stream();
+  if (to_server == NULL)
+    errno_return(ENOMEM, -1);
+  from_server = init_stream();
+  if (from_server == NULL)
+    {
+      stream_owner_release(to_server);
+      errno_return(ENOMEM, -1);
+    }
+
+  fd0 = unp_socket(domain, type, protocol, NULL);
+  if (fd0 == -1)
+    {
+      stream_owner_release(to_server);
+      stream_owner_release(from_server);
+      return -1;
+    }
+
+  us = u.u_ofile[fd0]->f_sock;
+  ix_lock_base();
+  us->to_server = to_server;           /* the socket owns them now */
+  us->from_server = from_server;
+  us->state = UNS_ACCEPTED;
+  ix_unlock_base();
+
+  fd1 = unp_socket(domain, type, protocol, us);
+  if (fd1 == -1)
+    {
+      syscall(SYS_close, fd0);
+      return -1;
+    }
+
+  ix_lock_base();
+  us->server = u.u_ofile[fd1];
+  ix_unlock_base();
+
+  sv[0] = fd0;
+  sv[1] = fd1;
+  return 0;
+}
+
+
+/*
+ * sendmsg/recvmsg on a local socket: the data of the iovecs through the
+ * stream, and SCM_RIGHTS -- descriptors passed to the other process (GNU
+ * screen hands its backend the attaching terminal this way, tmux too).
+ * An ixemul file is a shared struct file: passing one is a reference
+ * queued on the stream, and a new descriptor for it in the receiver.
+ * Network sockets (DTYPE_SOCKET) cannot be passed. (UP-Term)
+ */
+int
+unp_sendmsg(int s, const struct msghdr *msg, int flags)
+{
+  usetup;
+  struct file *f, *fr[UNIX_SOCKET_RIGHTS];
+  int nr = 0, i, total = 0, n;
+  struct cmsghdr *cm;
+
+  if (s < 0 || s >= NOFILE || (f = u.u_ofile[s]) == NULL ||
+      f->f_sock == NULL)
+    errno_return(EBADF, -1);
+  if (msg == NULL || (msg->msg_iovlen > 0 && msg->msg_iov == NULL))
+    errno_return(EFAULT, -1);
+  if (f->f_sock->state != UNS_ACCEPTED)
+    errno_return(ENOTCONN, -1);
+
+  /* the descriptors first: they must be there when the data is */
+  if (msg->msg_control && msg->msg_controllen >= sizeof(struct cmsghdr))
+    for (cm = CMSG_FIRSTHDR(msg); cm; cm = CMSG_NXTHDR((struct msghdr *)msg, cm))
+      {
+        int *fds = (int *)CMSG_DATA(cm);
+        int k = (cm->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+
+        if (cm->cmsg_level != SOL_SOCKET || cm->cmsg_type != SCM_RIGHTS)
+          continue;
+        for (i = 0; i < k; i++)
+          {
+            struct file *p = (fds[i] >= 0 && fds[i] < NOFILE) ? u.u_ofile[fds[i]] : NULL;
+
+            if (p == NULL || p->f_type == DTYPE_SOCKET || nr == UNIX_SOCKET_RIGHTS)
+              errno_return(p == NULL ? EBADF : EINVAL, -1);
+            fr[nr++] = p;
+          }
+      }
+
+  if (nr)
+    {
+      struct sock_stream *ss = get_stream(f, FALSE);
+
+      if (ss == NULL || (ss->flags & UNF_NO_READER))
+        {
+          release_stream(ss);
+          errno_return(EPIPE, -1);
+        }
+      if (ss->nrights + nr > UNIX_SOCKET_RIGHTS)
+        {
+          release_stream(ss);
+          errno_return(ETOOMANYREFS, -1);
+        }
+      ix_lock_base();
+      for (i = 0; i < nr; i++)
+        {
+          fr[i]->f_count++;
+          ss->right_at[ss->nrights] = ss->written;  /* its message starts here */
+          ss->rights[ss->nrights++] = fr[i];
+        }
+      ix_unlock_base();
+      release_stream(ss);
+    }
+
+  for (i = 0; i < msg->msg_iovlen; i++)
+    {
+      if (msg->msg_iov[i].iov_len == 0)
+        continue;
+      n = stream_write(f, msg->msg_iov[i].iov_base, msg->msg_iov[i].iov_len);
+      if (n < 0)
+        return total ? total : -1;
+      total += n;
+    }
+  return total;
+}
+
+
+int
+unp_recvmsg(int s, struct msghdr *msg, int flags)
+{
+  usetup;
+  struct file *f;
+  int i, n = 0, total = 0, limit = -1, deliver, fit, k = 0;
+  struct sock_stream *ss;
+
+  if (s < 0 || s >= NOFILE || (f = u.u_ofile[s]) == NULL ||
+      f->f_sock == NULL)
+    errno_return(EBADF, -1);
+  if (msg == NULL || (msg->msg_iovlen > 0 && msg->msg_iov == NULL))
+    errno_return(EFAULT, -1);
+  if (f->f_sock->state != UNS_ACCEPTED)
+    errno_return(ENOTCONN, -1);
+
+  /* the data (one read, as a stream socket gives what is there), but not
+     past the start of the next passed descriptor's message: that message
+     comes with its descriptor in a later recvmsg */
+  ss = get_stream(f, TRUE);
+  if (ss)
+    for (i = 0; i < ss->nrights; i++)
+      if (ss->right_at[i] > ss->readn)
+        {
+          limit = ss->right_at[i] - ss->readn;
+          break;
+        }
+  release_stream(ss);
+  for (i = 0; i < msg->msg_iovlen; i++)
+    if (msg->msg_iov[i].iov_len)
+      {
+        int len = msg->msg_iov[i].iov_len;
+
+        if (limit >= 0 && len > limit)
+          len = limit;
+        n = stream_read(f, msg->msg_iov[i].iov_base, len);
+        if (n < 0)
+          return -1;
+        total = n;
+        break;
+      }
+  msg->msg_flags = 0;
+
+  /* the descriptors whose message this read began (at EOF: all of them) */
+  ss = get_stream(f, TRUE);
+  deliver = 0;
+  if (ss)
+    while (deliver < ss->nrights &&
+           (ss->right_at[deliver] < ss->readn ||
+            (n == 0 && ss->right_at[deliver] <= ss->readn)))
+      deliver++;
+  fit = 0;
+  if (msg->msg_control && msg->msg_controllen >= CMSG_LEN(sizeof(int)))
+    fit = (msg->msg_controllen - CMSG_LEN(0)) / sizeof(int);
+  if (deliver)
+    {
+      struct cmsghdr *cm = CMSG_FIRSTHDR(msg);
+      int *fds = fit ? (int *)CMSG_DATA(cm) : NULL;
+
+      while (k < deliver && k < fit)
+        {
+          int fd;
+
+          if (ufalloc(0, &fd))
+            break;
+          u.u_ofile[fd] = ss->rights[k];  /* its reference comes with it */
+          u.u_pofile[fd] = 0;
+          if (fd > u.u_lastfile)
+            u.u_lastfile = fd;
+          fds[k++] = fd;
+        }
+      /* what did not fit is closed, as BSD does (MSG_CTRUNC) */
+      for (i = k; i < deliver; i++)
+        if (ss->rights[i]->f_close)
+          (*ss->rights[i]->f_close)(ss->rights[i]);
+      if (k < deliver)
+        msg->msg_flags |= MSG_CTRUNC;
+      for (i = deliver; i < ss->nrights; i++)
+        {
+          ss->rights[i - deliver] = ss->rights[i];
+          ss->right_at[i - deliver] = ss->right_at[i];
+        }
+      ss->nrights -= deliver;
+    }
+  if (k)
+    {
+      struct cmsghdr *cm = CMSG_FIRSTHDR(msg);
+
+      cm->cmsg_level = SOL_SOCKET;
+      cm->cmsg_type = SCM_RIGHTS;
+      cm->cmsg_len = CMSG_LEN(k * sizeof(int));
+      msg->msg_controllen = cm->cmsg_len;
+    }
+  else
+    msg->msg_controllen = 0;
+  release_stream(ss);
+  return total;
 }
 
 
@@ -1492,6 +1773,7 @@ stream_read(struct file *f, char *buf, int len)
 
         do_read = len < avail ? len : avail;
         really_read += do_read;
+        ss->readn += do_read;
         bcopy(ss->reader, buf, do_read);
         ss->reader += do_read;
         len -= do_read;
@@ -1501,8 +1783,9 @@ stream_read(struct file *f, char *buf, int len)
           ss->reader = ss->buffer;
       }
 
+      /* room now: the writer waiting in select */
       Forbid();
-      signal_select_task(ss->task);
+      signal_select_task(ss->wtask);
       Permit();
       ix_wakeup((u_int)ss);
     }
@@ -1608,6 +1891,7 @@ stream_write(struct file *f, const char *buf, int len)
           {
             do_write = len < avail ? len : avail;
             really_written += do_write;
+            ss->written += do_write;
             bcopy(buf, ss->writer, do_write);
             len -= do_write;
             buf += do_write;
@@ -1816,8 +2100,8 @@ unp_select(struct file *f, int select_cmd, int io_mode,
 
   if (select_cmd == SELCMD_CANCEL)
     {
-      if (ss->task == task)
-        ss->task = NULL;
+      if (io_mode == SELMODE_IN ? ss->task == task : ss->wtask == task)
+        *(io_mode == SELMODE_IN ? &ss->task : &ss->wtask) = NULL;
       Permit();
       stream_drop_reference(ss);
       return 0;
@@ -1828,8 +2112,9 @@ unp_select(struct file *f, int select_cmd, int io_mode,
 
   if (select_cmd == SELCMD_CHECK || select_cmd == SELCMD_POLL)
     {
-      if (select_cmd == SELCMD_CHECK && ss->task == task)
-        ss->task = NULL;
+      if (select_cmd == SELCMD_CHECK &&
+          (io_mode == SELMODE_IN ? ss->task == task : ss->wtask == task))
+        *(io_mode == SELMODE_IN ? &ss->task : &ss->wtask) = NULL;
 
       result = io_mode == SELMODE_IN ? ready_in : ready_out;
       Permit();
@@ -1837,7 +2122,12 @@ unp_select(struct file *f, int select_cmd, int io_mode,
       return result;
     }
 
-  ss->task = task;
+  /* reading and writing wait in separate slots: a reader and a writer in
+     two processes on one stream each get their own wake-up (UP-Term) */
+  if (io_mode == SELMODE_IN)
+    ss->task = task;
+  else
+    ss->wtask = task;
   if ((io_mode == SELMODE_IN && ready_in) ||
       (io_mode == SELMODE_OUT && ready_out))
     signal_select_task(task);

@@ -14,7 +14,8 @@ if [ -n "$IMAGE_REBUILD" ] || ! docker image inspect ixemul-gcc295 >/dev/null 2>
   docker build -f docker/Dockerfile -t ixemul-gcc295 . >/dev/null
 fi
 # KEEP=1: build into the existing build295 (make redoes what changed;
-# a configure.in or Makefile.in change needs the full build)
+# only for .c edits: all.c does not depend on headers, and a configure.in,
+# Makefile.in or header change needs the full build)
 [ -n "$KEEP" ] && [ -f build295/config.status ] || { rm -rf build295 && mkdir build295; }
 docker run --rm --platform linux/amd64 \
   -v "$PWD":/ix \

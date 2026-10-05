@@ -260,6 +260,8 @@ int
 socketpair (int domain, int type, int protocol, int sv[2])
 {
   usetup;
+  if (domain == PF_UNIX)               /* UP-Term */
+    return unp_socketpair(domain, type, protocol, sv);
   errno = EPFNOSUPPORT;
   KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
   return -1;
@@ -324,11 +326,8 @@ sendmsg (int s, const struct msghdr *msg, int flags)
   if (!fp)
     return -1;
 
-  if (fp->f_type == DTYPE_USOCKET)
-    {
-      errno = EOPNOTSUPP;
-      return -1;
-    }
+  if (fp->f_type == DTYPE_USOCKET)    /* SCM_RIGHTS (UP-Term) */
+    return unp_sendmsg(s, msg, flags);
 
   ostat = u.p_stat;
   u.p_stat = SWAIT;
@@ -396,11 +395,8 @@ recvmsg (int s, struct msghdr *msg, int flags)
   if (!fp)
     return -1;
 
-  if (fp->f_type == DTYPE_USOCKET)
-    {
-      errno = EOPNOTSUPP;
-      return -1;
-    }
+  if (fp->f_type == DTYPE_USOCKET)    /* SCM_RIGHTS (UP-Term) */
+    return unp_recvmsg(s, msg, flags);
 
   ostat = u.p_stat;
   u.p_stat = SWAIT;
