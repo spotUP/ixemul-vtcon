@@ -84,9 +84,9 @@ same build, and the UP-Term kit installs both libraries.
       connect errors (78d2934)
 
 ### M5 vtcon handlers: per-process WAIT_CHAR (section 5)
-- [ ] M5.1 `pty_handler.c` keeps a waiter list instead of ending the older WAIT_CHAR
-- [ ] M5.2 `vtcon_handler.c` the same
-- [ ] M5.3 Host test for each (vtcon `make test`)
+- [x] M5.1 `pty_handler.c` keeps a waiter list instead of ending the older WAIT_CHAR
+- [x] M5.2 `vtcon_handler.c` the same
+- [x] M5.3 Host test for each (vtcon `make test`)
 
 ### M6 Rig and kit carry ixnet
 - [x] M6.1 `ixpty_rig.use_ixemul` copies ixnet.library beside ixemul.library
@@ -94,17 +94,17 @@ same build, and the UP-Term kit installs both libraries.
       `Install.installer` install it (and keep the old one as .orig, like ixemul)
 
 ### M7 Rig matrix (section 7)
-- [ ] R1 library loads, versions match, GG binaries (ls, wc, less, nano, tcsh)
-- [ ] R2 ixpty 24/24, ptytest, ttyprobe, getty
-- [ ] R3 ixc99 17/17, ixbg/ixsig/ixsock/ixwait, tcsh ^Z bg fg
-- [ ] R4 tmux_rig 7/7, screen_rig all
-- [ ] R5 ixpipe_rig 4/4, no requester
-- [ ] R6 vshpath_rig, slash_rig, dotdot
+- [x] R1 library loads, versions match, GG binaries (ls, wc, less, nano, tcsh)
+- [x] R2 ixpty 24/24, ptytest, ttyprobe, getty
+- [x] R3 ixc99 17/17, ixbg/ixsig/ixsock/ixwait, tcsh ^Z bg fg
+- [x] R4 tmux_rig 7/7, screen_rig all
+- [x] R5 ixpipe_rig 4/4, no requester
+- [x] R6 vshpath_rig, slash_rig, dotdot
 - [ ] R7 SIGWINCH redraw (tmux, vim, less) and the 20-exits-while-dragging freeze recipe
-- [ ] R8 CPython c3-sentinel all OK; vector-audit 0 mismatches
-- [ ] R9 nvim_rig --tui, --v012 --tui
+- [x] R8 CPython c3-sentinel all OK; vector-audit 0 mismatches
+- [x] R9 nvim_rig --tui, --v012 --tui
 - [ ] R10 upterm-ports grep 3.12, ncurses 6.6 cases; spawnprobe
-- [ ] R11 mallocbench 48.2 vs 80.x recorded
+- [x] R11 mallocbench 48.2 vs 80.x recorded
 
 ### M8 SDK and ports
 - [ ] M8.1 SDK headers from 80.x + ours; resolve libgen.h (const vs writable), poll.h
@@ -133,6 +133,27 @@ same build, and the UP-Term kit installs both libraries.
   ixsock names/pairpingpong/pairwake/rights all ok.
 - Found on the way: 80.1 refused a sun_path without NUL (screen's bind):
   fixed (2ae1c37), test vtcon ixsock names (2b7e767).
+
+- R2 (vtcon 842467d handlers): ixpty 26/26, ptytest 34/34, ttyprobe as
+  designed (shot), getty 7/7. R3: ixc99 17/17; tcsh job control: ^Z, bg,
+  fg, SIGTTOU "Suspended (tty output)", SIGTTIN "Suspended (tty input)".
+- M5 (vtcon 842467d): waitset per task; debug trace old 35 WAIT_CHAR / 30
+  "no", new 15 / 10.
+
+- R1: Version 80.1 for both libraries, GG ls, less draws and quits, nano
+  edits, saves and quits. R4 after M5: tmux 6/7, screen 4/4 (the colour
+  cube fails the same on 48.2: the 060 rig's RTG screen). R5 ixpipe 3/3.
+  R6 vshpath 5/5, slash 9/9, dotdot identical to 48.2. R8 sentinel all OK,
+  vector-audit 0 mismatches. R9 nvim 0.4.4 8/8, 0.12.5 9/9. R10 grep and
+  ncurses cases 22/22 (spawnprobe waits for M8: libixcompat builds
+  against the SDK headers). R11 malloc+free 795 ns (80.x) vs 724 ns (48.2),
+  both with the small-block cache.
+- R7 open: after a window resize, less, nvim and tmux do not redraw -- on
+  48.2 just the same (not a regression; vtcon ledger W47). The
+  20-exits-while-dragging freeze recipe not run yet.
+- FS-UAE aborted (host malloc) when nvim, run without -i NONE and with no
+  HOME, wrote its ShaDa into a host folder named "~" on BOOTX: -- a host
+  file system bug of FS-UAE, not ixemul; with -i NONE the same runs pass.
 
 ## Decisions log
 
