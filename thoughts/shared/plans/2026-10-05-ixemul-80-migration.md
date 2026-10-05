@@ -1,0 +1,158 @@
+---
+date: 2026-10-05
+topic: Move ixemul-vtcon from 48.2 to ixemul 80.1, carrying the UP-Term patches
+tags: [ixemul, 80.1, rebase, af_unix, scm_rights, pty, termios, sigwinch, ixnet]
+status: draft
+---
+
+# ixemul 80.1 migration
+
+**Decision (owner, 2026-10-05):** migrate fully to 80.1 now. 48.2 stays as the backup:
+branch `feature/wide-chars` (fa0156c) and its `build295` library are kept untouched, and
+the kit can be rebuilt from them at any time (`IXEMUL_LIB=`).
+
+**Input:** vtcon `thoughts/shared/research/2026-10-05_ixemul-80-evaluation.md` (the patch
+table #1-#29, ABI measurements, risks, rig matrix). Section numbers below refer to it.
+
+**Done means:** a library built from `feature/ixemul-80` (80.1 + every patch the table
+marks keep/rebase/rewrite) passes the rig matrix R1-R11 with ixemul and ixnet from the
+same build, and the UP-Term kit installs both libraries.
+
+## Source
+
+- Archive: `https://aminet.net/dev/lib/ixemul-80.1-m68k.lha`, 5,536,049 bytes,
+  sha256 `9bf3d573650ffd7211b399451900345029f2d0cce54ddf6b28754f1ff55308ae`.
+- The import commit is `ixemul/` of that archive, laid over pristine 48.2 (1ee186a), so
+  `git diff 1ee186a <import>` is exactly 48.2 -> 80.1.
+- Branches: `import/ixemul-80.1` (pristine 80.1), `feature/ixemul-80` (our patches on it).
+- Work tree: `~/Code/ixemul-80` (a git worktree). Remove it when the branch is merged.
+
+## Constraints
+
+- Library compiler stays gcc 2.95.3 in Docker (`docker/build.sh`); bebbo's gcc 6 only for
+  libixcompat and the ports.
+- ixemul and ixnet are version-locked (`ixnet_open.c:82-91`, ix_panic on a mismatch). Every
+  place that installs ixemul.library must install ixnet.library from the same build: the
+  rig (`ixpty_rig.use_ixemul`, `rig.py` RIG_LIBS) and the kit (`dist/install.dos`,
+  `Makefile` dist).
+- Max 2 emulators at once.
+- The SDK in `~/opt/amiga/m68k-amigaos/ixemul` is shared by every port: change it only in
+  phase M8, after the library passes the rig.
+
+## Checklist
+
+### M0 Import
+- [x] M0.1 Branch `import/ixemul-80.1` from 1ee186a; tree = 80.1 `ixemul/`; one commit.
+- [x] M0.2 `tools/functable.py` and `tools/stubcheck.py` (the vector and stub checkers
+      from the evaluation) committed on `feature/ixemul-80`.
+
+### M1 Build system (#1, #2)
+- [x] M1.1 `docker/build.sh` builds pristine 80.1 (ixemul 020/881 + ixnet 020).
+- [x] M1.2 functable: 660 vectors in ixemul, 112 in ixnet (section 3).
+- [x] M1.3 Our stdint.h dropped in favour of 80.1's; create_header cross fix carried.
+
+### M2 Clean rebases
+- [x] M2.1 #4 ^\ ^Z (905dc76)
+- [x] M2.2 #5 job control (cfe5322)
+- [x] M2.3 #9 `_psignal` guard (98cefba)
+- [x] M2.4 #14 execve native env (5f2d856)
+- [x] M2.5 #15 IXPIPE: quiet (8836946)
+- [x] M2.6 #20 FIONREAD, printf z t j hh (9c75798)
+- [x] M2.7 #22 size_t (ddd6e22)
+- [x] M2.8 #23 __plock device part (0a1c765)
+- [x] M2.9 #25-#29 libixcompat and headers (0f62d3e, 672d4f7, aea8ab7, 2e152be, a8d7bdb)
+
+### M3 Hand rebases into files 80.1 rewrote
+- [x] M3.1 #3 termios and winsize by packet (bf02921) into `__tioctl.c`
+- [x] M3.2 #6 BSD ptys on PTY:, SIGWINCH to the group (64ae67f), `__close.c` per-process
+- [x] M3.3 #7 version id "[UP-Term ...]" (e085db4)
+- [x] M3.4 #8 SIGTTIN/SIGTTOU (6d36ffc) into the rewritten `__read.c`/`__write.c`
+- [x] M3.5 #13a stat of /dev/tty (825ece7, the /dev/tty half)
+- [x] M3.6 #17 SDK header parts (bb620d4): va_start/va_copy, signal.h, termios O*,
+      socket.h names, langinfo
+- [x] M3.7 #19 select: write-only wake, EINTR from ixnet, console read/write (3073a40)
+- [x] M3.8 #21 malloc small-block cache (5fbb894) on the changed `malloc.c`/`vfork.c`
+- [x] M3.9 #24 non-seekable stream S_IFIFO/ESPIPE (8dad95d) on the rewritten `lseek.c`
+- [x] M3.10 Dropped as covered, verified by reading 80.1: #10 (ac7b11c), #12 compat
+      poll/realpath (e137b24), #13b connect (825ece7 second half)
+
+### M4 AF_UNIX on 80.1's refcounted streams
+- [x] M4.1 #16 socketpair(AF_UNIX), socklen_t/sa_family_t, `*_r`, if_nametoindex (5c7bd59);
+      one `socklen_t` guard across sys/socket.h, arpa/inet.h, netdb.h
+- [x] M4.2 #11 sendmsg/recvmsg SCM_RIGHTS (bc5a7a1)
+- [x] M4.3 #18 descriptors ride with their message, one waiter per direction, POSIX
+      connect errors (78d2934)
+
+### M5 vtcon handlers: per-process WAIT_CHAR (section 5)
+- [ ] M5.1 `pty_handler.c` keeps a waiter list instead of ending the older WAIT_CHAR
+- [ ] M5.2 `vtcon_handler.c` the same
+- [ ] M5.3 Host test for each (vtcon `make test`)
+
+### M6 Rig and kit carry ixnet
+- [x] M6.1 `ixpty_rig.use_ixemul` copies ixnet.library beside ixemul.library
+- [x] M6.2 Kit: `Makefile` dist copies ixnet.library; `install.dos` and
+      `Install.installer` install it (and keep the old one as .orig, like ixemul)
+
+### M7 Rig matrix (section 7)
+- [ ] R1 library loads, versions match, GG binaries (ls, wc, less, nano, tcsh)
+- [ ] R2 ixpty 24/24, ptytest, ttyprobe, getty
+- [ ] R3 ixc99 17/17, ixbg/ixsig/ixsock/ixwait, tcsh ^Z bg fg
+- [ ] R4 tmux_rig 7/7, screen_rig all
+- [ ] R5 ixpipe_rig 4/4, no requester
+- [ ] R6 vshpath_rig, slash_rig, dotdot
+- [ ] R7 SIGWINCH redraw (tmux, vim, less) and the 20-exits-while-dragging freeze recipe
+- [ ] R8 CPython c3-sentinel all OK; vector-audit 0 mismatches
+- [ ] R9 nvim_rig --tui, --v012 --tui
+- [ ] R10 upterm-ports grep 3.12, ncurses 6.6 cases; spawnprobe
+- [ ] R11 mallocbench 48.2 vs 80.x recorded
+
+### M8 SDK and ports
+- [ ] M8.1 SDK headers from 80.x + ours; resolve libgen.h (const vs writable), poll.h
+      (nfds_t, POLLWR*), neovim's netdb.h addrinfo
+- [ ] M8.2 `make -C compat install` (the stale 4.6 KB libixcompat.a, section 4)
+- [ ] M8.3 Rebuild CPython, neovim (0.4.4, 0.12.5), tmux, screen, upterm-ports; re-run
+      R4, R8, R9, R10
+
+### M9 Land
+- [ ] M9.1 Kit built with the 80.x pair; install_rig passes
+- [ ] M9.2 vtcon ledger and this plan updated; worktree removed after merge
+
+### M10 Library with bebbo's gcc 6 (owner question 2026-10-05)
+- [ ] M10.1 Build the M9 tree with bebbo's gcc 6 (the 32efe2b C fixes are carried);
+      the 48.2 gcc 6 build crashed at run time, cause never found: bisect it against
+      the 2.95.3 build object by object if it recurs
+- [ ] M10.2 Rig matrix R1-R11 on the gcc 6 build; mallocbench and conbench against
+      the 2.95.3 build; keep gcc 6 only if it passes everything and is faster
+
+## Rig results so far (2026-10-05, 060 rig)
+
+- Pristine 80.1 from build.sh: loads, ixnet version matches, GG ls runs.
+- 80.x + patches: ixpty 24/24; tmux_rig 6/7 and screen_rig all four
+  children, the same as 48.2 on this rig (both fail only the colour cube,
+  36 of 240 cells, on the 060 rig's RTG screen: not the library);
+  ixsock names/pairpingpong/pairwake/rights all ok.
+- Found on the way: 80.1 refused a sun_path without NUL (screen's bind):
+  fixed (2ae1c37), test vtcon ixsock names (2b7e767).
+
+## Decisions log
+
+- 2026-10-05: worktree at `~/Code/ixemul-80`; 48.2 branch kept as the backup.
+- 2026-10-05: 80.1's library/Makefile.in hard-wired an in-tree build
+  (`true_srcdir = ../../..`); restored the `@srcdir@` pattern the other
+  directories use, so the Docker out-of-tree build works.
+- 2026-10-05: M0.1 import is 21a78ae on `import/ixemul-80.1`.
+- 2026-10-05: docker/build.sh builds the compiler image only once: its gcc is
+  configured with include/, so every header edit rebuilt gcc 2.95.3 under
+  emulation (the first 80.1 build sat in that for 15 minutes).
+- 2026-10-05: 80.1's intops/ (bswap16/32/64) was not in AC_OUTPUT and its
+  Makefile was a checked-in in-tree copy; added to configure.in/configure,
+  Makefile.in takes @srcdir@ like the other directories.
+- 2026-10-05: M3.10 #10 verified covered (`copyout_unix_address` NULL-safe,
+  unp.c:526, called only when name != NULL, :1006). #13b verified covered:
+  bind tests `client_path`, connect writes `server_path` (unp.c:802, :1079),
+  so a failed connect no longer blocks a bind.
+- 2026-10-05: #12 libixcompat poll()/realpath() are KEPT, not dropped: 80.1's
+  vectors 643/656 do not exist in 48.2, so a port linked to them would jump
+  past the end of the 48.2 backup library. The static copies win at link
+  and run on both.
+- 2026-10-05: gcc 2.95.3 first (known-good base), gcc 6 after as M10.
