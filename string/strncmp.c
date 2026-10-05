@@ -75,60 +75,60 @@
  */
 
 ENTRY(strncmp)
-asm("
-	movl	sp@(12),d0		/* count */
-	jeq	.Lstrncmp_done
-	movl	sp@(4),a0		/* string1 */
-	movl	sp@(8),a1		/* string2 */
-
-.Lstrncmp_loop:
-	movb	a0@+,d1
-	jeq	.Lstrncmp_zero
-	subb	a1@+,d1
-	jne	.Lstrncmp_diff
-	subql	#1,d0
-	jeq	.Lstrncmp_done
-
-	movb	a0@+,d1
-	jeq	.Lstrncmp_zero
-	subb	a1@+,d1
-	jne	.Lstrncmp_diff
-	subql	#1,d0
-	jeq	.Lstrncmp_done
-
-	movb	a0@+,d1
-	jeq	.Lstrncmp_zero
-	subb	a1@+,d1
-	jne	.Lstrncmp_diff
-	subql	#1,d0
-	jeq	.Lstrncmp_done
-
-	movb	a0@+,d1
-	jeq	.Lstrncmp_zero
-	subb	a1@+,d1
-	jne	.Lstrncmp_diff
-	subql	#1,d0
-	jne	.Lstrncmp_loop
-
-.Lstrncmp_done:
-	moveq	#0,d0
-	rts
-
-.Lstrncmp_zero:
-	/*
-	 * string1 ended before the count was exhausted.  Compare its NUL
-	 * directly with the current byte from string2.
-	 */
-	subb	a1@,d1
-
-.Lstrncmp_diff:
-	/*
-	 * Reconstruct the exact signed result of the unsigned-byte
-	 * subtraction from the low result byte and the carry/borrow flag.
-	 */
-	scs	d0
-	extw	d0
-	extl	d0
-	movb	d1,d0
-	rts
+asm("\n\
+	movl	sp@(12),d0		/* count */\n\
+	jeq	.Lstrncmp_done\n\
+	movl	sp@(4),a0		/* string1 */\n\
+	movl	sp@(8),a1		/* string2 */\n\
+\n\
+.Lstrncmp_loop:\n\
+	movb	a0@+,d1\n\
+	jeq	.Lstrncmp_zero\n\
+	subb	a1@+,d1\n\
+	jne	.Lstrncmp_diff\n\
+	subql	#1,d0\n\
+	jeq	.Lstrncmp_done\n\
+\n\
+	movb	a0@+,d1\n\
+	jeq	.Lstrncmp_zero\n\
+	subb	a1@+,d1\n\
+	jne	.Lstrncmp_diff\n\
+	subql	#1,d0\n\
+	jeq	.Lstrncmp_done\n\
+\n\
+	movb	a0@+,d1\n\
+	jeq	.Lstrncmp_zero\n\
+	subb	a1@+,d1\n\
+	jne	.Lstrncmp_diff\n\
+	subql	#1,d0\n\
+	jeq	.Lstrncmp_done\n\
+\n\
+	movb	a0@+,d1\n\
+	jeq	.Lstrncmp_zero\n\
+	subb	a1@+,d1\n\
+	jne	.Lstrncmp_diff\n\
+	subql	#1,d0\n\
+	jne	.Lstrncmp_loop\n\
+\n\
+.Lstrncmp_done:\n\
+	moveq	#0,d0\n\
+	rts\n\
+\n\
+.Lstrncmp_zero:\n\
+	/*\n\
+	 * string1 ended before the count was exhausted.  Compare its NUL\n\
+	 * directly with the current byte from string2.\n\
+	 */\n\
+	subb	a1@,d1\n\
+\n\
+.Lstrncmp_diff:\n\
+	/*\n\
+	 * Reconstruct the exact signed result of the unsigned-byte\n\
+	 * subtraction from the low result byte and the carry/borrow flag.\n\
+	 */\n\
+	scs	d0\n\
+	extw	d0\n\
+	extl	d0\n\
+	movb	d1,d0\n\
+	rts\n\
 ");

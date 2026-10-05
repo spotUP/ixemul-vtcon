@@ -38,31 +38,31 @@
  *	- use nested DBcc instructions or use one and limit size to 64K
  */
 ENTRY(bzero)
-asm("
-	movl	sp@(4),a0	/* destination */
-	movl	sp@(8),d0	/* count */
-	tstl	d0			/* explicit zero-length check */
-	jeq		bzdone		/* avoid stray write on odd address */
-	movl	a0,d1
-	btst	#0,d1		/* address odd? */
-	jeq	bzeven		/* no, skip alignment */
-	clrb	a0@+		/* yes, clear a byte */
-	subql	#1,d0		/* adjust count */
-	jeq	bzdone		/* if zero, all done */
-bzeven:
-	movl	d0,d1
-	lsrl	#2,d1		/* convert to longword count */
-	jeq	bzbloop		/* no longwords, skip loop */
-bzlloop:
-	clrl	a0@+		/* clear a longword */
-	subql	#1,d1		/* adjust count */
-	jne	bzlloop		/* still more, keep going */
-	andl	#3,d0		/* what remains */
-	jeq	bzdone		/* nothing, all done */
-bzbloop:
-	clrb	a0@+		/* clear a byte */
-	subql	#1,d0		/* adjust count */
-	jne	bzbloop		/* still more, keep going */
-bzdone:
-	rts
+asm("\n\
+	movl	sp@(4),a0	/* destination */\n\
+	movl	sp@(8),d0	/* count */\n\
+	tstl	d0			/* explicit zero-length check */\n\
+	jeq		bzdone		/* avoid stray write on odd address */\n\
+	movl	a0,d1\n\
+	btst	#0,d1		/* address odd? */\n\
+	jeq	bzeven		/* no, skip alignment */\n\
+	clrb	a0@+		/* yes, clear a byte */\n\
+	subql	#1,d0		/* adjust count */\n\
+	jeq	bzdone		/* if zero, all done */\n\
+bzeven:\n\
+	movl	d0,d1\n\
+	lsrl	#2,d1		/* convert to longword count */\n\
+	jeq	bzbloop		/* no longwords, skip loop */\n\
+bzlloop:\n\
+	clrl	a0@+		/* clear a longword */\n\
+	subql	#1,d1		/* adjust count */\n\
+	jne	bzlloop		/* still more, keep going */\n\
+	andl	#3,d0		/* what remains */\n\
+	jeq	bzdone		/* nothing, all done */\n\
+bzbloop:\n\
+	clrb	a0@+		/* clear a byte */\n\
+	subql	#1,d0		/* adjust count */\n\
+	jne	bzbloop		/* still more, keep going */\n\
+bzdone:\n\
+	rts\n\
 ");

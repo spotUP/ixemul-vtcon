@@ -48,7 +48,7 @@
 /* network-to-host 32-bit conversion. */
 
 ENTRY(ntohl)
-asm("
-	movl	sp@(4),d0
-	rts
+asm("\n\
+	movl	sp@(4),d0\n\
+	rts\n\
 ");

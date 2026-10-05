@@ -25,16 +25,16 @@
 
 ENTRY(rindex)
 ENTRY(strrchr)
-asm("
-	movl	sp@(4),a1	/* string */
-	movb	sp@(11),d1	/* char to look for */
-	moveq	#0,d0		/* clear rindex pointer */
-rixloop:
-	cmpb	a1@,d1		/* found our char? */
-	jne	rixnope		/* no, check for null */
-	movl	a1,d0		/* yes, remember location */
-rixnope:
-	tstb	a1@+		/* null? */
-	jne	rixloop		/* no, keep going */
-	rts
+asm("\n\
+	movl	sp@(4),a1	/* string */\n\
+	movb	sp@(11),d1	/* char to look for */\n\
+	moveq	#0,d0		/* clear rindex pointer */\n\
+rixloop:\n\
+	cmpb	a1@,d1		/* found our char? */\n\
+	jne	rixnope		/* no, check for null */\n\
+	movl	a1,d0		/* yes, remember location */\n\
+rixnope:\n\
+	tstb	a1@+		/* null? */\n\
+	jne	rixloop		/* no, keep going */\n\
+	rts\n\
 ");

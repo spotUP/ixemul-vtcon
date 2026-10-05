@@ -69,264 +69,264 @@
 #if SWAB_CPU_060
 
 ENTRY(swab)
-asm("
-        movl    sp@(12),d1              /* byte count */
-        tstl    d1
-        jmi     swab_done_060          /* negative count: no operation */
-        lsrl    #1,d1                   /* complete 16-bit pairs */
-        jeq     swab_done_060
-
-        movl    sp@(4),a0               /* source */
-        movl    sp@(8),a1               /* destination */
-
-        cmpl    #8,d1
-        blo     swab_tail_060
-
-swab_loop8_060:
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        subql   #8,d1
-        cmpl    #8,d1
-        jcc     swab_loop8_060
-
-swab_tail_060:
-        tstl    d1
-        jeq     swab_done_060
-
-swab_tail_loop_060:
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-        subql   #1,d1
-        jne     swab_tail_loop_060
-
-swab_done_060:
-        rts
+asm("\n\
+        movl    sp@(12),d1              /* byte count */\n\
+        tstl    d1\n\
+        jmi     swab_done_060          /* negative count: no operation */\n\
+        lsrl    #1,d1                   /* complete 16-bit pairs */\n\
+        jeq     swab_done_060\n\
+\n\
+        movl    sp@(4),a0               /* source */\n\
+        movl    sp@(8),a1               /* destination */\n\
+\n\
+        cmpl    #8,d1\n\
+        blo     swab_tail_060\n\
+\n\
+swab_loop8_060:\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        subql   #8,d1\n\
+        cmpl    #8,d1\n\
+        jcc     swab_loop8_060\n\
+\n\
+swab_tail_060:\n\
+        tstl    d1\n\
+        jeq     swab_done_060\n\
+\n\
+swab_tail_loop_060:\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+        subql   #1,d1\n\
+        jne     swab_tail_loop_060\n\
+\n\
+swab_done_060:\n\
+        rts\n\
 ");
 
 
 #elif SWAB_CPU_040
 
 ENTRY(swab)
-asm("
-        movl    sp@(12),d1              /* byte count */
-        tstl    d1
-        jmi     swab_done_040          /* negative count: no operation */
-        lsrl    #1,d1                   /* complete 16-bit pairs */
-        jeq     swab_done_040
-
-        movl    sp@(4),a0               /* source */
-        movl    sp@(8),a1               /* destination */
-
-        cmpl    #4,d1
-        blo     swab_tail_040
-
-swab_loop4_040:
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        subql   #4,d1
-        cmpl    #4,d1
-        jcc     swab_loop4_040
-
-swab_tail_040:
-        tstl    d1
-        jeq     swab_done_040
-
-swab_tail_loop_040:
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-        subql   #1,d1
-        jne     swab_tail_loop_040
-
-swab_done_040:
-        rts
+asm("\n\
+        movl    sp@(12),d1              /* byte count */\n\
+        tstl    d1\n\
+        jmi     swab_done_040          /* negative count: no operation */\n\
+        lsrl    #1,d1                   /* complete 16-bit pairs */\n\
+        jeq     swab_done_040\n\
+\n\
+        movl    sp@(4),a0               /* source */\n\
+        movl    sp@(8),a1               /* destination */\n\
+\n\
+        cmpl    #4,d1\n\
+        blo     swab_tail_040\n\
+\n\
+swab_loop4_040:\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        subql   #4,d1\n\
+        cmpl    #4,d1\n\
+        jcc     swab_loop4_040\n\
+\n\
+swab_tail_040:\n\
+        tstl    d1\n\
+        jeq     swab_done_040\n\
+\n\
+swab_tail_loop_040:\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+        subql   #1,d1\n\
+        jne     swab_tail_loop_040\n\
+\n\
+swab_done_040:\n\
+        rts\n\
 ");
 
 
 #elif SWAB_CPU_020
 
 ENTRY(swab)
-asm("
-        movl    sp@(12),d1              /* byte count */
-        tstl    d1
-        jmi     swab_done_020          /* negative count: no operation */
-        lsrl    #1,d1                   /* complete 16-bit pairs */
-        jeq     swab_done_020
-
-        movl    sp@(4),a0               /* source */
-        movl    sp@(8),a1               /* destination */
-
-        cmpl    a1,a0
-        jeq     swab_word_entry_020     /* MOVEP is not in-place safe */
-
-        cmpl    #4,d1
-        blo     swab_word_entry_020
-
-swab_movep4_020:
-        movepl  a0@(0),d0               /* source bytes 0,2,4,6 */
-        movepl  d0,a1@(1)               /* -> destination 1,3,5,7 */
-        movepl  a0@(1),d0               /* source bytes 1,3,5,7 */
-        movepl  d0,a1@(0)               /* -> destination 0,2,4,6 */
-        addql   #8,a0
-        addql   #8,a1
-        subql   #4,d1
-        cmpl    #4,d1
-        jcc     swab_movep4_020
-
-swab_word_entry_020:
-        tstl    d1
-        jeq     swab_done_020
-
-        cmpl    #4,d1
-        blo     swab_word_tail_020
-
-swab_word4_020:
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        subql   #4,d1
-        cmpl    #4,d1
-        jcc     swab_word4_020
-
-swab_word_tail_020:
-        tstl    d1
-        jeq     swab_done_020
-
-swab_word_tail_loop_020:
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-        subql   #1,d1
-        jne     swab_word_tail_loop_020
-
-swab_done_020:
-        rts
+asm("\n\
+        movl    sp@(12),d1              /* byte count */\n\
+        tstl    d1\n\
+        jmi     swab_done_020          /* negative count: no operation */\n\
+        lsrl    #1,d1                   /* complete 16-bit pairs */\n\
+        jeq     swab_done_020\n\
+\n\
+        movl    sp@(4),a0               /* source */\n\
+        movl    sp@(8),a1               /* destination */\n\
+\n\
+        cmpl    a1,a0\n\
+        jeq     swab_word_entry_020     /* MOVEP is not in-place safe */\n\
+\n\
+        cmpl    #4,d1\n\
+        blo     swab_word_entry_020\n\
+\n\
+swab_movep4_020:\n\
+        movepl  a0@(0),d0               /* source bytes 0,2,4,6 */\n\
+        movepl  d0,a1@(1)               /* -> destination 1,3,5,7 */\n\
+        movepl  a0@(1),d0               /* source bytes 1,3,5,7 */\n\
+        movepl  d0,a1@(0)               /* -> destination 0,2,4,6 */\n\
+        addql   #8,a0\n\
+        addql   #8,a1\n\
+        subql   #4,d1\n\
+        cmpl    #4,d1\n\
+        jcc     swab_movep4_020\n\
+\n\
+swab_word_entry_020:\n\
+        tstl    d1\n\
+        jeq     swab_done_020\n\
+\n\
+        cmpl    #4,d1\n\
+        blo     swab_word_tail_020\n\
+\n\
+swab_word4_020:\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        subql   #4,d1\n\
+        cmpl    #4,d1\n\
+        jcc     swab_word4_020\n\
+\n\
+swab_word_tail_020:\n\
+        tstl    d1\n\
+        jeq     swab_done_020\n\
+\n\
+swab_word_tail_loop_020:\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+        subql   #1,d1\n\
+        jne     swab_word_tail_loop_020\n\
+\n\
+swab_done_020:\n\
+        rts\n\
 ");
 
 
 #else  /* SWAB_CPU_000 */
 
 ENTRY(swab)
-asm("
-        movl    sp@(12),d1              /* byte count */
-        tstl    d1
-        jmi     swab_done_000          /* negative count: no operation */
-        lsrl    #1,d1                   /* complete 16-bit pairs */
-        jeq     swab_done_000
-
-        movl    sp@(4),a0               /* source */
-        movl    sp@(8),a1               /* destination */
-
-        movl    a0,d0
-        btst    #0,d0
-        jne     swab_byte_loop_000
-        movl    a1,d0
-        btst    #0,d0
-        jne     swab_byte_loop_000
-
-        cmpl    #4,d1
-        blo     swab_word_tail_000
-
-swab_word4_000:
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-
-        subql   #4,d1
-        cmpl    #4,d1
-        jcc     swab_word4_000
-
-swab_word_tail_000:
-        tstl    d1
-        jeq     swab_done_000
-
-swab_word_tail_loop_000:
-        movw    a0@+,d0
-        rorw    #8,d0
-        movw    d0,a1@+
-        subql   #1,d1
-        jne     swab_word_tail_loop_000
-        bra     swab_done_000
-
-swab_byte_loop_000:
-        movb    a0@+,d0
-        movb    a0@+,a1@+
-        movb    d0,a1@+
-        subql   #1,d1
-        jne     swab_byte_loop_000
-
-swab_done_000:
-        rts
+asm("\n\
+        movl    sp@(12),d1              /* byte count */\n\
+        tstl    d1\n\
+        jmi     swab_done_000          /* negative count: no operation */\n\
+        lsrl    #1,d1                   /* complete 16-bit pairs */\n\
+        jeq     swab_done_000\n\
+\n\
+        movl    sp@(4),a0               /* source */\n\
+        movl    sp@(8),a1               /* destination */\n\
+\n\
+        movl    a0,d0\n\
+        btst    #0,d0\n\
+        jne     swab_byte_loop_000\n\
+        movl    a1,d0\n\
+        btst    #0,d0\n\
+        jne     swab_byte_loop_000\n\
+\n\
+        cmpl    #4,d1\n\
+        blo     swab_word_tail_000\n\
+\n\
+swab_word4_000:\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+\n\
+        subql   #4,d1\n\
+        cmpl    #4,d1\n\
+        jcc     swab_word4_000\n\
+\n\
+swab_word_tail_000:\n\
+        tstl    d1\n\
+        jeq     swab_done_000\n\
+\n\
+swab_word_tail_loop_000:\n\
+        movw    a0@+,d0\n\
+        rorw    #8,d0\n\
+        movw    d0,a1@+\n\
+        subql   #1,d1\n\
+        jne     swab_word_tail_loop_000\n\
+        bra     swab_done_000\n\
+\n\
+swab_byte_loop_000:\n\
+        movb    a0@+,d0\n\
+        movb    a0@+,a1@+\n\
+        movb    d0,a1@+\n\
+        subql   #1,d1\n\
+        jne     swab_byte_loop_000\n\
+\n\
+swab_done_000:\n\
+        rts\n\
 ");
 
 #endif

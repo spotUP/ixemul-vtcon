@@ -48,8 +48,8 @@
 /* host-to-network 16-bit conversion. */
 
 ENTRY(htons)
-asm("
-	clrl	d0
-	movw	sp@(6),d0
-	rts
+asm("\n\
+	clrl	d0\n\
+	movw	sp@(6),d0\n\
+	rts\n\
 ");

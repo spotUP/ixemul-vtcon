@@ -36,18 +36,18 @@
 /* bit = fls(value) */
 
 ENTRY(fls)
-asm("
-	moveq	#32,d0
-	movl	sp@(4),d1
-	beq	fls_zero
-fls_again:
-	subql	#1,d0
-	btst	d0,d1
-	beq	fls_again
-	addql	#1,d0
-	rts
-fls_zero:
-	moveq	#0,d0
-	rts
+asm("\n\
+	moveq	#32,d0\n\
+	movl	sp@(4),d1\n\
+	beq	fls_zero\n\
+fls_again:\n\
+	subql	#1,d0\n\
+	btst	d0,d1\n\
+	beq	fls_again\n\
+	addql	#1,d0\n\
+	rts\n\
+fls_zero:\n\
+	moveq	#0,d0\n\
+	rts\n\
 ");
 

@@ -48,8 +48,8 @@
 /* network-to-host 16-bit conversion. */
 
 ENTRY(ntohs)
-asm("
-	clrl	d0
-	movw	sp@(6),d0
-	rts
+asm("\n\
+	clrl	d0\n\
+	movw	sp@(6),d0\n\
+	rts\n\
 ");

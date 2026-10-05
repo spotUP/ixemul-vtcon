@@ -126,141 +126,141 @@
  */
 
 ENTRY(bcopy)
-asm("
-        movl    sp@(12),d1           /* length */
-        tstl    d1
-        jle     .done                /* len <= 0 -> nothing to do */
-
-        movl    sp@(4),a0            /* src */
-        movl    sp@(8),a1            /* dst */
-
-        cmpl    a1,a0
-        blo     .backward            /* copy backwards if src < dst */
-
-/* ------------------------------------------------------------------ */
-/* Forward copy                                                       */
-/* ------------------------------------------------------------------ */
-
-.forward:
-        cmpl    #32,d1               /* small block */
-        blo     .f_small
-
-.f_lw_entry:
-        movl    d1,d0
-        lsrl    #5,d0                /* 32-byte / 8-longword blocks */
-        beq     .f_lw_rem
-
-.f_lw_unroll:
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        subql   #1,d0
-        bne     .f_lw_unroll
-
-.f_lw_rem:
-        /*
-         * d1 still holds the byte count for this phase.
-         * Remaining longwords after 32-byte / 8-longword blocks:
-         *     (d1 >> 2) & 7
-         * d1 is not decremented by the 32-byte block loop.
-         */
-
-        movl    d1,d0
-        lsrl    #2,d0                /* longword count */
-        andl    #7,d0
-        beq     .f_tail
-
-.f_lw_loop:
-        movl    a0@+,a1@+
-        subql   #1,d0
-        bne     .f_lw_loop
-
-.f_tail:
-        andl    #3,d1                /* remaining bytes */
-        beq     .done
-
-.f_b_loop:
-        movb    a0@+,a1@+
-        subql   #1,d1
-        bne     .f_b_loop
-        bra     .done
-
-.f_small:
-.f_small_loop:
-        movb    a0@+,a1@+
-        subql   #1,d1
-        bne     .f_small_loop
-        bra     .done
-
-/* ------------------------------------------------------------------ */
-/* Backward copy                                                      */
-/* ------------------------------------------------------------------ */
-
-.backward:
-        addl    d1,a0                /* src end */
-        addl    d1,a1                /* dst end */
-
-        cmpl    #32,d1
-        blo     .b_small
-
-.b_lw_entry:
-        movl    d1,d0
-        lsrl    #5,d0                /* 32-byte / 8-longword blocks */
-        beq     .b_lw_rem
-
-.b_lw_unroll:
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        subql   #1,d0
-        bne     .b_lw_unroll
-
-.b_lw_rem:
-        /*
-         * d1 still holds the byte count for this phase.
-         * Remaining backward longwords after 32-byte / 8-longword blocks:
-         *     (d1 >> 2) & 7
-         * d1 is not decremented by the 32-byte block loop.
-         */
-
-        movl    d1,d0
-        lsrl    #2,d0                /* longword count */
-        andl    #7,d0
-        beq     .b_tail
-
-.b_lw_loop:
-        movl    a0@-,a1@-
-        subql   #1,d0
-        bne     .b_lw_loop
-
-.b_tail:
-        andl    #3,d1
-        beq     .done
-
-.b_b_loop:
-        movb    a0@-,a1@-
-        subql   #1,d1
-        bne     .b_b_loop
-        bra     .done
-
-.b_small:
-.b_small_loop:
-        movb    a0@-,a1@-
-        subql   #1,d1
-        bne     .b_small_loop
-
-.done:
-        rts
+asm("\n\
+        movl    sp@(12),d1           /* length */\n\
+        tstl    d1\n\
+        jle     .done                /* len <= 0 -> nothing to do */\n\
+\n\
+        movl    sp@(4),a0            /* src */\n\
+        movl    sp@(8),a1            /* dst */\n\
+\n\
+        cmpl    a1,a0\n\
+        blo     .backward            /* copy backwards if src < dst */\n\
+\n\
+/* ------------------------------------------------------------------ */\n\
+/* Forward copy                                                       */\n\
+/* ------------------------------------------------------------------ */\n\
+\n\
+.forward:\n\
+        cmpl    #32,d1               /* small block */\n\
+        blo     .f_small\n\
+\n\
+.f_lw_entry:\n\
+        movl    d1,d0\n\
+        lsrl    #5,d0                /* 32-byte / 8-longword blocks */\n\
+        beq     .f_lw_rem\n\
+\n\
+.f_lw_unroll:\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        subql   #1,d0\n\
+        bne     .f_lw_unroll\n\
+\n\
+.f_lw_rem:\n\
+        /*\n\
+         * d1 still holds the byte count for this phase.\n\
+         * Remaining longwords after 32-byte / 8-longword blocks:\n\
+         *     (d1 >> 2) & 7\n\
+         * d1 is not decremented by the 32-byte block loop.\n\
+         */\n\
+\n\
+        movl    d1,d0\n\
+        lsrl    #2,d0                /* longword count */\n\
+        andl    #7,d0\n\
+        beq     .f_tail\n\
+\n\
+.f_lw_loop:\n\
+        movl    a0@+,a1@+\n\
+        subql   #1,d0\n\
+        bne     .f_lw_loop\n\
+\n\
+.f_tail:\n\
+        andl    #3,d1                /* remaining bytes */\n\
+        beq     .done\n\
+\n\
+.f_b_loop:\n\
+        movb    a0@+,a1@+\n\
+        subql   #1,d1\n\
+        bne     .f_b_loop\n\
+        bra     .done\n\
+\n\
+.f_small:\n\
+.f_small_loop:\n\
+        movb    a0@+,a1@+\n\
+        subql   #1,d1\n\
+        bne     .f_small_loop\n\
+        bra     .done\n\
+\n\
+/* ------------------------------------------------------------------ */\n\
+/* Backward copy                                                      */\n\
+/* ------------------------------------------------------------------ */\n\
+\n\
+.backward:\n\
+        addl    d1,a0                /* src end */\n\
+        addl    d1,a1                /* dst end */\n\
+\n\
+        cmpl    #32,d1\n\
+        blo     .b_small\n\
+\n\
+.b_lw_entry:\n\
+        movl    d1,d0\n\
+        lsrl    #5,d0                /* 32-byte / 8-longword blocks */\n\
+        beq     .b_lw_rem\n\
+\n\
+.b_lw_unroll:\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        subql   #1,d0\n\
+        bne     .b_lw_unroll\n\
+\n\
+.b_lw_rem:\n\
+        /*\n\
+         * d1 still holds the byte count for this phase.\n\
+         * Remaining backward longwords after 32-byte / 8-longword blocks:\n\
+         *     (d1 >> 2) & 7\n\
+         * d1 is not decremented by the 32-byte block loop.\n\
+         */\n\
+\n\
+        movl    d1,d0\n\
+        lsrl    #2,d0                /* longword count */\n\
+        andl    #7,d0\n\
+        beq     .b_tail\n\
+\n\
+.b_lw_loop:\n\
+        movl    a0@-,a1@-\n\
+        subql   #1,d0\n\
+        bne     .b_lw_loop\n\
+\n\
+.b_tail:\n\
+        andl    #3,d1\n\
+        beq     .done\n\
+\n\
+.b_b_loop:\n\
+        movb    a0@-,a1@-\n\
+        subql   #1,d1\n\
+        bne     .b_b_loop\n\
+        bra     .done\n\
+\n\
+.b_small:\n\
+.b_small_loop:\n\
+        movb    a0@-,a1@-\n\
+        subql   #1,d1\n\
+        bne     .b_small_loop\n\
+\n\
+.done:\n\
+        rts\n\
 ");
 
 #elif BCOPY_CPU_040
@@ -278,193 +278,193 @@ asm("
  */
 
 ENTRY(bcopy)
-asm("
-        movl    sp@(12),d1          /* d1 = len */
-        tstl    d1
-        jle     bcdone_bcopy_040    /* len <= 0 -> nothing to do */
-
-        movl    sp@(4),a0           /* a0 = src */
-        movl    sp@(8),a1           /* a1 = dst */
-
-        cmpl    a1,a0
-        blo     bcback_040          /* src < dst -> copy backwards */
-
-/* ------------------------------------------------------------------ */
-/* Forward copy: src >= dst                                           */
-/* ------------------------------------------------------------------ */
-
-bcforw_040:
-        cmpl    #16,d1              /* small block */
-        blo     bcf_small_040
-
-        /*
-         * Try to get 4-byte alignment when src and dst share alignment.
-         * If (a0 - a1) & 3 != 0, skip alignment and still use
-         * longword copy. 040 tolerates unaligned longwords.
-         */
-        movl    a0,d0
-        subl    a1,d0
-        andl    #3,d0
-        bne     bcf_noalign_040     /* different alignment -> no pre-align */
-
-        /* src and dst share low 2 bits, align dst and thus src to 4 */
-        movl    a1,d0
-        andl    #3,d0
-        beq     bcf_lw_entry_040    /* already 4-byte aligned */
-
-bcf_align_loop_040:
-        movb    a0@+,a1@+           /* copy byte until dst 4-byte aligned */
-        subql   #1,d1
-        beq     bcdone_bcopy_040
-        movl    a1,d0
-        andl    #3,d0
-        bne     bcf_align_loop_040
-        bra     bcf_lw_entry_040
-
-bcf_noalign_040:
-        /* No shared alignment: still do longwords, but without pre-align. */
-
-bcf_lw_entry_040:
-        movl    d1,d0
-        lsrl    #4,d0               /* 16-byte / 4-longword blocks */
-        beq     bcf_lw_rem_040
-
-bcf_lw_unroll_040:
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        subql   #1,d0
-        bne     bcf_lw_unroll_040
-
-bcf_lw_rem_040:
-        /*
-         * d1 still holds the original byte count.
-         * It is not decremented by the 16-byte block loop.
-         * Remaining forward longwords after 16-byte / 4-longword blocks:
-         *     (d1 >> 2) & 3
-         * Tail bytes are later computed as d1 & 3.
-         */
-        movl    d1,d0
-        lsrl    #2,d0               /* d0 = len / 4 */
-        andl    #3,d0               /* remaining longwords */
-        beq     bcf_tail_040
-
-bcf_lw_loop_040:
-        movl    a0@+,a1@+
-        subql   #1,d0
-        bne     bcf_lw_loop_040
-
-bcf_tail_040:
-        /*
-         * d1 still holds the original byte count.
-         * Tail bytes are:
-         *     d1 & 3
-         */
-
-        andl    #3,d1               /* remaining bytes */
-        beq     bcdone_bcopy_040
-
-bcf_b_loop_040:
-        movb    a0@+,a1@+           /* copy byte */
-        subql   #1,d1
-        bne     bcf_b_loop_040
-        bra     bcdone_bcopy_040
-
-bcf_small_040:
-        movb    a0@+,a1@+           /* small forward copy */
-        subql   #1,d1
-        bne     bcf_small_040
-        bra     bcdone_bcopy_040
-
-/* ------------------------------------------------------------------ */
-/* Backward copy: src < dst                                           */
-/* ------------------------------------------------------------------ */
-
-bcback_040:
-        addl    d1,a0               /* a0 = src + len */
-        addl    d1,a1               /* a1 = dst + len */
-
-        cmpl    #16,d1              /* small block */
-        blo     bcb_small_040
-
-        /*
-         * Same alignment strategy as forward copy, but backwards.
-         */
-        movl    a0,d0
-        subl    a1,d0
-        andl    #3,d0
-        bne     bcb_noalign_040     /* different alignment -> no pre-align */
-
-        movl    a1,d0
-        andl    #3,d0
-        beq     bcb_lw_entry_040
-
-bcb_align_loop_040:
-        movb    a0@-,a1@-           /* copy byte until dst 4-byte aligned */
-        subql   #1,d1
-        beq     bcdone_bcopy_040
-        movl    a1,d0
-        andl    #3,d0
-        bne     bcb_align_loop_040
-        bra     bcb_lw_entry_040
-
-bcb_noalign_040:
-
-bcb_lw_entry_040:
-        movl    d1,d0
-        lsrl    #4,d0               /* 16-byte / 4-longword blocks */
-        beq     bcb_lw_rem_040
-
-bcb_lw_unroll_040:
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        subql   #1,d0
-        bne     bcb_lw_unroll_040
-
-bcb_lw_rem_040:
-        /*
-         * d1 still holds the original byte count.
-         * It is not decremented by the 16-byte block loop.
-         * Remaining backward longwords after 16-byte / 4-longword blocks:
-         *     (d1 >> 2) & 3
-         * Tail bytes are later computed as d1 & 3.
-         */
-        movl    d1,d0
-        lsrl    #2,d0               /* d0 = len / 4 */
-        andl    #3,d0               /* remaining longwords */
-        beq     bcb_tail_040
-
-bcb_lw_loop_040:
-        movl    a0@-,a1@-
-        subql   #1,d0
-        bne     bcb_lw_loop_040
-
-bcb_tail_040:
-        /*
-         * d1 still holds the original byte count.
-         * Tail bytes are:
-         *     d1 & 3
-         */
-
-        andl    #3,d1               /* remaining bytes */
-        beq     bcdone_bcopy_040
-
-bcb_b_loop_040:
-        movb    a0@-,a1@-           /* copy byte backwards */
-        subql   #1,d1
-        bne     bcb_b_loop_040
-        bra     bcdone_bcopy_040
-
-bcb_small_040:
-        movb    a0@-,a1@-           /* small backward copy */
-        subql   #1,d1
-        bne     bcb_small_040
-
-bcdone_bcopy_040:
-        rts
+asm("\n\
+        movl    sp@(12),d1          /* d1 = len */\n\
+        tstl    d1\n\
+        jle     bcdone_bcopy_040    /* len <= 0 -> nothing to do */\n\
+\n\
+        movl    sp@(4),a0           /* a0 = src */\n\
+        movl    sp@(8),a1           /* a1 = dst */\n\
+\n\
+        cmpl    a1,a0\n\
+        blo     bcback_040          /* src < dst -> copy backwards */\n\
+\n\
+/* ------------------------------------------------------------------ */\n\
+/* Forward copy: src >= dst                                           */\n\
+/* ------------------------------------------------------------------ */\n\
+\n\
+bcforw_040:\n\
+        cmpl    #16,d1              /* small block */\n\
+        blo     bcf_small_040\n\
+\n\
+        /*\n\
+         * Try to get 4-byte alignment when src and dst share alignment.\n\
+         * If (a0 - a1) & 3 != 0, skip alignment and still use\n\
+         * longword copy. 040 tolerates unaligned longwords.\n\
+         */\n\
+        movl    a0,d0\n\
+        subl    a1,d0\n\
+        andl    #3,d0\n\
+        bne     bcf_noalign_040     /* different alignment -> no pre-align */\n\
+\n\
+        /* src and dst share low 2 bits, align dst and thus src to 4 */\n\
+        movl    a1,d0\n\
+        andl    #3,d0\n\
+        beq     bcf_lw_entry_040    /* already 4-byte aligned */\n\
+\n\
+bcf_align_loop_040:\n\
+        movb    a0@+,a1@+           /* copy byte until dst 4-byte aligned */\n\
+        subql   #1,d1\n\
+        beq     bcdone_bcopy_040\n\
+        movl    a1,d0\n\
+        andl    #3,d0\n\
+        bne     bcf_align_loop_040\n\
+        bra     bcf_lw_entry_040\n\
+\n\
+bcf_noalign_040:\n\
+        /* No shared alignment: still do longwords, but without pre-align. */\n\
+\n\
+bcf_lw_entry_040:\n\
+        movl    d1,d0\n\
+        lsrl    #4,d0               /* 16-byte / 4-longword blocks */\n\
+        beq     bcf_lw_rem_040\n\
+\n\
+bcf_lw_unroll_040:\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        subql   #1,d0\n\
+        bne     bcf_lw_unroll_040\n\
+\n\
+bcf_lw_rem_040:\n\
+        /*\n\
+         * d1 still holds the original byte count.\n\
+         * It is not decremented by the 16-byte block loop.\n\
+         * Remaining forward longwords after 16-byte / 4-longword blocks:\n\
+         *     (d1 >> 2) & 3\n\
+         * Tail bytes are later computed as d1 & 3.\n\
+         */\n\
+        movl    d1,d0\n\
+        lsrl    #2,d0               /* d0 = len / 4 */\n\
+        andl    #3,d0               /* remaining longwords */\n\
+        beq     bcf_tail_040\n\
+\n\
+bcf_lw_loop_040:\n\
+        movl    a0@+,a1@+\n\
+        subql   #1,d0\n\
+        bne     bcf_lw_loop_040\n\
+\n\
+bcf_tail_040:\n\
+        /*\n\
+         * d1 still holds the original byte count.\n\
+         * Tail bytes are:\n\
+         *     d1 & 3\n\
+         */\n\
+\n\
+        andl    #3,d1               /* remaining bytes */\n\
+        beq     bcdone_bcopy_040\n\
+\n\
+bcf_b_loop_040:\n\
+        movb    a0@+,a1@+           /* copy byte */\n\
+        subql   #1,d1\n\
+        bne     bcf_b_loop_040\n\
+        bra     bcdone_bcopy_040\n\
+\n\
+bcf_small_040:\n\
+        movb    a0@+,a1@+           /* small forward copy */\n\
+        subql   #1,d1\n\
+        bne     bcf_small_040\n\
+        bra     bcdone_bcopy_040\n\
+\n\
+/* ------------------------------------------------------------------ */\n\
+/* Backward copy: src < dst                                           */\n\
+/* ------------------------------------------------------------------ */\n\
+\n\
+bcback_040:\n\
+        addl    d1,a0               /* a0 = src + len */\n\
+        addl    d1,a1               /* a1 = dst + len */\n\
+\n\
+        cmpl    #16,d1              /* small block */\n\
+        blo     bcb_small_040\n\
+\n\
+        /*\n\
+         * Same alignment strategy as forward copy, but backwards.\n\
+         */\n\
+        movl    a0,d0\n\
+        subl    a1,d0\n\
+        andl    #3,d0\n\
+        bne     bcb_noalign_040     /* different alignment -> no pre-align */\n\
+\n\
+        movl    a1,d0\n\
+        andl    #3,d0\n\
+        beq     bcb_lw_entry_040\n\
+\n\
+bcb_align_loop_040:\n\
+        movb    a0@-,a1@-           /* copy byte until dst 4-byte aligned */\n\
+        subql   #1,d1\n\
+        beq     bcdone_bcopy_040\n\
+        movl    a1,d0\n\
+        andl    #3,d0\n\
+        bne     bcb_align_loop_040\n\
+        bra     bcb_lw_entry_040\n\
+\n\
+bcb_noalign_040:\n\
+\n\
+bcb_lw_entry_040:\n\
+        movl    d1,d0\n\
+        lsrl    #4,d0               /* 16-byte / 4-longword blocks */\n\
+        beq     bcb_lw_rem_040\n\
+\n\
+bcb_lw_unroll_040:\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        subql   #1,d0\n\
+        bne     bcb_lw_unroll_040\n\
+\n\
+bcb_lw_rem_040:\n\
+        /*\n\
+         * d1 still holds the original byte count.\n\
+         * It is not decremented by the 16-byte block loop.\n\
+         * Remaining backward longwords after 16-byte / 4-longword blocks:\n\
+         *     (d1 >> 2) & 3\n\
+         * Tail bytes are later computed as d1 & 3.\n\
+         */\n\
+        movl    d1,d0\n\
+        lsrl    #2,d0               /* d0 = len / 4 */\n\
+        andl    #3,d0               /* remaining longwords */\n\
+        beq     bcb_tail_040\n\
+\n\
+bcb_lw_loop_040:\n\
+        movl    a0@-,a1@-\n\
+        subql   #1,d0\n\
+        bne     bcb_lw_loop_040\n\
+\n\
+bcb_tail_040:\n\
+        /*\n\
+         * d1 still holds the original byte count.\n\
+         * Tail bytes are:\n\
+         *     d1 & 3\n\
+         */\n\
+\n\
+        andl    #3,d1               /* remaining bytes */\n\
+        beq     bcdone_bcopy_040\n\
+\n\
+bcb_b_loop_040:\n\
+        movb    a0@-,a1@-           /* copy byte backwards */\n\
+        subql   #1,d1\n\
+        bne     bcb_b_loop_040\n\
+        bra     bcdone_bcopy_040\n\
+\n\
+bcb_small_040:\n\
+        movb    a0@-,a1@-           /* small backward copy */\n\
+        subql   #1,d1\n\
+        bne     bcb_small_040\n\
+\n\
+bcdone_bcopy_040:\n\
+        rts\n\
 ");
 
 #elif BCOPY_CPU_020
@@ -482,187 +482,187 @@ bcdone_bcopy_040:
  */
 
 ENTRY(bcopy)
-asm("
-        movl    sp@(12),d1           /* d1 = len */
-        tstl    d1
-        jle     bcdone_bcopy_020    /* len <= 0 -> nothing to do */
-
-        movl    sp@(4),a0           /* a0 = src */
-        movl    sp@(8),a1           /* a1 = dst */
-
-        cmpl    a1,a0
-        blo     bcback_020          /* src < dst -> copy backwards */
-
-/* ------------------------------------------------------------------ */
-/* Forward copy: src >= dst                                           */
-/* ------------------------------------------------------------------ */
-
-bcforw_020:
-        cmpl    #16,d1              /* small block? */
-        blo     bcf_small_020       /* len < 16 -> byte loop only */
-
-        /*
-         * Try to get 4-byte alignment when src and dst share alignment.
-         * If (a0 - a1) & 3 != 0, skip alignment and still use
-         * longword copy. 020+ tolerates unaligned longwords.
-         */
-        movl    a0,d0
-        subl    a1,d0
-        andl    #3,d0
-        bne     bcf_noalign_020     /* different alignment -> no pre-align */
-
-        /* src and dst share low 2 bits, align dst and thus src to 4 */
-        movl    a1,d0
-        andl    #3,d0
-        beq     bcf_lw_entry_020    /* already 4-byte aligned */
-
-bcf_align_loop_020:
-        movb    a0@+,a1@+           /* copy byte until dst 4-byte aligned */
-        subql   #1,d1
-        beq     bcdone_bcopy_020
-        movl    a1,d0
-        andl    #3,d0
-        bne     bcf_align_loop_020
-        bra     bcf_lw_entry_020
-
-bcf_noalign_020:
-        /* No shared alignment: still do longwords, but without pre-align. */
-
-bcf_lw_entry_020:
-        movl    d1,d0
-        lsrl    #4,d0               /* d0 = len / 16 (4-longword blocks) */
-        beq     bcf_lw_rem_020
-
-bcf_lw_unroll_020:
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        movl    a0@+,a1@+
-        subql   #1,d0
-        bne     bcf_lw_unroll_020
-
-bcf_lw_rem_020:
-        /*
-         * d1 is the remaining byte count after any pre-align bytes.
-         * It is not decremented by the 16-byte block loop.
-         * Remaining forward longwords after 16-byte / 4-longword blocks:
-         *     (d1 >> 2) & 3
-         * Tail bytes are later computed as d1 & 3.
-         */
-
-        movl    d1,d0
-        lsrl    #2,d0               /* d0 = len / 4 (longwords) */
-        andl    #3,d0               /* remaining longwords (0..3) */
-        beq     bcf_tail_020
-
-bcf_lw_loop_020:
-        movl    a0@+,a1@+
-        subql   #1,d0
-        bne     bcf_lw_loop_020
-
-bcf_tail_020:
-        andl    #3,d1               /* remaining bytes */
-        beq     bcdone_bcopy_020
-
-bcf_b_loop_020:
-        movb    a0@+,a1@+           /* copy remaining bytes */
-        subql   #1,d1
-        bne     bcf_b_loop_020
-        bra     bcdone_bcopy_020
-
-bcf_small_020:
-        /* Small forward copy: pure byte loop */
-bcf_small_loop_020:
-        movb    a0@+,a1@+
-        subql   #1,d1
-        bne     bcf_small_loop_020
-        bra     bcdone_bcopy_020
-
-/* ------------------------------------------------------------------ */
-/* Backward copy: src < dst                                           */
-/* ------------------------------------------------------------------ */
-
-bcback_020:
-        addl    d1,a0               /* a0 = src + len */
-        addl    d1,a1               /* a1 = dst + len */
-
-        cmpl    #16,d1              /* small block? */
-        blo     bcb_small_020       /* len < 16 -> byte loop only */
-
-        /*
-         * Same alignment strategy as forward copy, but backwards.
-         */
-        movl    a0,d0
-        subl    a1,d0
-        andl    #3,d0
-        bne     bcb_noalign_020     /* different alignment -> no pre-align */
-
-        movl    a1,d0
-        andl    #3,d0
-        beq     bcb_lw_entry_020
-
-bcb_align_loop_020:
-        movb    a0@-,a1@-           /* copy byte until dst 4-byte aligned */
-        subql   #1,d1
-        beq     bcdone_bcopy_020
-        movl    a1,d0
-        andl    #3,d0
-        bne     bcb_align_loop_020
-        bra     bcb_lw_entry_020
-
-bcb_noalign_020:
-
-bcb_lw_entry_020:
-        movl    d1,d0
-        lsrl    #4,d0               /* d0 = len / 16 (4-longword blocks) */
-        beq     bcb_lw_rem_020
-
-bcb_lw_unroll_020:
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        movl    a0@-,a1@-
-        subql   #1,d0
-        bne     bcb_lw_unroll_020
-
-bcb_lw_rem_020:
-        /*
-         * d1 is the remaining byte count after any pre-align bytes.
-         * It is not decremented by the 16-byte block loop.
-         * Remaining backward longwords after 16-byte / 4-longword blocks:
-         *     (d1 >> 2) & 3
-         * Tail bytes are later computed as d1 & 3.
-         */
-
-        movl    d1,d0
-        lsrl    #2,d0               /* d0 = len / 4 */
-        andl    #3,d0
-        beq     bcb_tail_020
-
-bcb_lw_loop_020:
-        movl    a0@-,a1@-
-        subql   #1,d0
-        bne     bcb_lw_loop_020
-
-bcb_tail_020:
-        andl    #3,d1               /* remaining bytes */
-        beq     bcdone_bcopy_020
-
-bcb_b_loop_020:
-        movb    a0@-,a1@-           /* copy remaining bytes backwards */
-        subql   #1,d1
-        bne     bcb_b_loop_020
-        bra     bcdone_bcopy_020
-
-bcb_small_020:
-        /* Small backward copy: pure byte loop */
-bcb_small_loop_020:
-        movb    a0@-,a1@-
-        subql   #1,d1
-        bne     bcb_small_loop_020
-
-bcdone_bcopy_020:
-        rts
+asm("\n\
+        movl    sp@(12),d1           /* d1 = len */\n\
+        tstl    d1\n\
+        jle     bcdone_bcopy_020    /* len <= 0 -> nothing to do */\n\
+\n\
+        movl    sp@(4),a0           /* a0 = src */\n\
+        movl    sp@(8),a1           /* a1 = dst */\n\
+\n\
+        cmpl    a1,a0\n\
+        blo     bcback_020          /* src < dst -> copy backwards */\n\
+\n\
+/* ------------------------------------------------------------------ */\n\
+/* Forward copy: src >= dst                                           */\n\
+/* ------------------------------------------------------------------ */\n\
+\n\
+bcforw_020:\n\
+        cmpl    #16,d1              /* small block? */\n\
+        blo     bcf_small_020       /* len < 16 -> byte loop only */\n\
+\n\
+        /*\n\
+         * Try to get 4-byte alignment when src and dst share alignment.\n\
+         * If (a0 - a1) & 3 != 0, skip alignment and still use\n\
+         * longword copy. 020+ tolerates unaligned longwords.\n\
+         */\n\
+        movl    a0,d0\n\
+        subl    a1,d0\n\
+        andl    #3,d0\n\
+        bne     bcf_noalign_020     /* different alignment -> no pre-align */\n\
+\n\
+        /* src and dst share low 2 bits, align dst and thus src to 4 */\n\
+        movl    a1,d0\n\
+        andl    #3,d0\n\
+        beq     bcf_lw_entry_020    /* already 4-byte aligned */\n\
+\n\
+bcf_align_loop_020:\n\
+        movb    a0@+,a1@+           /* copy byte until dst 4-byte aligned */\n\
+        subql   #1,d1\n\
+        beq     bcdone_bcopy_020\n\
+        movl    a1,d0\n\
+        andl    #3,d0\n\
+        bne     bcf_align_loop_020\n\
+        bra     bcf_lw_entry_020\n\
+\n\
+bcf_noalign_020:\n\
+        /* No shared alignment: still do longwords, but without pre-align. */\n\
+\n\
+bcf_lw_entry_020:\n\
+        movl    d1,d0\n\
+        lsrl    #4,d0               /* d0 = len / 16 (4-longword blocks) */\n\
+        beq     bcf_lw_rem_020\n\
+\n\
+bcf_lw_unroll_020:\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        movl    a0@+,a1@+\n\
+        subql   #1,d0\n\
+        bne     bcf_lw_unroll_020\n\
+\n\
+bcf_lw_rem_020:\n\
+        /*\n\
+         * d1 is the remaining byte count after any pre-align bytes.\n\
+         * It is not decremented by the 16-byte block loop.\n\
+         * Remaining forward longwords after 16-byte / 4-longword blocks:\n\
+         *     (d1 >> 2) & 3\n\
+         * Tail bytes are later computed as d1 & 3.\n\
+         */\n\
+\n\
+        movl    d1,d0\n\
+        lsrl    #2,d0               /* d0 = len / 4 (longwords) */\n\
+        andl    #3,d0               /* remaining longwords (0..3) */\n\
+        beq     bcf_tail_020\n\
+\n\
+bcf_lw_loop_020:\n\
+        movl    a0@+,a1@+\n\
+        subql   #1,d0\n\
+        bne     bcf_lw_loop_020\n\
+\n\
+bcf_tail_020:\n\
+        andl    #3,d1               /* remaining bytes */\n\
+        beq     bcdone_bcopy_020\n\
+\n\
+bcf_b_loop_020:\n\
+        movb    a0@+,a1@+           /* copy remaining bytes */\n\
+        subql   #1,d1\n\
+        bne     bcf_b_loop_020\n\
+        bra     bcdone_bcopy_020\n\
+\n\
+bcf_small_020:\n\
+        /* Small forward copy: pure byte loop */\n\
+bcf_small_loop_020:\n\
+        movb    a0@+,a1@+\n\
+        subql   #1,d1\n\
+        bne     bcf_small_loop_020\n\
+        bra     bcdone_bcopy_020\n\
+\n\
+/* ------------------------------------------------------------------ */\n\
+/* Backward copy: src < dst                                           */\n\
+/* ------------------------------------------------------------------ */\n\
+\n\
+bcback_020:\n\
+        addl    d1,a0               /* a0 = src + len */\n\
+        addl    d1,a1               /* a1 = dst + len */\n\
+\n\
+        cmpl    #16,d1              /* small block? */\n\
+        blo     bcb_small_020       /* len < 16 -> byte loop only */\n\
+\n\
+        /*\n\
+         * Same alignment strategy as forward copy, but backwards.\n\
+         */\n\
+        movl    a0,d0\n\
+        subl    a1,d0\n\
+        andl    #3,d0\n\
+        bne     bcb_noalign_020     /* different alignment -> no pre-align */\n\
+\n\
+        movl    a1,d0\n\
+        andl    #3,d0\n\
+        beq     bcb_lw_entry_020\n\
+\n\
+bcb_align_loop_020:\n\
+        movb    a0@-,a1@-           /* copy byte until dst 4-byte aligned */\n\
+        subql   #1,d1\n\
+        beq     bcdone_bcopy_020\n\
+        movl    a1,d0\n\
+        andl    #3,d0\n\
+        bne     bcb_align_loop_020\n\
+        bra     bcb_lw_entry_020\n\
+\n\
+bcb_noalign_020:\n\
+\n\
+bcb_lw_entry_020:\n\
+        movl    d1,d0\n\
+        lsrl    #4,d0               /* d0 = len / 16 (4-longword blocks) */\n\
+        beq     bcb_lw_rem_020\n\
+\n\
+bcb_lw_unroll_020:\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        movl    a0@-,a1@-\n\
+        subql   #1,d0\n\
+        bne     bcb_lw_unroll_020\n\
+\n\
+bcb_lw_rem_020:\n\
+        /*\n\
+         * d1 is the remaining byte count after any pre-align bytes.\n\
+         * It is not decremented by the 16-byte block loop.\n\
+         * Remaining backward longwords after 16-byte / 4-longword blocks:\n\
+         *     (d1 >> 2) & 3\n\
+         * Tail bytes are later computed as d1 & 3.\n\
+         */\n\
+\n\
+        movl    d1,d0\n\
+        lsrl    #2,d0               /* d0 = len / 4 */\n\
+        andl    #3,d0\n\
+        beq     bcb_tail_020\n\
+\n\
+bcb_lw_loop_020:\n\
+        movl    a0@-,a1@-\n\
+        subql   #1,d0\n\
+        bne     bcb_lw_loop_020\n\
+\n\
+bcb_tail_020:\n\
+        andl    #3,d1               /* remaining bytes */\n\
+        beq     bcdone_bcopy_020\n\
+\n\
+bcb_b_loop_020:\n\
+        movb    a0@-,a1@-           /* copy remaining bytes backwards */\n\
+        subql   #1,d1\n\
+        bne     bcb_b_loop_020\n\
+        bra     bcdone_bcopy_020\n\
+\n\
+bcb_small_020:\n\
+        /* Small backward copy: pure byte loop */\n\
+bcb_small_loop_020:\n\
+        movb    a0@-,a1@-\n\
+        subql   #1,d1\n\
+        bne     bcb_small_loop_020\n\
+\n\
+bcdone_bcopy_020:\n\
+        rts\n\
 ");
 
 #else  /* BCOPY_CPU_000 */
@@ -677,66 +677,66 @@ bcdone_bcopy_020:
  */
 
 ENTRY(bcopy)
-asm("
-	movl	sp@(12),d1	/* check count */
-	tstl	d1
-	jle	bcdone_bcopy	/* count <= 0, don't do anything */
-	movl	sp@(4),a0	/* src address */
-	movl	sp@(8),a1	/* dest address */
-	cmpl	a1,a0		/* src before dest? */
-	blo	bcback		/* yes, must copy backwards */
-	movl	a0,d0
-	btst	#0,d0		/* src address odd? */
-	jeq	bcfeven		/* no, skip alignment */
-	movb	a0@+,a1@+	/* yes, copy a byte */
-	subql	#1,d1		/* adjust count */
-	jeq	bcdone_bcopy	/* count 0, all done  */
-bcfeven:
-	movl	a1,d0
-	btst	#0,d0		/* dest address odd? */
-	jne	bcfbloop	/* yes, no hope for alignment, copy bytes */
-	movl	d1,d0		/* no, both even */
-	lsrl	#2,d0		/* convert count to longword count */
-	jeq	bcfbloop	/* count 0, skip longword loop */
-bcflloop:
-	movl	a0@+,a1@+	/* copy a longword */
-	subql	#1,d0		/* adjust count */
-	jne	bcflloop	/* still more, keep copying */
-	andl	#3,d1		/* what remains */
-	jeq	bcdone_bcopy	/* nothing, all done */
-bcfbloop:
-	movb	a0@+,a1@+	/* copy a byte */
-	subql	#1,d1		/* adjust count */
-	jne	bcfbloop	/* still more, keep going */
-bcdone_bcopy:
-	rts
-bcback:
-	addl	d1,a0		/* src pointer to end */
-	addl	d1,a1		/* dest pointer to end */
-	movl	a0,d0
-	btst	#0,d0		/* src address odd? */
-	jeq	bcbeven		/* no, skip alignment */
-	movb	a0@-,a1@-	/* yes, copy a byte */
-	subql	#1,d1		/* adjust count */
-	jeq	bcdone_bcopy	/* count 0, all done  */
-bcbeven:
-	movl	a1,d0
-	btst	#0,d0		/* dest address odd? */
-	jne	bcbbloop	/* yes, no hope for alignment, copy bytes */
-	movl	d1,d0		/* no, both even */
-	lsrl	#2,d0		/* convert count to longword count */
-	jeq	bcbbloop	/* count 0, skip longword loop */
-bcblloop:
-	movl	a0@-,a1@-	/* copy a longword */
-	subql	#1,d0		/* adjust count */
-	jne	bcblloop	/* still more, keep copying */
-	andl	#3,d1		/* what remains */
-	jeq	bcdone_bcopy	/* nothing, all done */
-bcbbloop:
-	movb	a0@-,a1@-	/* copy a byte */
-	subql	#1,d1		/* adjust count */
-	jne	bcbbloop	/* still more, keep going */
-	rts
+asm("\n\
+	movl	sp@(12),d1	/* check count */\n\
+	tstl	d1\n\
+	jle	bcdone_bcopy	/* count <= 0, don't do anything */\n\
+	movl	sp@(4),a0	/* src address */\n\
+	movl	sp@(8),a1	/* dest address */\n\
+	cmpl	a1,a0		/* src before dest? */\n\
+	blo	bcback		/* yes, must copy backwards */\n\
+	movl	a0,d0\n\
+	btst	#0,d0		/* src address odd? */\n\
+	jeq	bcfeven		/* no, skip alignment */\n\
+	movb	a0@+,a1@+	/* yes, copy a byte */\n\
+	subql	#1,d1		/* adjust count */\n\
+	jeq	bcdone_bcopy	/* count 0, all done  */\n\
+bcfeven:\n\
+	movl	a1,d0\n\
+	btst	#0,d0		/* dest address odd? */\n\
+	jne	bcfbloop	/* yes, no hope for alignment, copy bytes */\n\
+	movl	d1,d0		/* no, both even */\n\
+	lsrl	#2,d0		/* convert count to longword count */\n\
+	jeq	bcfbloop	/* count 0, skip longword loop */\n\
+bcflloop:\n\
+	movl	a0@+,a1@+	/* copy a longword */\n\
+	subql	#1,d0		/* adjust count */\n\
+	jne	bcflloop	/* still more, keep copying */\n\
+	andl	#3,d1		/* what remains */\n\
+	jeq	bcdone_bcopy	/* nothing, all done */\n\
+bcfbloop:\n\
+	movb	a0@+,a1@+	/* copy a byte */\n\
+	subql	#1,d1		/* adjust count */\n\
+	jne	bcfbloop	/* still more, keep going */\n\
+bcdone_bcopy:\n\
+	rts\n\
+bcback:\n\
+	addl	d1,a0		/* src pointer to end */\n\
+	addl	d1,a1		/* dest pointer to end */\n\
+	movl	a0,d0\n\
+	btst	#0,d0		/* src address odd? */\n\
+	jeq	bcbeven		/* no, skip alignment */\n\
+	movb	a0@-,a1@-	/* yes, copy a byte */\n\
+	subql	#1,d1		/* adjust count */\n\
+	jeq	bcdone_bcopy	/* count 0, all done  */\n\
+bcbeven:\n\
+	movl	a1,d0\n\
+	btst	#0,d0		/* dest address odd? */\n\
+	jne	bcbbloop	/* yes, no hope for alignment, copy bytes */\n\
+	movl	d1,d0		/* no, both even */\n\
+	lsrl	#2,d0		/* convert count to longword count */\n\
+	jeq	bcbbloop	/* count 0, skip longword loop */\n\
+bcblloop:\n\
+	movl	a0@-,a1@-	/* copy a longword */\n\
+	subql	#1,d0		/* adjust count */\n\
+	jne	bcblloop	/* still more, keep copying */\n\
+	andl	#3,d1		/* what remains */\n\
+	jeq	bcdone_bcopy	/* nothing, all done */\n\
+bcbbloop:\n\
+	movb	a0@-,a1@-	/* copy a byte */\n\
+	subql	#1,d1		/* adjust count */\n\
+	jne	bcbbloop	/* still more, keep going */\n\
+	rts\n\
 ");
 
 #endif

@@ -48,45 +48,45 @@
 #include "defs.h"
 
 ENTRY(memrchr)
-asm("
-	movl	sp@(4),a0	/* memory block */
-	movb	sp@(11),d0	/* byte to look for */
-	movl	sp@(12),d1	/* byte count */
-	jeq	memrchrnotfound
-
-	addl	d1,a0		/* one byte past the search area */
-
-memrchrloop:
-	cmpl	#4,d1
-	jcs	memrchrtail
-
-	cmpb	a0@-,d0		/* byte 4 */
-	jeq	memrchrfound
-	cmpb	a0@-,d0		/* byte 3 */
-	jeq	memrchrfound
-	cmpb	a0@-,d0		/* byte 2 */
-	jeq	memrchrfound
-	cmpb	a0@-,d0		/* byte 1 */
-	jeq	memrchrfound
-
-	subql	#4,d1
-	jne	memrchrloop
-	bra	memrchrnotfound
-
-memrchrtail:
-	tstl	d1
-	jeq	memrchrnotfound
-memrchrtail_loop:
-	cmpb	a0@-,d0
-	jeq	memrchrfound
-	subql	#1,d1
-	jne	memrchrtail_loop
-
-memrchrnotfound:
-	moveq	#0,d0
-	rts
-
-memrchrfound:
-	movl	a0,d0		/* a0 was pre-decremented */
-	rts
+asm("\n\
+	movl	sp@(4),a0	/* memory block */\n\
+	movb	sp@(11),d0	/* byte to look for */\n\
+	movl	sp@(12),d1	/* byte count */\n\
+	jeq	memrchrnotfound\n\
+\n\
+	addl	d1,a0		/* one byte past the search area */\n\
+\n\
+memrchrloop:\n\
+	cmpl	#4,d1\n\
+	jcs	memrchrtail\n\
+\n\
+	cmpb	a0@-,d0		/* byte 4 */\n\
+	jeq	memrchrfound\n\
+	cmpb	a0@-,d0		/* byte 3 */\n\
+	jeq	memrchrfound\n\
+	cmpb	a0@-,d0		/* byte 2 */\n\
+	jeq	memrchrfound\n\
+	cmpb	a0@-,d0		/* byte 1 */\n\
+	jeq	memrchrfound\n\
+\n\
+	subql	#4,d1\n\
+	jne	memrchrloop\n\
+	bra	memrchrnotfound\n\
+\n\
+memrchrtail:\n\
+	tstl	d1\n\
+	jeq	memrchrnotfound\n\
+memrchrtail_loop:\n\
+	cmpb	a0@-,d0\n\
+	jeq	memrchrfound\n\
+	subql	#1,d1\n\
+	jne	memrchrtail_loop\n\
+\n\
+memrchrnotfound:\n\
+	moveq	#0,d0\n\
+	rts\n\
+\n\
+memrchrfound:\n\
+	movl	a0,d0		/* a0 was pre-decremented */\n\
+	rts\n\
 ");

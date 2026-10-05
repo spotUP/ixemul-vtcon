@@ -26,10 +26,10 @@
 #include "defs.h"
 
 ENTRY(abs)
-asm("
-	movl	sp@(4),d0
-	jge	L1
-	negl	d0
-L1:
-	rts
+asm("\n\
+	movl	sp@(4),d0\n\
+	jge	Labs_done\n\
+	negl	d0\n\
+Labs_done:\n\
+	rts\n\
 ");

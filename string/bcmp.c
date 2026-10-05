@@ -95,91 +95,91 @@
  * 32-byte main loop.  Keep the loop counter fully 32-bit.
  */
 ENTRY(bcmp)
-asm("
-	movl	sp@(4),a0		/* string 1 */
-	movl	sp@(8),a1		/* string 2 */
-	movl	sp@(12),d1		/* length */
-	tstl	d1
-	jeq	.Lbc060_done
-
-	/* Small blocks: avoid alignment setup. */
-	cmpl	#8,d1
-	jcs	.Lbc060_byte
-
-	/* Word-align string 1.  68060 permits unaligned accesses to string 2. */
-	movl	a0,d0
-	btst	#0,d0
-	jeq	.Lbc060_even
-	cmpmb	a0@+,a1@+
-	jne	.Lbc060_noteq
-	subql	#1,d1
-	addql	#1,d0
-
-.Lbc060_even:
-	/* Longword-align string 1. */
-	btst	#1,d0
-	jeq	.Lbc060_aligned
-	cmpmw	a0@+,a1@+
-	jne	.Lbc060_noteq
-	subql	#2,d1
-
-.Lbc060_aligned:
-	/* Compare 32 bytes per main-loop iteration. */
-	movl	d1,d0
-	lsrl	#5,d0
-	jeq	.Lbc060_long
-	andl	#31,d1
-
-.Lbc060_32loop:
-	cmpml	a0@+,a1@+
-	jne	.Lbc060_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc060_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc060_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc060_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc060_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc060_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc060_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc060_noteq
-	subql	#1,d0
-	jne	.Lbc060_32loop
-
-.Lbc060_long:
-	tstl	d1
-	jeq	.Lbc060_done
-	movl	d1,d0
-	lsrl	#2,d0
-	jeq	.Lbc060_byte
-	andl	#3,d1
-
-.Lbc060_longloop:
-	cmpml	a0@+,a1@+
-	jne	.Lbc060_noteq
-	subql	#1,d0
-	jne	.Lbc060_longloop
-
-	tstl	d1
-	jeq	.Lbc060_done
-
-.Lbc060_byte:
-	cmpmb	a0@+,a1@+
-	jne	.Lbc060_noteq
-	subql	#1,d1
-	jne	.Lbc060_byte
-
-.Lbc060_done:
-	moveq	#0,d0
-	rts
-
-.Lbc060_noteq:
-	moveq	#1,d0
-	rts
+asm("\n\
+	movl	sp@(4),a0		/* string 1 */\n\
+	movl	sp@(8),a1		/* string 2 */\n\
+	movl	sp@(12),d1		/* length */\n\
+	tstl	d1\n\
+	jeq	.Lbc060_done\n\
+\n\
+	/* Small blocks: avoid alignment setup. */\n\
+	cmpl	#8,d1\n\
+	jcs	.Lbc060_byte\n\
+\n\
+	/* Word-align string 1.  68060 permits unaligned accesses to string 2. */\n\
+	movl	a0,d0\n\
+	btst	#0,d0\n\
+	jeq	.Lbc060_even\n\
+	cmpmb	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	subql	#1,d1\n\
+	addql	#1,d0\n\
+\n\
+.Lbc060_even:\n\
+	/* Longword-align string 1. */\n\
+	btst	#1,d0\n\
+	jeq	.Lbc060_aligned\n\
+	cmpmw	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	subql	#2,d1\n\
+\n\
+.Lbc060_aligned:\n\
+	/* Compare 32 bytes per main-loop iteration. */\n\
+	movl	d1,d0\n\
+	lsrl	#5,d0\n\
+	jeq	.Lbc060_long\n\
+	andl	#31,d1\n\
+\n\
+.Lbc060_32loop:\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	subql	#1,d0\n\
+	jne	.Lbc060_32loop\n\
+\n\
+.Lbc060_long:\n\
+	tstl	d1\n\
+	jeq	.Lbc060_done\n\
+	movl	d1,d0\n\
+	lsrl	#2,d0\n\
+	jeq	.Lbc060_byte\n\
+	andl	#3,d1\n\
+\n\
+.Lbc060_longloop:\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	subql	#1,d0\n\
+	jne	.Lbc060_longloop\n\
+\n\
+	tstl	d1\n\
+	jeq	.Lbc060_done\n\
+\n\
+.Lbc060_byte:\n\
+	cmpmb	a0@+,a1@+\n\
+	jne	.Lbc060_noteq\n\
+	subql	#1,d1\n\
+	jne	.Lbc060_byte\n\
+\n\
+.Lbc060_done:\n\
+	moveq	#0,d0\n\
+	rts\n\
+\n\
+.Lbc060_noteq:\n\
+	moveq	#1,d0\n\
+	rts\n\
 ");
 
 #elif defined(__mc68040__)
@@ -191,87 +191,87 @@ asm("
  * full 32-bit SUBQ/BNE loop counter.
  */
 ENTRY(bcmp)
-asm("
-	movl	sp@(4),a0
-	movl	sp@(8),a1
-	movl	sp@(12),d1
-	tstl	d1
-	jeq	.Lbc040_done
-
-	cmpl	#8,d1
-	jcs	.Lbc040_byte
-
-	movl	a0,d0
-	btst	#0,d0
-	jeq	.Lbc040_even
-	cmpmb	a0@+,a1@+
-	jne	.Lbc040_noteq
-	subql	#1,d1
-	addql	#1,d0
-
-.Lbc040_even:
-	btst	#1,d0
-	jeq	.Lbc040_aligned
-	cmpmw	a0@+,a1@+
-	jne	.Lbc040_noteq
-	subql	#2,d1
-
-.Lbc040_aligned:
-	movl	d1,d0
-	lsrl	#5,d0
-	jeq	.Lbc040_long
-	andl	#31,d1
-
-.Lbc040_32loop:
-	cmpml	a0@+,a1@+
-	jne	.Lbc040_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc040_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc040_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc040_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc040_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc040_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc040_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc040_noteq
-	subql	#1,d0
-	jne	.Lbc040_32loop
-
-.Lbc040_long:
-	tstl	d1
-	jeq	.Lbc040_done
-	movl	d1,d0
-	lsrl	#2,d0
-	jeq	.Lbc040_byte
-	andl	#3,d1
-
-.Lbc040_longloop:
-	cmpml	a0@+,a1@+
-	jne	.Lbc040_noteq
-	subql	#1,d0
-	jne	.Lbc040_longloop
-
-	tstl	d1
-	jeq	.Lbc040_done
-
-.Lbc040_byte:
-	cmpmb	a0@+,a1@+
-	jne	.Lbc040_noteq
-	subql	#1,d1
-	jne	.Lbc040_byte
-
-.Lbc040_done:
-	moveq	#0,d0
-	rts
-
-.Lbc040_noteq:
-	moveq	#1,d0
-	rts
+asm("\n\
+	movl	sp@(4),a0\n\
+	movl	sp@(8),a1\n\
+	movl	sp@(12),d1\n\
+	tstl	d1\n\
+	jeq	.Lbc040_done\n\
+\n\
+	cmpl	#8,d1\n\
+	jcs	.Lbc040_byte\n\
+\n\
+	movl	a0,d0\n\
+	btst	#0,d0\n\
+	jeq	.Lbc040_even\n\
+	cmpmb	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	subql	#1,d1\n\
+	addql	#1,d0\n\
+\n\
+.Lbc040_even:\n\
+	btst	#1,d0\n\
+	jeq	.Lbc040_aligned\n\
+	cmpmw	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	subql	#2,d1\n\
+\n\
+.Lbc040_aligned:\n\
+	movl	d1,d0\n\
+	lsrl	#5,d0\n\
+	jeq	.Lbc040_long\n\
+	andl	#31,d1\n\
+\n\
+.Lbc040_32loop:\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	subql	#1,d0\n\
+	jne	.Lbc040_32loop\n\
+\n\
+.Lbc040_long:\n\
+	tstl	d1\n\
+	jeq	.Lbc040_done\n\
+	movl	d1,d0\n\
+	lsrl	#2,d0\n\
+	jeq	.Lbc040_byte\n\
+	andl	#3,d1\n\
+\n\
+.Lbc040_longloop:\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	subql	#1,d0\n\
+	jne	.Lbc040_longloop\n\
+\n\
+	tstl	d1\n\
+	jeq	.Lbc040_done\n\
+\n\
+.Lbc040_byte:\n\
+	cmpmb	a0@+,a1@+\n\
+	jne	.Lbc040_noteq\n\
+	subql	#1,d1\n\
+	jne	.Lbc040_byte\n\
+\n\
+.Lbc040_done:\n\
+	moveq	#0,d0\n\
+	rts\n\
+\n\
+.Lbc040_noteq:\n\
+	moveq	#1,d0\n\
+	rts\n\
 ");
 
 #elif defined(__mc68020__) || defined(__mc68030__)
@@ -284,92 +284,92 @@ asm("
  * long-running unrolled loop.  Byte tails use a full 32-bit count.
  */
 ENTRY(bcmp)
-asm("
-	movl	sp@(4),a0
-	movl	sp@(8),a1
-	movl	sp@(12),d1
-	tstl	d1
-	jeq	.Lbc020_done
-
-	cmpl	#8,d1
-	jcs	.Lbc020_byte
-
-	movl	a0,d0
-	btst	#0,d0
-	jeq	.Lbc020_even
-	cmpmb	a0@+,a1@+
-	jne	.Lbc020_noteq
-	subql	#1,d1
-	addql	#1,d0
-
-.Lbc020_even:
-	btst	#1,d0
-	jeq	.Lbc020_aligned
-	cmpmw	a0@+,a1@+
-	jne	.Lbc020_noteq
-	subql	#2,d1
-
-.Lbc020_aligned:
-	movl	d1,d0
-	lsrl	#5,d0
-	jeq	.Lbc020_long
-	andl	#31,d1
-	subql	#1,d0
-
-.Lbc020_32loop:
-	cmpml	a0@+,a1@+
-	jne	.Lbc020_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc020_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc020_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc020_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc020_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc020_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc020_noteq
-	cmpml	a0@+,a1@+
-	jne	.Lbc020_noteq
-	dbf	d0,.Lbc020_32loop
-	clrw	d0
-	subql	#1,d0
-	jcc	.Lbc020_32loop
-
-.Lbc020_long:
-	tstl	d1
-	jeq	.Lbc020_done
-	movl	d1,d0
-	lsrl	#2,d0
-	jeq	.Lbc020_byte
-	subql	#1,d0
-
-.Lbc020_longloop:
-	cmpml	a0@+,a1@+
-	jne	.Lbc020_noteq
-	dbf	d0,.Lbc020_longloop
-	clrw	d0
-	subql	#1,d0
-	jcc	.Lbc020_longloop
-
-	andl	#3,d1
-	jeq	.Lbc020_done
-
-.Lbc020_byte:
-	cmpmb	a0@+,a1@+
-	jne	.Lbc020_noteq
-	subql	#1,d1
-	jne	.Lbc020_byte
-
-.Lbc020_done:
-	moveq	#0,d0
-	rts
-
-.Lbc020_noteq:
-	moveq	#1,d0
-	rts
+asm("\n\
+	movl	sp@(4),a0\n\
+	movl	sp@(8),a1\n\
+	movl	sp@(12),d1\n\
+	tstl	d1\n\
+	jeq	.Lbc020_done\n\
+\n\
+	cmpl	#8,d1\n\
+	jcs	.Lbc020_byte\n\
+\n\
+	movl	a0,d0\n\
+	btst	#0,d0\n\
+	jeq	.Lbc020_even\n\
+	cmpmb	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	subql	#1,d1\n\
+	addql	#1,d0\n\
+\n\
+.Lbc020_even:\n\
+	btst	#1,d0\n\
+	jeq	.Lbc020_aligned\n\
+	cmpmw	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	subql	#2,d1\n\
+\n\
+.Lbc020_aligned:\n\
+	movl	d1,d0\n\
+	lsrl	#5,d0\n\
+	jeq	.Lbc020_long\n\
+	andl	#31,d1\n\
+	subql	#1,d0\n\
+\n\
+.Lbc020_32loop:\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	dbf	d0,.Lbc020_32loop\n\
+	clrw	d0\n\
+	subql	#1,d0\n\
+	jcc	.Lbc020_32loop\n\
+\n\
+.Lbc020_long:\n\
+	tstl	d1\n\
+	jeq	.Lbc020_done\n\
+	movl	d1,d0\n\
+	lsrl	#2,d0\n\
+	jeq	.Lbc020_byte\n\
+	subql	#1,d0\n\
+\n\
+.Lbc020_longloop:\n\
+	cmpml	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	dbf	d0,.Lbc020_longloop\n\
+	clrw	d0\n\
+	subql	#1,d0\n\
+	jcc	.Lbc020_longloop\n\
+\n\
+	andl	#3,d1\n\
+	jeq	.Lbc020_done\n\
+\n\
+.Lbc020_byte:\n\
+	cmpmb	a0@+,a1@+\n\
+	jne	.Lbc020_noteq\n\
+	subql	#1,d1\n\
+	jne	.Lbc020_byte\n\
+\n\
+.Lbc020_done:\n\
+	moveq	#0,d0\n\
+	rts\n\
+\n\
+.Lbc020_noteq:\n\
+	moveq	#1,d0\n\
+	rts\n\
 ");
 
 #else
@@ -382,97 +382,97 @@ asm("
  * accesses remain safe on the oldest supported processors.
  */
 ENTRY(bcmp)
-asm("
-	movl	sp@(4),a0	/* string 1 */
-	movl	sp@(8),a1	/* string 2 */
-	movl	sp@(12),d0	/* length */
-	jeq	bcdone_bcmp	/* if zero, nothing to do */
-
-	movl	a0,d1
-	btst	#0,d1		/* string 1 address odd? */
-	jeq	bceven		/* no, skip alignment */
-	cmpmb	a0@+,a1@+	/* yes, compare a byte */
-	jne	bcnoteq		/* not equal, return non-zero */
-	subql	#1,d0		/* adjust count */
-	jeq	bcdone_bcmp	/* count 0, return zero */
-
-bceven:
-	movl	a1,d1
-	btst	#0,d1		/* string 2 address odd? */
-	jne	bcbcheck		/* yes, compare bytes */
-
-	/*
-	 * Both addresses are even.  Compare 16 bytes per main-loop
-	 * iteration, then handle remaining longwords and bytes.
-	 */
-	cmpl	#16,d0
-	jcs	bclcheck
-
-bcl16loop:
-	cmpml	a0@+,a1@+
-	jne	bcnoteq
-	cmpml	a0@+,a1@+
-	jne	bcnoteq
-	cmpml	a0@+,a1@+
-	jne	bcnoteq
-	cmpml	a0@+,a1@+
-	jne	bcnoteq
-	subl	#16,d0
-	jeq	bcdone_bcmp
-	cmpl	#16,d0
-	jcc	bcl16loop
-
-bclcheck:
-	cmpl	#4,d0
-	jcs	bcbtail
-
-bcltail:
-	cmpml	a0@+,a1@+
-	jne	bcnoteq
-	subql	#4,d0
-	jeq	bcdone_bcmp
-	cmpl	#4,d0
-	jcc	bcltail
-	bra	bcbtail
-
-	/*
-	 * Different address parity: longword accesses cannot be used safely
-	 * on 68000, so compare four bytes per main-loop iteration.
-	 */
-bcbcheck:
-	cmpl	#4,d0
-	jcs	bcbtail
-
-bcb4loop:
-	cmpmb	a0@+,a1@+
-	jne	bcnoteq
-	cmpmb	a0@+,a1@+
-	jne	bcnoteq
-	cmpmb	a0@+,a1@+
-	jne	bcnoteq
-	cmpmb	a0@+,a1@+
-	jne	bcnoteq
-	subql	#4,d0
-	jeq	bcdone_bcmp
-	cmpl	#4,d0
-	jcc	bcb4loop
-
-bcbtail:
-	tstl	d0
-	jeq	bcdone_bcmp
-
-bcbloop:
-	cmpmb	a0@+,a1@+
-	jne	bcnoteq
-	subql	#1,d0
-	jne	bcbloop
-
-bcdone_bcmp:
-	rts
-
-bcnoteq:
-	moveq	#1,d0
-	rts
+asm("\n\
+	movl	sp@(4),a0	/* string 1 */\n\
+	movl	sp@(8),a1	/* string 2 */\n\
+	movl	sp@(12),d0	/* length */\n\
+	jeq	bcdone_bcmp	/* if zero, nothing to do */\n\
+\n\
+	movl	a0,d1\n\
+	btst	#0,d1		/* string 1 address odd? */\n\
+	jeq	bceven		/* no, skip alignment */\n\
+	cmpmb	a0@+,a1@+	/* yes, compare a byte */\n\
+	jne	bcnoteq		/* not equal, return non-zero */\n\
+	subql	#1,d0		/* adjust count */\n\
+	jeq	bcdone_bcmp	/* count 0, return zero */\n\
+\n\
+bceven:\n\
+	movl	a1,d1\n\
+	btst	#0,d1		/* string 2 address odd? */\n\
+	jne	bcbcheck		/* yes, compare bytes */\n\
+\n\
+	/*\n\
+	 * Both addresses are even.  Compare 16 bytes per main-loop\n\
+	 * iteration, then handle remaining longwords and bytes.\n\
+	 */\n\
+	cmpl	#16,d0\n\
+	jcs	bclcheck\n\
+\n\
+bcl16loop:\n\
+	cmpml	a0@+,a1@+\n\
+	jne	bcnoteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	bcnoteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	bcnoteq\n\
+	cmpml	a0@+,a1@+\n\
+	jne	bcnoteq\n\
+	subl	#16,d0\n\
+	jeq	bcdone_bcmp\n\
+	cmpl	#16,d0\n\
+	jcc	bcl16loop\n\
+\n\
+bclcheck:\n\
+	cmpl	#4,d0\n\
+	jcs	bcbtail\n\
+\n\
+bcltail:\n\
+	cmpml	a0@+,a1@+\n\
+	jne	bcnoteq\n\
+	subql	#4,d0\n\
+	jeq	bcdone_bcmp\n\
+	cmpl	#4,d0\n\
+	jcc	bcltail\n\
+	bra	bcbtail\n\
+\n\
+	/*\n\
+	 * Different address parity: longword accesses cannot be used safely\n\
+	 * on 68000, so compare four bytes per main-loop iteration.\n\
+	 */\n\
+bcbcheck:\n\
+	cmpl	#4,d0\n\
+	jcs	bcbtail\n\
+\n\
+bcb4loop:\n\
+	cmpmb	a0@+,a1@+\n\
+	jne	bcnoteq\n\
+	cmpmb	a0@+,a1@+\n\
+	jne	bcnoteq\n\
+	cmpmb	a0@+,a1@+\n\
+	jne	bcnoteq\n\
+	cmpmb	a0@+,a1@+\n\
+	jne	bcnoteq\n\
+	subql	#4,d0\n\
+	jeq	bcdone_bcmp\n\
+	cmpl	#4,d0\n\
+	jcc	bcb4loop\n\
+\n\
+bcbtail:\n\
+	tstl	d0\n\
+	jeq	bcdone_bcmp\n\
+\n\
+bcbloop:\n\
+	cmpmb	a0@+,a1@+\n\
+	jne	bcnoteq\n\
+	subql	#1,d0\n\
+	jne	bcbloop\n\
+\n\
+bcdone_bcmp:\n\
+	rts\n\
+\n\
+bcnoteq:\n\
+	moveq	#1,d0\n\
+	rts\n\
 ");
 
 #endif

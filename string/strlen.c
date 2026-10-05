@@ -33,20 +33,20 @@
 #include "defs.h"
 
 ENTRY(strlen)
-asm("
-	movl	sp@(4),a0	/* string */
-	movl	a0,d0
-slloop:
-	tstb	a0@+
-	jeq	sldone
-	tstb	a0@+
-	jeq	sldone
-	tstb	a0@+
-	jeq	sldone
-	tstb	a0@+
-	jne	slloop
-sldone:
-	subl	a0,d0
-	notl	d0
-	rts
+asm("\n\
+	movl	sp@(4),a0	/* string */\n\
+	movl	a0,d0\n\
+slloop:\n\
+	tstb	a0@+\n\
+	jeq	sldone\n\
+	tstb	a0@+\n\
+	jeq	sldone\n\
+	tstb	a0@+\n\
+	jeq	sldone\n\
+	tstb	a0@+\n\
+	jne	slloop\n\
+sldone:\n\
+	subl	a0,d0\n\
+	notl	d0\n\
+	rts\n\
 ");

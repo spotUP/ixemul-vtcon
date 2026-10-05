@@ -24,12 +24,12 @@
 #include "defs.h"
 
 ENTRY(strcpy)
-asm("
-	movl	sp@(8),a0		/* a0 = fromaddr */
-	movl	sp@(4),d0		/* return value is toaddr */
-	movl	d0,a1			/* a1 = toaddr */
-strcpyloop:
-	movb	a0@+,a1@+		/* copy a byte */
-	jne	strcpyloop		/* copied non-null, keep going */
-	rts
+asm("\n\
+	movl	sp@(8),a0		/* a0 = fromaddr */\n\
+	movl	sp@(4),d0		/* return value is toaddr */\n\
+	movl	d0,a1			/* a1 = toaddr */\n\
+strcpyloop:\n\
+	movb	a0@+,a1@+		/* copy a byte */\n\
+	jne	strcpyloop		/* copied non-null, keep going */\n\
+	rts\n\
 ");

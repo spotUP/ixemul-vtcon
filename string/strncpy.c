@@ -35,51 +35,51 @@
  */
 
 ENTRY(strncpy)
-asm("
-	movl	sp@(4),d0		/* return destination */
-	movl	sp@(12),d1		/* count */
-	jeq	.Lsn_done
-	movl	sp@(8),a0		/* source */
-	movl	d0,a1			/* destination */
-
-	/*
-	 * Bias the count for DBEQ.  Each DBEQ pass handles one 16-bit
-	 * count block while preserving the upper half of d1.
-	 */
-	subql	#1,d1
-
-.Lsn_copy:
-	movb	a0@+,a1@+
-	dbeq	d1,.Lsn_copy
-	jeq	.Lsn_pad_entry
-
-	/*
-	 * DBEQ exhausted the low word without copying NUL.
-	 * Advance to the next 16-bit block if the 32-bit count remains.
-	 */
-	clrw	d1
-	subql	#1,d1
-	jcc	.Lsn_copy
-	rts
-
-.Lsn_pad_entry:
-	/*
-	 * The terminating NUL has already consumed one byte of the count.
-	 */
-	subql	#1,d1
-	jcs	.Lsn_done
-
-.Lsn_pad:
-	clrb	a1@+
-	dbra	d1,.Lsn_pad
-
-	/*
-	 * Continue padding when a higher 16-bit count block remains.
-	 */
-	clrw	d1
-	subql	#1,d1
-	jcc	.Lsn_pad
-
-.Lsn_done:
-	rts
+asm("\n\
+	movl	sp@(4),d0		/* return destination */\n\
+	movl	sp@(12),d1		/* count */\n\
+	jeq	.Lsn_done\n\
+	movl	sp@(8),a0		/* source */\n\
+	movl	d0,a1			/* destination */\n\
+\n\
+	/*\n\
+	 * Bias the count for DBEQ.  Each DBEQ pass handles one 16-bit\n\
+	 * count block while preserving the upper half of d1.\n\
+	 */\n\
+	subql	#1,d1\n\
+\n\
+.Lsn_copy:\n\
+	movb	a0@+,a1@+\n\
+	dbeq	d1,.Lsn_copy\n\
+	jeq	.Lsn_pad_entry\n\
+\n\
+	/*\n\
+	 * DBEQ exhausted the low word without copying NUL.\n\
+	 * Advance to the next 16-bit block if the 32-bit count remains.\n\
+	 */\n\
+	clrw	d1\n\
+	subql	#1,d1\n\
+	jcc	.Lsn_copy\n\
+	rts\n\
+\n\
+.Lsn_pad_entry:\n\
+	/*\n\
+	 * The terminating NUL has already consumed one byte of the count.\n\
+	 */\n\
+	subql	#1,d1\n\
+	jcs	.Lsn_done\n\
+\n\
+.Lsn_pad:\n\
+	clrb	a1@+\n\
+	dbra	d1,.Lsn_pad\n\
+\n\
+	/*\n\
+	 * Continue padding when a higher 16-bit count block remains.\n\
+	 */\n\
+	clrw	d1\n\
+	subql	#1,d1\n\
+	jcc	.Lsn_pad\n\
+\n\
+.Lsn_done:\n\
+	rts\n\
 ");

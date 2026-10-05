@@ -66,7 +66,7 @@ int
 ix_timer(char *foobar, ...)
 {
   register struct Task	*t_pass	asm ("a1");
-  register u_int	a5 asm ("a5");
+  u_int			a5;
   struct Task		*me;
   struct user		*p;
   u_int			current_pc;
@@ -77,10 +77,12 @@ ix_timer(char *foobar, ...)
 
   /*
    * The timer interrupt enters with the target task in a1.
-   * GCC generates a5 as the frame pointer for this varargs function.
-   * Mark both fixed registers as defined at this ABI boundary.
+   * GCC generates a5 as the frame pointer for this varargs function;
+   * __builtin_frame_address(0) is that a5 (gcc 3+ refuse a register
+   * variable bound to the frame pointer).
    */
-  __asm__ __volatile__ ("" : "=a" (t_pass), "=a" (a5));
+  __asm__ __volatile__ ("" : "=a" (t_pass));
+  a5 = (u_int) __builtin_frame_address (0);
 
   me = t_pass;
   p = getuser(me);
@@ -168,7 +170,7 @@ int
 ix_timer (char *foobar, ...)
 {
   u_int			current_pc;
-  register u_int	a5 asm ("a5");
+  u_int			a5;
   u_int			sp;
   struct Task		*current_task;
   struct ixnode         *node;
@@ -177,7 +179,7 @@ ix_timer (char *foobar, ...)
    * GCC generates a5 as the frame pointer for this varargs function.
    * Mark the fixed register as defined at this ABI boundary.
    */
-  __asm__ __volatile__ ("" : "=a" (a5));
+  a5 = (u_int) __builtin_frame_address (0);
 
   current_task = FindTask(0);
 

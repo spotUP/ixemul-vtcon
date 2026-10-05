@@ -543,61 +543,61 @@ vfork_own_malloc (void)
 }
 
 
-asm ("
-	.globl _vfork
-	.globl _ix_vfork
-	.globl _ix_vfork_resume
-_vfork:
-	| store a setjmp () compatible frame on the stack to pass to _vfork ()
-	lea	sp@(-18*4),sp		| _JBLEN (17) longs on the stack
-	pea	sp@
-	jbsr	_setjmp
-	addqw	#4,sp
-	| now patch sp and pc, since they differ
-	addl	#20*4,sp@(8)		| account for buffer space
-	movel	sp@(18*4),sp@(20)	| insert real PC (return addr on stack)
-	| tell _vfork *not* yet to switch to own malloc-list
-	pea	0:W
-	bsr	__vfork
-	lea	sp@(18*4 + 4),sp
-	rts
-
-_ix_vfork:
-	| this is the vfork used in older versions of the library
-	lea	sp@(-18*4),sp		| _JBLEN (17) longs on the stack
-	pea	sp@
-	jbsr	_setjmp
-	addqw	#4,sp
-	| now patch sp and pc, since they differ
-	addl	#20*4,sp@(8)		| account for buffer space
-	movel	sp@(18*4),sp@(20)	| insert real PC (return addr on stack)
-	| tell _vfork to have the child run with own malloc-list.
-	pea	1:W
-	bsr	__vfork
-	lea	sp@(18*4 + 4),sp
-	rts
-
-
-	| the following is longjmp(), with the subtle difference that this
-	| thing doesn't insist in returning something non-zero... 
-_vfork_longjmp:
-	movel	sp@(4),a0	/* save area pointer */
-	tstl	a0@(8)		/* ensure non-zero SP */
-	jeq	Lbotch		/* oops! */
-	movel	sp@(8),d0	/* grab return value */
-	moveml	a0@(28),d2-d7/a2-a4/a6	/* restore non-scratch regs */
-	movel	a0,sp@-		/* let sigreturn */
-	jbsr	_sigreturn	/*   finish for us */
-
-Lbotch:
-	jsr	_longjmperror
-	stop	#0
-
-_ix_vfork_resume:
-	pea	sp@		| pass the sp containing the return address
-	bsr	__vfork_resume
-	addqw	#4,sp
-	rts
+asm ("\n\
+	.globl _vfork\n\
+	.globl _ix_vfork\n\
+	.globl _ix_vfork_resume\n\
+_vfork:\n\
+	| store a setjmp () compatible frame on the stack to pass to _vfork ()\n\
+	lea	sp@(-18*4),sp		| _JBLEN (17) longs on the stack\n\
+	pea	sp@\n\
+	jbsr	_setjmp\n\
+	addqw	#4,sp\n\
+	| now patch sp and pc, since they differ\n\
+	addl	#20*4,sp@(8)		| account for buffer space\n\
+	movel	sp@(18*4),sp@(20)	| insert real PC (return addr on stack)\n\
+	| tell _vfork *not* yet to switch to own malloc-list\n\
+	pea	0:W\n\
+	bsr	__vfork\n\
+	lea	sp@(18*4 + 4),sp\n\
+	rts\n\
+\n\
+_ix_vfork:\n\
+	| this is the vfork used in older versions of the library\n\
+	lea	sp@(-18*4),sp		| _JBLEN (17) longs on the stack\n\
+	pea	sp@\n\
+	jbsr	_setjmp\n\
+	addqw	#4,sp\n\
+	| now patch sp and pc, since they differ\n\
+	addl	#20*4,sp@(8)		| account for buffer space\n\
+	movel	sp@(18*4),sp@(20)	| insert real PC (return addr on stack)\n\
+	| tell _vfork to have the child run with own malloc-list.\n\
+	pea	1:W\n\
+	bsr	__vfork\n\
+	lea	sp@(18*4 + 4),sp\n\
+	rts\n\
+\n\
+\n\
+	| the following is longjmp(), with the subtle difference that this\n\
+	| thing doesn't insist in returning something non-zero... \n\
+_vfork_longjmp:\n\
+	movel	sp@(4),a0	/* save area pointer */\n\
+	tstl	a0@(8)		/* ensure non-zero SP */\n\
+	jeq	Lbotch		/* oops! */\n\
+	movel	sp@(8),d0	/* grab return value */\n\
+	moveml	a0@(28),d2-d7/a2-a4/a6	/* restore non-scratch regs */\n\
+	movel	a0,sp@-		/* let sigreturn */\n\
+	jbsr	_sigreturn	/*   finish for us */\n\
+\n\
+Lbotch:\n\
+	jsr	_longjmperror\n\
+	stop	#0\n\
+\n\
+_ix_vfork_resume:\n\
+	pea	sp@		| pass the sp containing the return address\n\
+	bsr	__vfork_resume\n\
+	addqw	#4,sp\n\
+	rts\n\
 ");
 
 /*

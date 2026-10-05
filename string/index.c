@@ -25,16 +25,16 @@
 
 ENTRY(index)
 ENTRY(strchr)
-asm("
-	movl	sp@(4),a0	/* string */
-	movb	sp@(11),d0	/* char to look for */
-ixloop:
-	cmpb	a0@,d0		/* found our char? */
-	jeq	ixfound		/* yes, break out */
-	tstb	a0@+		/* null? */
-	jne	ixloop		/* no, keep going */
-	subal	a0,a0		/* not found, return null */
-ixfound:
-	movl	a0,d0		/* found, return pointer */
-	rts
+asm("\n\
+	movl	sp@(4),a0	/* string */\n\
+	movb	sp@(11),d0	/* char to look for */\n\
+ixloop:\n\
+	cmpb	a0@,d0		/* found our char? */\n\
+	jeq	ixfound		/* yes, break out */\n\
+	tstb	a0@+		/* null? */\n\
+	jne	ixloop		/* no, keep going */\n\
+	subal	a0,a0		/* not found, return null */\n\
+ixfound:\n\
+	movl	a0,d0		/* found, return pointer */\n\
+	rts\n\
 ");

@@ -48,7 +48,7 @@
 /* host-to-network 32-bit conversion. */
 
 ENTRY(htonl)
-asm("
-	movl	sp@(4),d0
-	rts
+asm("\n\
+	movl	sp@(4),d0\n\
+	rts\n\
 ");

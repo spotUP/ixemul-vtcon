@@ -26,15 +26,15 @@
 #include "defs.h"
 
 ENTRY(ffs)
-asm("
-	moveq	#-1,d0
-	movl	sp@(4),d1
-	beq	done
-again:
-	addql	#1,d0
-	btst	d0,d1
-	beq	again
-done:
-	addql	#1,d0
-	rts
+asm("\n\
+	moveq	#-1,d0\n\
+	movl	sp@(4),d1\n\
+	beq	done\n\
+again:\n\
+	addql	#1,d0\n\
+	btst	d0,d1\n\
+	beq	again\n\
+done:\n\
+	addql	#1,d0\n\
+	rts\n\
 ");

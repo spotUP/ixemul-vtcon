@@ -520,19 +520,24 @@ setrun (struct Task *t)
    *       return from a kill() to yourself, before the signal handler had a
    *       chance to react accordingly to the signal..
    */
+  /* Supervisor() (exec -30) may change d0, d1, a0 and a1: all of them are
+   * clobbers, or a caller this is inlined into (sig_launch, gcc 16 -O2)
+   * keeps live values in d0/d1 across it and the task hangs (UP-Term).
+   * The labels carry %= so each inlined copy has its own. sr comes back
+   * in a data register: a5 is borrowed here. */
   asm volatile (" \n\
     movel a5,a0\n\
-    lea	  L_get_sr,a5\n\
+    lea	  L_get_sr%=,a5\n\
     movel 4:w,a6\n\
     jsr	  a6@(-0x1e)\n\
     movel a1,%0\n\
-    bra	  L_skip\n\
-L_get_sr:\n\
+    bra	  L_skip%=\n\
+L_get_sr%=:\n\
     movew sp@,a1	| get sr register from the calling function\n\
     rte\n\
-L_skip:\n\
+L_skip%=:\n\
     movel a0,a5\n\
-	" : "=g" (sr) : : "a0", "a1", "a6");
+	" : "=d" (sr) : : "d0", "d1", "a0", "a1", "a6", "cc", "memory");
 
   /* Don't force context switch if:
      o  running in Supervisor mode

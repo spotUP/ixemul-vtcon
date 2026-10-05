@@ -26,13 +26,13 @@
 #include "defs.h"
 
 ENTRY(insque)
-asm("
-	movl	sp@(8),a0
-	movl	sp@(4),a1
-	movl	a0@,a1@
-	movl	a0,a1@(4)
-	movl	a1,a0@
-	movl	a1@,a0
-	movl	a1,a0@(4)
-	rts
+asm("\n\
+	movl	sp@(8),a0\n\
+	movl	sp@(4),a1\n\
+	movl	a0@,a1@\n\
+	movl	a0,a1@(4)\n\
+	movl	a1,a0@\n\
+	movl	a1@,a0\n\
+	movl	a1,a0@(4)\n\
+	rts\n\
 ");

@@ -8,118 +8,118 @@
 /*
  * Glue asm to C.
  */
-asm("
-	.globl	___stkext
-___stkext:
-	moveml	d0/d1/a0/a1/a6,sp@-
-	subqw	#4,sp		| sigset_t
-	jbsr	_atomic_on
-	subw	#12,sp		| struct StackSwapStruct
-	jbsr	_stkext
-	tstl	d0
-	jeq	s_noext
-	movel	4:W,a6
-	movel	sp,a0
-	jsr	a6@(-0x2dc)	| StackSwap(a0)
-s_ret:
-	jbsr	_atomic_off
-	addqw	#4,sp		| StackSwapStruct is not copied
-	moveml	sp@+,d0/d1/a0/a1/a6
-	rts
-s_noext:
-	addw	#12,sp
-	jra	s_ret
-
-	.globl	___stkext_f    | see above
-___stkext_f:
-	moveml	d0/d1/a0/a1/a6,sp@-
-	subqw	#4,sp
-	jbsr	_atomic_on
-	subw	#12,sp
-	jbsr	_stkext_f
-	tstl	d0
-	jeq	sf_noext
-	movel	4:W,a6
-	movel	sp,a0
-	jsr	a6@(-0x2dc)
-sf_ret:
-	jbsr	_atomic_off
-	addqw	#4,sp
-	moveml	sp@+,d0/d1/a0/a1/a6
-  	rts
-sf_noext:
-	addw	#12,sp
-	jra	sf_ret
-  
-	.globl	___stkext_startup
-___stkext_startup:
-	moveml	d0/d1/a0/a1/a6,sp@-
-	subqw	#4,sp
-	jbsr	_atomic_on	| FIXME: Is this necessary/allowed that early?
-	subw	#12,sp
-	jbsr	_stkext_startup
-	tstl	d0
-	jeq	ss_noext
-	movel	4:W,a6
-	movel	sp,a0
-	jsr	a6@(-0x2dc)
-ss_ret:
-	jbsr	_atomic_off	| FIXME: Is this necessary/allowed that early?
-	addqw	#4,sp
-	moveml	sp@+,d0/d1/a0/a1/a6
-  	rts
-ss_noext:
-	addw	#12,sp
-	jra	ss_ret
-
-	.globl	___stkrst_f    | see above
-___stkrst_f:
-	moveml	d0/d1/a0/a1/a6,sp@-
-	subqw	#4,sp
-	jbsr	_atomic_on
-	subw	#12,sp
-	jbsr	_stkrst_f
-	movel	4:W,a6
-	movel	sp,a0
-	jsr	a6@(-0x2dc)
-	jbsr	_atomic_off
-	addqw	#4,sp
-	moveml	sp@+,d0/d1/a0/a1/a6
-  	rts
-  
-	.globl	___stkrst
-___stkrst:
-	moveml	d0/d1/a0/a1/a6,sp@-	    | preserve registers
-	subqw	#4,sp		| make room for the signal mask
-	jbsr	_atomic_on	| disable all signals
-	subw	#12,sp		| make room for a StackSwapStruct
-	jbsr	_stkrst		| calculate either target sp or StackSwapStruct
-	tstl	d0		| set target sp?
-	jeq	swpfrm		| jump if not
-	movel	d0,a0		| I have a lot of preserved registers and
-				| returnadresses on the stack. It's necessary
-				| to copy them to the new location
-	moveq	#6,d0		| 1 rts, 5 regs and 1 signal mask to copy (1+5+1)-1=6
-	lea	sp@(40:W),a1	| get address of uppermost byte+1 (1+5+1)*4+12=40
-	cmpl	a0,a1		| compare with target location
-	jls	lp1		| jump if source<=target
-	lea	a0@(-28:W),a0	| else start at lower bound (1+5+1)*4=28
-	lea	a1@(-28:W),a1
-	movel	a0,sp		| set sp to reserve the room
-lp0:	movel	a1@+,a0@+	| copy with raising addresses
-	dbra	d0,lp0		| as long as d0>=0.
-	jra	endlp		| ready
-lp1:	movel	a1@-,a0@-	| copy with falling addresses
-	dbra	d0,lp1		| as long as d0>=0
-	movel	a0,sp		| finally set sp
-	jra	endlp		| ready
-swpfrm:	movel	4:W,a6		| If sp wasn't set call StackSwap()
-	movel	sp,a0
-	jsr	a6@(-0x2dc)
-endlp:	jbsr	_atomic_off	| reenable signals
-	addqw	#4,sp		| adjust sp
-	moveml	sp@+,d0/d1/a0/a1/a6	    | restore registers
-	rts			| and return
+asm("\n\
+	.globl	___stkext\n\
+___stkext:\n\
+	moveml	d0/d1/a0/a1/a6,sp@-\n\
+	subqw	#4,sp		| sigset_t\n\
+	jbsr	_atomic_on\n\
+	subw	#12,sp		| struct StackSwapStruct\n\
+	jbsr	_stkext\n\
+	tstl	d0\n\
+	jeq	s_noext\n\
+	movel	4:W,a6\n\
+	movel	sp,a0\n\
+	jsr	a6@(-0x2dc)	| StackSwap(a0)\n\
+s_ret:\n\
+	jbsr	_atomic_off\n\
+	addqw	#4,sp		| StackSwapStruct is not copied\n\
+	moveml	sp@+,d0/d1/a0/a1/a6\n\
+	rts\n\
+s_noext:\n\
+	addw	#12,sp\n\
+	jra	s_ret\n\
+\n\
+	.globl	___stkext_f    | see above\n\
+___stkext_f:\n\
+	moveml	d0/d1/a0/a1/a6,sp@-\n\
+	subqw	#4,sp\n\
+	jbsr	_atomic_on\n\
+	subw	#12,sp\n\
+	jbsr	_stkext_f\n\
+	tstl	d0\n\
+	jeq	sf_noext\n\
+	movel	4:W,a6\n\
+	movel	sp,a0\n\
+	jsr	a6@(-0x2dc)\n\
+sf_ret:\n\
+	jbsr	_atomic_off\n\
+	addqw	#4,sp\n\
+	moveml	sp@+,d0/d1/a0/a1/a6\n\
+  	rts\n\
+sf_noext:\n\
+	addw	#12,sp\n\
+	jra	sf_ret\n\
+  \n\
+	.globl	___stkext_startup\n\
+___stkext_startup:\n\
+	moveml	d0/d1/a0/a1/a6,sp@-\n\
+	subqw	#4,sp\n\
+	jbsr	_atomic_on	| FIXME: Is this necessary/allowed that early?\n\
+	subw	#12,sp\n\
+	jbsr	_stkext_startup\n\
+	tstl	d0\n\
+	jeq	ss_noext\n\
+	movel	4:W,a6\n\
+	movel	sp,a0\n\
+	jsr	a6@(-0x2dc)\n\
+ss_ret:\n\
+	jbsr	_atomic_off	| FIXME: Is this necessary/allowed that early?\n\
+	addqw	#4,sp\n\
+	moveml	sp@+,d0/d1/a0/a1/a6\n\
+  	rts\n\
+ss_noext:\n\
+	addw	#12,sp\n\
+	jra	ss_ret\n\
+\n\
+	.globl	___stkrst_f    | see above\n\
+___stkrst_f:\n\
+	moveml	d0/d1/a0/a1/a6,sp@-\n\
+	subqw	#4,sp\n\
+	jbsr	_atomic_on\n\
+	subw	#12,sp\n\
+	jbsr	_stkrst_f\n\
+	movel	4:W,a6\n\
+	movel	sp,a0\n\
+	jsr	a6@(-0x2dc)\n\
+	jbsr	_atomic_off\n\
+	addqw	#4,sp\n\
+	moveml	sp@+,d0/d1/a0/a1/a6\n\
+  	rts\n\
+  \n\
+	.globl	___stkrst\n\
+___stkrst:\n\
+	moveml	d0/d1/a0/a1/a6,sp@-	    | preserve registers\n\
+	subqw	#4,sp		| make room for the signal mask\n\
+	jbsr	_atomic_on	| disable all signals\n\
+	subw	#12,sp		| make room for a StackSwapStruct\n\
+	jbsr	_stkrst		| calculate either target sp or StackSwapStruct\n\
+	tstl	d0		| set target sp?\n\
+	jeq	swpfrm		| jump if not\n\
+	movel	d0,a0		| I have a lot of preserved registers and\n\
+				| returnadresses on the stack. It's necessary\n\
+				| to copy them to the new location\n\
+	moveq	#6,d0		| 1 rts, 5 regs and 1 signal mask to copy (1+5+1)-1=6\n\
+	lea	sp@(40:W),a1	| get address of uppermost byte+1 (1+5+1)*4+12=40\n\
+	cmpl	a0,a1		| compare with target location\n\
+	jls	lp1		| jump if source<=target\n\
+	lea	a0@(-28:W),a0	| else start at lower bound (1+5+1)*4=28\n\
+	lea	a1@(-28:W),a1\n\
+	movel	a0,sp		| set sp to reserve the room\n\
+lp0:	movel	a1@+,a0@+	| copy with raising addresses\n\
+	dbra	d0,lp0		| as long as d0>=0.\n\
+	jra	endlp		| ready\n\
+lp1:	movel	a1@-,a0@-	| copy with falling addresses\n\
+	dbra	d0,lp1		| as long as d0>=0\n\
+	movel	a0,sp		| finally set sp\n\
+	jra	endlp		| ready\n\
+swpfrm:	movel	4:W,a6		| If sp wasn't set call StackSwap()\n\
+	movel	sp,a0\n\
+	jsr	a6@(-0x2dc)\n\
+endlp:	jbsr	_atomic_off	| reenable signals\n\
+	addqw	#4,sp		| adjust sp\n\
+	moveml	sp@+,d0/d1/a0/a1/a6	    | restore registers\n\
+	rts			| and return\n\
 ");
 
 void __stkrst_f(void);

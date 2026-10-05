@@ -26,11 +26,11 @@
 #include "defs.h"
 
 ENTRY(remque)
-asm("
-	movl	sp@(4),a0
-	movl	a0@,a1
-	movl	a0@(4),a0
-	movl	a0,a1@(4)
-	movl	a1,a0@
-	rts
+asm("\n\
+	movl	sp@(4),a0\n\
+	movl	a0@,a1\n\
+	movl	a0@(4),a0\n\
+	movl	a0,a1@(4)\n\
+	movl	a1,a0@\n\
+	rts\n\
 ");

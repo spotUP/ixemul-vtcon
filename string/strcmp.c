@@ -74,50 +74,50 @@
  */
 
 ENTRY(strcmp)
-asm("
-	movl	sp@(4),a0		/* string1 */
-	movl	sp@(8),a1		/* string2 */
-
-.Lstrcmp_loop:
-	movb	a0@+,d1
-	jeq	.Lstrcmp_zero
-	subb	a1@+,d1
-	jne	.Lstrcmp_diff
-
-	movb	a0@+,d1
-	jeq	.Lstrcmp_zero
-	subb	a1@+,d1
-	jne	.Lstrcmp_diff
-
-	movb	a0@+,d1
-	jeq	.Lstrcmp_zero
-	subb	a1@+,d1
-	jne	.Lstrcmp_diff
-
-	movb	a0@+,d1
-	jeq	.Lstrcmp_zero
-	subb	a1@+,d1
-	jeq	.Lstrcmp_loop
-
-.Lstrcmp_diff:
-	/*
-	 * SUBB leaves the low byte of the true unsigned-char difference
-	 * in d1 and sets carry on borrow.  Build the correct signed 32-bit
-	 * result without loading either string byte again.
-	 */
-	scs	d0
-	extw	d0
-	extl	d0
-	movb	d1,d0
-	rts
-
-.Lstrcmp_zero:
-	/*
-	 * string1 ended.  Return 0 - (unsigned char)*string2.
-	 * a1 has not yet been advanced for this byte.
-	 */
-	moveq	#0,d0
-	movb	a1@,d0
-	negl	d0
-	rts
+asm("\n\
+	movl	sp@(4),a0		/* string1 */\n\
+	movl	sp@(8),a1		/* string2 */\n\
+\n\
+.Lstrcmp_loop:\n\
+	movb	a0@+,d1\n\
+	jeq	.Lstrcmp_zero\n\
+	subb	a1@+,d1\n\
+	jne	.Lstrcmp_diff\n\
+\n\
+	movb	a0@+,d1\n\
+	jeq	.Lstrcmp_zero\n\
+	subb	a1@+,d1\n\
+	jne	.Lstrcmp_diff\n\
+\n\
+	movb	a0@+,d1\n\
+	jeq	.Lstrcmp_zero\n\
+	subb	a1@+,d1\n\
+	jne	.Lstrcmp_diff\n\
+\n\
+	movb	a0@+,d1\n\
+	jeq	.Lstrcmp_zero\n\
+	subb	a1@+,d1\n\
+	jeq	.Lstrcmp_loop\n\
+\n\
+.Lstrcmp_diff:\n\
+	/*\n\
+	 * SUBB leaves the low byte of the true unsigned-char difference\n\
+	 * in d1 and sets carry on borrow.  Build the correct signed 32-bit\n\
+	 * result without loading either string byte again.\n\
+	 */\n\
+	scs	d0\n\
+	extw	d0\n\
+	extl	d0\n\
+	movb	d1,d0\n\
+	rts\n\
+\n\
+.Lstrcmp_zero:\n\
+	/*\n\
+	 * string1 ended.  Return 0 - (unsigned char)*string2.\n\
+	 * a1 has not yet been advanced for this byte.\n\
+	 */\n\
+	moveq	#0,d0\n\
+	movb	a1@,d0\n\
+	negl	d0\n\
+	rts\n\
 ");

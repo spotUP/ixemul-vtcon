@@ -36,28 +36,28 @@ double frexp(double value, int *eptr)
 
 /* fabs(double) */
 ENTRY(fabs)
-asm("
-	movel	sp@(4),d0
-	movel	sp@(8),d1
-	bclr	#31,d0
-	rts
+asm("\n\
+	movel	sp@(4),d0\n\
+	movel	sp@(8),d1\n\
+	bclr	#31,d0\n\
+	rts\n\
 ");
 
 /* -double */
 ENTRY(__negdf2)
-asm("
-	movel	sp@(4),d0
-	movel	sp@(8),d1
-	bchg	#31,d0
-	rts
+asm("\n\
+	movel	sp@(4),d0\n\
+	movel	sp@(8),d1\n\
+	bchg	#31,d0\n\
+	rts\n\
 ");
 
 /* -single */
 ENTRY(__negsf2)
-asm("
-	movel	sp@(4),d0
-	bchg	#31,d0
-	rts
+asm("\n\
+	movel	sp@(4),d0\n\
+	bchg	#31,d0\n\
+	rts\n\
 ");
 
 
@@ -245,32 +245,32 @@ float __addsf3(float a, float b)
 /* double < double: -1 */
 /* double == double: 0 */
 ENTRY(__cmpdf2)
-asm("
-	fmoved	sp@(4),fp0
-	fcmpd	sp@(12),fp0
-	fbgt	Lagtb1
-	fslt	d0
-	extbl	d0
-	rts
-Lagtb1:
-	moveq	#1,d0
-	rts
+asm("\n\
+	fmoved	sp@(4),fp0\n\
+	fcmpd	sp@(12),fp0\n\
+	fbgt	Lagtb1\n\
+	fslt	d0\n\
+	extbl	d0\n\
+	rts\n\
+Lagtb1:\n\
+	moveq	#1,d0\n\
+	rts\n\
 ");
 
 /* single > single: 1 */
 /* single < single: -1 */
 /* single == single: 0 */
 ENTRY(__cmpsf2)
-asm("
-	fmoves	sp@(4),fp0
-	fcmps	sp@(8),fp0
-	fbgt	Lagtb2
-	fslt	d0
-	extbl	d0
-	rts
-Lagtb2:
-	moveq	#1,d0
-	rts
+asm("\n\
+	fmoves	sp@(4),fp0\n\
+	fcmps	sp@(8),fp0\n\
+	fbgt	Lagtb2\n\
+	fslt	d0\n\
+	extbl	d0\n\
+	rts\n\
+Lagtb2:\n\
+	moveq	#1,d0\n\
+	rts\n\
 ");
 
 /* double / double */
@@ -338,16 +338,16 @@ double __floatsidf(SItype a)
  * returns: val * (2**exp), for integer exp
  */
 ENTRY(ldexp)
-asm("
-	fmoved		sp@(4),fp0
-	fbeq		Ldone
-	ftwotoxl	sp@(12),fp1
-	fmulx		fp1,fp0
-Ldone:
-	fmoved		fp0,sp@-
-	movel		sp@+,d0
-	movel		sp@+,d1
-	rts
+asm("\n\
+	fmoved		sp@(4),fp0\n\
+	fbeq		Ldone\n\
+	ftwotoxl	sp@(12),fp1\n\
+	fmulx		fp1,fp0\n\
+Ldone:\n\
+	fmoved		fp0,sp@-\n\
+	movel		sp@+,d0\n\
+	movel		sp@+,d1\n\
+	rts\n\
 ");
 
 /*
@@ -355,16 +355,16 @@ Ldone:
  * returns: xxx and n (in *iptr) where val == n.xxx
  */
 ENTRY(modf)
-asm("
-	fmoved	sp@(4),fp0
-	movel	sp@(12),a0
-	fintrzx	fp0,fp1
-	fmoved	fp1,a0@
-	fsubx	fp1,fp0
-	fmoved	fp0,sp@-
-	movel	sp@+,d0
-	movel	sp@+,d1
-	rts
+asm("\n\
+	fmoved	sp@(4),fp0\n\
+	movel	sp@(12),a0\n\
+	fintrzx	fp0,fp1\n\
+	fmoved	fp1,a0@\n\
+	fsubx	fp1,fp0\n\
+	fmoved	fp0,sp@-\n\
+	movel	sp@+,d0\n\
+	movel	sp@+,d1\n\
+	rts\n\
 ");
 
 

@@ -333,37 +333,42 @@ struct lockinfo
   int result;
 };
 
+/* The stack pointers and SR are machine state the compiler cannot see:
+ * "memory" makes each a barrier, so gcc 3+ do not move them across calls
+ * (sig_launch compared the usp from before psig() pushed a signal frame,
+ * and the task hung with gcc 16 -O2; UP-Term). */
 static inline u_int get_usp (void) 
 { 
   u_int res;
 
-  asm volatile ("movel	usp,%0" : "=a" (res));
+  asm volatile ("movel	usp,%0" : "=a" (res) : : "memory");
   return res;
 }
 
 static inline void set_usp (u_int new_usp)
 {
-  asm volatile ("movel  %0,usp" : /* no output */ : "a" (new_usp));
+  asm volatile ("movel  %0,usp" : /* no output */ : "a" (new_usp) : "memory");
 }
 
 static inline u_int get_sp (void) 
 { 
   u_int res;
 
-  asm volatile ("movel	sp,%0" : "=a" (res));
+  asm volatile ("movel	sp,%0" : "=a" (res) : : "memory");
   return res;
 }
 
 static inline void set_sp (u_int new_sp)
 {
-  asm volatile ("movel  %0,sp" : /* no output */ : "a" (new_sp));
+  asm volatile ("movel  %0,sp" : /* no output */ : "a" (new_sp) : "memory");
 }
 
 static inline u_short get_sr (void) 
 { 
   u_short res;
 
-  asm volatile ("movew	sr,%0" : "=g" (res));
+  /* SR moves to a data register or memory only ("=g" let gcc 16 pick a0) */
+  asm volatile ("movew	sr,%0" : "=dm" (res) : : "memory");
   return res;
 }
 

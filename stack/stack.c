@@ -7,12 +7,12 @@
 #define str(s) #s
 #define sstr(s) str(s)
 
-asm("
-	.data
-	.even
-	.globl	___stack
-	.ascii	\"StCk\"	| Magic cookie
-___stack:
-	.long	" sstr(STACKSIZE) "
-	.ascii	\"sTcK\"	| Magic cookie
+asm("\n\
+	.data\n\
+	.even\n\
+	.globl	___stack\n\
+	.ascii	\"StCk\"	| Magic cookie\n\
+___stack:\n\
+	.long	" sstr(STACKSIZE) "\n\
+	.ascii	\"sTcK\"	| Magic cookie\n\
 ");
