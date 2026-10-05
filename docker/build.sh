@@ -6,7 +6,13 @@
 set -e
 cd "$(dirname "$0")/.."
 PATH=/Applications/Docker.app/Contents/Resources/bin:$PATH
-docker build -f docker/Dockerfile -t ixemul-gcc295 . >/dev/null
+# The image's gcc is configured with this tree's include/ (--with-headers),
+# so any header edit would rebuild gcc 2.95.3 under amd64 emulation. The
+# library's own Makefiles put include/ first anyway: build the image once,
+# or again with IMAGE_REBUILD=1 after a Dockerfile change.
+if [ -n "$IMAGE_REBUILD" ] || ! docker image inspect ixemul-gcc295 >/dev/null 2>&1; then
+  docker build -f docker/Dockerfile -t ixemul-gcc295 . >/dev/null
+fi
 rm -rf build295 && mkdir build295
 docker run --rm --platform linux/amd64 \
   -v "$PWD":/ix \
