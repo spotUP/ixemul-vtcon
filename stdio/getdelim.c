@@ -33,6 +33,10 @@
  * and works with ixemul's 1991 FILE implementation.
  */
 
+/* usetup: the library's own header, not whichever file all.c put first */
+#define _KERNEL
+#include "ixemul.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>

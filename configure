@@ -1516,7 +1516,7 @@ ac_given_INSTALL="$INSTALL"
 
 trap 'rm -fr `echo "Makefile general/Makefile library/Makefile libsrc/Makefile
 	  static/Makefile stdio/Makefile stdlib/Makefile string/Makefile
-	  ixnet/Makefile stack/Makefile net/Makefile db/Makefile glue/Makefile
+	  ixnet/Makefile intops/Makefile stack/Makefile net/Makefile db/Makefile glue/Makefile
 	  utils/Makefile man/Makefile" | sed "s/:[^ ]*//g"` conftest*; exit 1' 1 2 15
 EOF
 cat >> $CONFIG_STATUS <<EOF
@@ -1620,7 +1620,7 @@ cat >> $CONFIG_STATUS <<EOF
 
 CONFIG_FILES=\${CONFIG_FILES-"Makefile general/Makefile library/Makefile libsrc/Makefile
 	  static/Makefile stdio/Makefile stdlib/Makefile string/Makefile
-	  ixnet/Makefile stack/Makefile net/Makefile db/Makefile glue/Makefile
+	  ixnet/Makefile intops/Makefile stack/Makefile net/Makefile db/Makefile glue/Makefile
 	  utils/Makefile man/Makefile"}
 EOF
 cat >> $CONFIG_STATUS <<\EOF

@@ -17,6 +17,10 @@
  *
  */
 
+/* usetup: the library's own header, not whichever file all.c put first */
+#define _KERNEL
+#include "ixemul.h"
+
 #include <time.h>
 #include <sys/time.h>
 #include <unistd.h>

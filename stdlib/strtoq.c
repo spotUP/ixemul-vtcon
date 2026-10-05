@@ -35,6 +35,10 @@
 static char sccsid[] = "@(#)strtoq.c	5.1 (Berkeley) 6/26/92";
 #endif /* LIBC_SCCS and not lint */
 
+/* usetup: the library's own header, not whichever file all.c put first */
+#define _KERNEL
+#include "ixemul.h"
+
 #include <sys/types.h>
 
 #include <limits.h>

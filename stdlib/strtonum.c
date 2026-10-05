@@ -25,6 +25,10 @@
  *  Added ixemul errno setup and defensive NULL input handling.
  */
 
+/* usetup: the library's own header, not whichever file all.c put first */
+#define _KERNEL
+#include "ixemul.h"
+
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>

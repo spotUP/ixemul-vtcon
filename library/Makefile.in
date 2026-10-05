@@ -56,7 +56,10 @@ endif
 # $(srcdir) = ixemul/library
 # $(topdir) = ixemul
 
-INCS = -I$(srcdir) -I$(true_srcdir) -I$(topdir)/include -I.
+# ../inlines: GG's inline headers beside the ixemul tree (48.2 had them;
+# without them the NDK's inline/intuition.h is used, whose varargs stubs
+# reference a global IntuitionBase the library does not have)
+INCS = -I$(srcdir) -I$(topdir)/include -I$(topdir)/../inlines/include -I.
 STD_CFLAGS = $(CFLAGS) $(INCS) $(OTHER_CFLAGS) -g
 ALL_CFLAGS = $(FLAVOR_CFLAGS) $(STD_CFLAGS)
 
@@ -83,8 +86,9 @@ SRC_MISC =	parse_version.c create_header.c tracecntl.c
 SRC_OTHERS =	hwck.c trap.c ix_timer.c debugstub.c
 OBJ_OTHERS =	$(SRC_OTHERS:.c=.o)
 
-SRC =           $(filter-out $(SRC_A4) $(SRC_OTHERS) $(SRC_MISC),$(notdir $(wildcard $(srcdir)/*.c)))
-
+# all.c includes the sources in this order: sorted, so every build machine
+# catenates the same way (make 4.1 returns wildcards in directory order).
+SRC =           $(sort $(filter-out $(SRC_A4) $(SRC_OTHERS) $(SRC_MISC),$(notdir $(wildcard $(srcdir)/*.c))))
 SRC___ =	$(filter _%,$(SRC))
 SRC_AH =	$(filter a% b% c% d% e% f% g% h%,$(SRC))
 SRC_II =	$(filter i%,$(SRC))

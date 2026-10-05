@@ -46,8 +46,9 @@ LIB =		libstring.a
 .c.o:
 		$(CC) $(ALL_CFLAGS) -c $< -o $@
 
-SRC =           $(notdir $(wildcard $(srcdir)/*.c))
-
+# all.c includes the sources in this order: sorted, so every build machine
+# catenates the same way (make 4.1 returns wildcards in directory order).
+SRC =           $(sort $(notdir $(wildcard $(srcdir)/*.c)))
 $(LIB) :	all.o
 		rm -f $@
 		$(AR) rv $@ $^

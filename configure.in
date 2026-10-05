@@ -14,5 +14,5 @@ AC_CHECK_HEADER(inline/exec.h, , \
 
 AC_OUTPUT(Makefile general/Makefile library/Makefile libsrc/Makefile
 	  static/Makefile stdio/Makefile stdlib/Makefile string/Makefile
-	  ixnet/Makefile stack/Makefile net/Makefile db/Makefile glue/Makefile
+	  ixnet/Makefile intops/Makefile stack/Makefile net/Makefile db/Makefile glue/Makefile
 	  utils/Makefile man/Makefile)

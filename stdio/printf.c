@@ -43,6 +43,10 @@ static char sccsid[] = "@(#)printf.c	8.1 (Berkeley) 6/4/93";
 static char rcsid[] = "$NetBSD: printf.c,v 1.5 1995/02/02 02:10:13 jtc Exp $";
 #endif /* LIBC_SCCS and not lint */
 
+/* usetup: the library's own header, not whichever file all.c put first */
+#define _KERNEL
+#include "ixemul.h"
+
 #include <stdio.h>
 #if __STDC__
 #include <stdarg.h>

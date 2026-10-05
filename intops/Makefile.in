@@ -9,10 +9,14 @@ AR      ?= ar
 RANLIB  ?= ranlib
 RM      ?= rm -f
 
-ifneq ($(wildcard bswap16.s),)
-SRCDIR = .
-else
+# configure writes this as intops/Makefile; make runs it in
+# intops/CPU/FPU/OS. In the source tree srcdir is ".", three levels up from
+# there; out of the tree (build295/) it is the source's intops/ itself.
+srcdir = @srcdir@
+ifeq ($(srcdir),.)
 SRCDIR = ../../..
+else
+SRCDIR = $(srcdir)
 endif
 
 VPATH = $(SRCDIR)

@@ -71,8 +71,9 @@ all: ixnet.library ixnet.debug
 SRC_A4 =	set_errno.c siglaunch.c
 SRC_MISC =	create_header.c parse_version.c
 
-SRC =           $(filter-out $(SRC_A4) $(SRC_MISC),$(notdir $(wildcard $(srcdir)/*.c)))
-
+# all.c includes the sources in this order: sorted, so every build machine
+# catenates the same way (make 4.1 returns wildcards in directory order).
+SRC =           $(sort $(filter-out $(SRC_A4) $(SRC_MISC),$(notdir $(wildcard $(srcdir)/*.c))))
 OBJ_N = 	start.o
 
 IXLIBS =	$(LIB)

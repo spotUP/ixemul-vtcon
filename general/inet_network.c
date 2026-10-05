@@ -35,6 +35,10 @@
 static char sccsid[] = "@(#)inet_addr.c 5.10 (Berkeley) 2/24/91";
 #endif /* LIBC_SCCS and not lint */
 
+/* usetup: the library's own header, not whichever file all.c put first */
+#define _KERNEL
+#include "ixemul.h"
+
 #include <sys/param.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>

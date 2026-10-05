@@ -49,8 +49,9 @@ LIB =		libgeneral.a
 
 A4_SRC =	glob.c
 
-SRC =           $(filter-out $(A4_SRC),$(notdir $(wildcard $(srcdir)/*.c)))
-
+# all.c includes the sources in this order: sorted, so every build machine
+# catenates the same way (make 4.1 returns wildcards in directory order).
+SRC =           $(sort $(filter-out $(A4_SRC),$(notdir $(wildcard $(srcdir)/*.c))))
 $(LIB):		all.o a4.o
 		rm -f $@
 		$(AR) rv $@ $^
