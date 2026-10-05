@@ -103,14 +103,14 @@ same build, and the UP-Term kit installs both libraries.
 - [ ] R7 SIGWINCH redraw (tmux, vim, less) and the 20-exits-while-dragging freeze recipe
 - [x] R8 CPython c3-sentinel all OK; vector-audit 0 mismatches
 - [x] R9 nvim_rig --tui, --v012 --tui
-- [ ] R10 upterm-ports grep 3.12, ncurses 6.6 cases; spawnprobe
+- [x] R10 upterm-ports grep 3.12, ncurses 6.6 cases; spawnprobe
 - [x] R11 mallocbench 48.2 vs 80.x recorded
 
 ### M8 SDK and ports
-- [ ] M8.1 SDK headers from 80.x + ours; resolve libgen.h (const vs writable), poll.h
+- [x] M8.1 SDK headers from 80.x + ours; resolve libgen.h (const vs writable), poll.h
       (nfds_t, POLLWR*), neovim's netdb.h addrinfo
-- [ ] M8.2 `make -C compat install` (the stale 4.6 KB libixcompat.a, section 4)
-- [ ] M8.3 Rebuild CPython, neovim (0.4.4, 0.12.5), tmux, screen, upterm-ports; re-run
+- [x] M8.2 `make -C compat install` (the stale 4.6 KB libixcompat.a, section 4)
+- [x] M8.3 Rebuild CPython, neovim (0.4.4, 0.12.5), tmux, screen, upterm-ports; re-run
       R4, R8, R9, R10
 
 ### M9 Land
@@ -154,6 +154,16 @@ same build, and the UP-Term kit installs both libraries.
 - FS-UAE aborted (host malloc) when nvim, run without -i NONE and with no
   HOME, wrote its ShaDa into a host folder named "~" on BOOTX: -- a host
   file system bug of FS-UAE, not ixemul; with -i NONE the same runs pass.
+
+- M8 (2026-10-05): SDK headers from 80.x + ours installed
+  (docker/install-sdk-headers.sh; backup ~/opt/ixemul-sdk-backup-2026-10-05.tgz),
+  libixcompat installed (46 KB, was the stale 4.6 KB). libc.a stays 48.2's
+  stub set, so rebuilt ports run on both libraries. Fixes it needed:
+  libixcompat stpcpy/mempcpy (gcc writes calls to them once declared),
+  neovim-amiga compat netdb.h defers to 80.x's (be3c4e5). Rebuilt and
+  rig-checked on 80.x: CPython sentinel 27 OK, tmux 6/7, screen 4/4, nvim
+  0.4.4 8/8 and 0.12.5 9/9, grep+ncurses cases 22/22, spawnprobe the known
+  13/14 (same on 48.2). On 48.2: sentinel 27 OK, nvim 0.12.5 9/9, tmux 6/7.
 
 ## Decisions log
 
