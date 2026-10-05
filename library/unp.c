@@ -533,8 +533,9 @@ copy_unix_path(const struct sockaddr *name, int namelen,
   while (len < path_bytes && sun->sun_path[len] != '\0')
     len++;
 
-  if (len == path_bytes)
-    return EINVAL;
+  /* the path may fill namelen without a NUL: BSD's SUN_LEN and GNU
+     screen's strlen(path) + 2 give exactly that (screen's bind failed
+     with EINVAL; UP-Term). It ends at namelen then. */
   if (len == 0)
     return EINVAL;
   if (len >= dstsize)
