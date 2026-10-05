@@ -2,7 +2,7 @@
 date: 2026-10-05
 topic: Move ixemul-vtcon from 48.2 to ixemul 80.1, carrying the UP-Term patches
 tags: [ixemul, 80.1, rebase, af_unix, scm_rights, pty, termios, sigwinch, ixnet]
-status: draft
+status: implemented
 ---
 
 # ixemul 80.1 migration
@@ -114,8 +114,8 @@ same build, and the UP-Term kit installs both libraries.
       R4, R8, R9, R10
 
 ### M9 Land
-- [ ] M9.1 Kit built with the 80.x pair; install_rig passes
-- [ ] M9.2 vtcon ledger and this plan updated; worktree removed after merge
+- [x] M9.1 Kit built with the 80.x pair; install_rig passes
+- [x] M9.2 vtcon ledger and this plan updated; worktree removed after merge
 
 ### M10 Library with bebbo's gcc 6 (owner question 2026-10-05)
 - [ ] M10.1 Build the M9 tree with bebbo's gcc 6 (the 32efe2b C fixes are carried);
@@ -164,6 +164,21 @@ same build, and the UP-Term kit installs both libraries.
   rig-checked on 80.x: CPython sentinel 27 OK, tmux 6/7, screen 4/4, nvim
   0.4.4 8/8 and 0.12.5 9/9, grep+ncurses cases 22/22, spawnprobe the known
   13/14 (same on 48.2). On 48.2: sentinel 27 OK, nvim 0.12.5 9/9, tmux 6/7.
+
+- M9 (2026-10-05): kit with the 80.1 pair, install_rig 56/56 (ixnet kept as
+  .orig and restored). ixemul-vtcon's main checkout is on feature/ixemul-80
+  (build295 = 80.1, the default path of vtcon's kit and rig); the 48.2 line
+  is branch stable-48.2 (fa0156c). Worktree ~/Code/ixemul-80 removed.
+- M10 (gcc 16) open, separate track. Found and fixed so far: gcc 16 left
+  d2 unsaved (m68k_save_reg shortcut on stale df chains) and has no
+  AmigaOS float return (new -mfloat-return-d0) -- compiler branch
+  feature/m68k-save-reg-and-float-return-d0 in ~/Code/amiga-gcc15/projects/gcc;
+  library: memset became `jra _memset` (e8bcc9d), USP/SR asm moved across
+  calls, setrun clobbers, asm string syntax (40852da). Still hangs: works
+  with gcc 2.95's string objects and gcc 16's rest, hangs with gcc 16's
+  string even at -O0 -- how gcc 16's string objects combine with the rest
+  (duplicate definitions, data placement), not optimisation. Tools:
+  tools/mixlink.sh (a.out objects first in a mixed archive).
 
 ## Decisions log
 
