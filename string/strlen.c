@@ -21,6 +21,15 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+/*
+ * strlen.c,v
+ *
+ * Revision 1.1  2026/08/25  ChatGPT modifications (JJ)
+ *
+ *    Unroll the byte scanning loop four times to reduce taken
+ *    backward branches while preserving byte-at-a-time accesses.
+ */
+
 #include "defs.h"
 
 ENTRY(strlen)
@@ -28,8 +37,15 @@ asm("
 	movl	sp@(4),a0	/* string */
 	movl	a0,d0
 slloop:
-	tstb	a0@+		/* null? */
-	jne	slloop		/* no, keep going */
+	tstb	a0@+
+	jeq	sldone
+	tstb	a0@+
+	jeq	sldone
+	tstb	a0@+
+	jeq	sldone
+	tstb	a0@+
+	jne	slloop
+sldone:
 	subl	a0,d0
 	notl	d0
 	rts

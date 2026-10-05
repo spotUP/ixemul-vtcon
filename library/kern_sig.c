@@ -18,6 +18,17 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  *  $Id: kern_sig.c,v 1.6 1994/07/11 00:32:56 rluebbert Exp $
+ * 
+ *
+ * Revision 1.7  2026/07/23  ChatGPT modifications (JJ)
+ *
+ *  Added lazy installation of the SIGWINCH input.device handler.
+ *
+ *  setsigvec() now installs the handler only when SIGWINCH is assigned
+ *  a real signal handler.  SIG_DFL, SIG_IGN and disposition queries do
+ *  not open input.device.  Installation is performed after Permit(),
+ *  since the packet and device operations may wait.
+ *
  *
  *  $Log: kern_sig.c,v $
  *  Revision 1.6  1994/07/11  00:32:56  rluebbert
@@ -187,6 +198,18 @@ setsigvec (int sig, struct sigaction *sa)
     }
 
   Permit();
+
+  /*
+   * Install the input.device handler only when the process requests
+   * delivery of SIGWINCH to a real signal handler.  Do this outside
+   * Forbid(), since __ix_install_sigwinch() may wait for DOS packets
+   * and synchronous device I/O.
+   */
+  if (sig == SIGWINCH &&
+      sa->sa_handler != SIG_DFL &&
+      sa->sa_handler != SIG_IGN &&
+      !u.u_idev_req)
+    __ix_install_sigwinch();
 }
 
 

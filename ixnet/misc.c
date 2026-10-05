@@ -22,6 +22,23 @@
  *
  */
 
+/*
+ * misc.c,v
+ *
+ * Revision 1.2  2026/08/05  ChatGPT modifications (JJ)
+ *
+ *    Guard AmiTCP usergroup calls with the actual usergroup.library base.
+ *    Roadshow without that optional library now keeps the existing local
+ *    umask implementation and returns NULL for unavailable crypt().
+ */
+
+/*
+ * Revision 1.1 2026/06/08 ChatGPT modifications (JJ)
+ *  Align ixnet sethostname() prototype with <unistd.h>.
+ *  The length argument is now size_t instead of int, and the local
+ *  bounded copy length uses size_t as well.
+ *  No behavioural change intended.
+ */
 
 /* stubs for group-file access functions */
 
@@ -71,13 +88,13 @@ int gethostname (char *name, int namelen)
 
 static char hostname[MAXHOSTNAMELEN] = "localhost";
 
-int sethostname (const char *name, int namelen)
+int sethostname (const char *name, size_t namelen)
 {
   usetup;
   struct ixnet *p = (struct ixnet *)u.u_ixnet;
 
   if (p->u_networkprotocol != IX_NETWORK_AMITCP) {
-    int len = namelen < sizeof (hostname) - 1 ? namelen : sizeof (hostname) - 1;
+    size_t len = namelen < sizeof (hostname) - 1 ? namelen : sizeof (hostname) - 1;
 
     strncpy (hostname, name, len);
     hostname[len] = 0;
@@ -90,7 +107,8 @@ char *crypt (const char *key, const char *setting)
   usetup;
   struct ixnet *p = (struct ixnet *)u.u_ixnet;
 
-  if (p->u_networkprotocol == IX_NETWORK_AMITCP)
+  if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+      p->u_UserGroupBase)
     return UG_crypt(key,setting);
   return NULL;
 }
@@ -101,7 +119,8 @@ umask (mode_t mode)
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
 
-    if (p->u_networkprotocol == IX_NETWORK_AMITCP) {
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase) {
         return UG_umask(mode);
     }
     else {

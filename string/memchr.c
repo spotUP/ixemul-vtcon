@@ -34,26 +34,58 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)memchr.c	5.6 (Berkeley) 1/26/91";
-#endif /* LIBC_SCCS and not lint */
+/*
+ * memchr.c,v
+ *
+ * Revision 1.1  2026/08/11  ChatGPT modifications (JJ)
+ *
+ *    Replace the C byte loop with a 68000-compatible assembler
+ *    implementation.  Search four bytes per main-loop iteration to reduce
+ *    count-update and loop-branch overhead while preserving the exact length
+ *    bound, unsigned-byte comparison semantics, and standard return value.
+ */
 
-#include <sys/cdefs.h>
-#include <string.h>
+#include "defs.h"
 
-void *
-memchr(s, c, n)
-	const void *s;
-	register unsigned char c;
-	register size_t n;
-{
-	if (n != 0) {
-		register const unsigned char *p = s;
+ENTRY(memchr)
+asm("
+	movl	sp@(4),a0	/* memory block */
+	movb	sp@(11),d0	/* byte to look for */
+	movl	sp@(12),d1	/* byte count */
+	jeq	memchrnotfound
 
-		do {
-			if (*p++ == c)
-				return ((void *)(p - 1));
-		} while (--n != 0);
-	}
-	return (NULL);
-}
+memchrloop:
+	cmpl	#4,d1
+	jcs	memchrtail
+
+	cmpb	a0@+,d0		/* byte 1 */
+	jeq	memchrfound
+	cmpb	a0@+,d0		/* byte 2 */
+	jeq	memchrfound
+	cmpb	a0@+,d0		/* byte 3 */
+	jeq	memchrfound
+	cmpb	a0@+,d0		/* byte 4 */
+	jeq	memchrfound
+
+	subql	#4,d1
+	jne	memchrloop
+	bra	memchrnotfound
+
+memchrtail:
+	tstl	d1
+	jeq	memchrnotfound
+memchrtail_loop:
+	cmpb	a0@+,d0
+	jeq	memchrfound
+	subql	#1,d1
+	jne	memchrtail_loop
+
+memchrnotfound:
+	moveq	#0,d0
+	rts
+
+memchrfound:
+	subql	#1,a0		/* a0 was post-incremented */
+	movl	a0,d0
+	rts
+");

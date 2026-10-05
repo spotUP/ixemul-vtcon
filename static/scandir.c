@@ -33,6 +33,25 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Revision 1.8  2026/06/18  ChatGPT/Deepseek  (JJ)
+ * - Harden scandir() error handling.
+ * - Close the directory stream if the initial namelist allocation fails.
+ * - Free all previously duplicated dirent entries and the namelist array
+ * 	 if entry allocation fails while scanning.
+ * - Use a temporary pointer for realloc() so the original namelist is not
+ * 	 lost on allocation failure.
+ * - Clean up the current dirent copy, previous entries, namelist array,
+ * 	 and directory stream on realloc() failure.
+ * - Use size_t for the namelist capacity to match nitems and allocation sizes.
+ * - Check capacity growth and realloc() size multiplication for overflow.
+ * - Use sizeof *names for namelist allocation size calculations.
+ *
+ *  Revision 1.7  2026/06/07  Copilot modifications (JJ)
+ *  - Copy d_type from readdir() result when duplicating struct dirent.
+ *    scandir() now preserves file type information (DT_*).
+ */
+
 #if defined(LIBC_SCCS) && !defined(lint)
 #if 0
 static char sccsid[] = "@(#)scandir.c	8.3 (Berkeley) 1/2/94";
@@ -74,8 +93,11 @@ scandir(dirname, namelist, select, dcomp)
 {
 	register struct dirent *d, *p, **names;
 	register size_t nitems;
-	long arraysz;
+	size_t arraysz;
+	size_t newarraysz;
+	struct dirent **newnames;
 	DIR *dirp;
+	size_t i;
 
 	if ((dirp = opendir(dirname)) == NULL)
 		return(-1);
@@ -85,9 +107,11 @@ scandir(dirname, namelist, select, dcomp)
 	 * and dividing it by a multiple of the minimum size entry. 
 	 */
 	arraysz = 50;
-	names = (struct dirent **)malloc(arraysz * sizeof(struct dirent *));
-	if (names == NULL)
+	names = (struct dirent **)malloc(arraysz * sizeof *names);
+	if (names == NULL) {
+		closedir(dirp);
 		return(-1);
+	}
 
 	nitems = 0;
 	while ((d = readdir(dirp)) != NULL) {
@@ -97,22 +121,52 @@ scandir(dirname, namelist, select, dcomp)
 		 * Make a minimum size copy of the data
 		 */
 		p = (struct dirent *)malloc(DIRSIZ(d));
-		if (p == NULL)
+		if (p == NULL) {
+			closedir(dirp);
+			for (i = 0; i < nitems; ++i)
+				free(names[i]);
+			free(names);
 			return(-1);
+		}
 		p->d_ino = d->d_ino;
 		p->d_reclen = d->d_reclen;
 		p->d_namlen = d->d_namlen;
+		p->d_type = d->d_type;
 		bcopy(d->d_name, p->d_name, p->d_namlen + 1);
 		/*
 		 * Check to make sure the array has space left and
 		 * realloc the maximum size.
 		 */
 		if (++nitems >= arraysz) {
-			arraysz += 50;
-			names = (struct dirent **)realloc((char *)names,
-				arraysz * sizeof(struct dirent *));
-			if (names == NULL)
+			if (arraysz > ((size_t)-1) - 50) {
+				closedir(dirp);
+				free(p);
+				for (i = 0; i < nitems - 1; ++i)
+					free(names[i]);
+				free(names);
 				return(-1);
+			}
+			newarraysz = arraysz + 50;
+			if (newarraysz > ((size_t)-1) / sizeof *names) {
+				closedir(dirp);
+				free(p);
+				for (i = 0; i < nitems - 1; ++i)
+					free(names[i]);
+				free(names);
+				return(-1);
+			}
+			newnames = (struct dirent **)realloc((char *)names,
+				newarraysz * sizeof *names);
+			if (newnames == NULL) {
+				closedir(dirp);
+				free(p);
+				for (i = 0; i < nitems - 1; ++i)
+					free(names[i]);
+				free(names);
+				return(-1);
+			}
+			names = newnames;
+			arraysz = newarraysz;
 		}
 		names[nitems-1] = p;
 	}

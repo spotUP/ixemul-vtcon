@@ -176,7 +176,9 @@ int tcflush(int fd, int which)
 		break;
 	default:
 		errno = EINVAL;
+#ifdef DEBUG
 		KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+#endif
 		return (-1);
 	}
 	if (ioctl(fd, TIOCFLUSH, &com) == -1)
@@ -210,7 +212,9 @@ int tcflow(int fd, int action)
 	}
 	default:
 		errno = EINVAL;
+#ifdef DEBUG
 		KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+#endif
 		return (-1);
 	}
 

@@ -25,6 +25,16 @@
  *  Revision 1.1  1992/05/14  19:55:40  mwild
  *  Initial revision
  *
+ * Revision 1.1.1.2  2026/06/16  JJ/ChatGPT
+ *
+ * Updated setrlimit() resource validation to match the complete
+ * RLIMIT_* range defined by RLIM_NLIMITS.
+ *
+ * - Accept all resource identifiers exported by <sys/resource.h>.
+ * - Preserve the historical no-op behavior: after validation,
+ *   setrlimit() still returns success without changing limits.
+ *
+ * ABI unchanged.
  */
 
 #define _KERNEL
@@ -42,7 +52,7 @@ setrlimit(int resource, struct rlimit *rlp)
 {
   usetup;
 
-  if (resource < RLIMIT_CPU || resource > RLIMIT_RSS || !rlp)
+  if (!rlp || resource < 0 || resource >= RLIM_NLIMITS)
     {
       errno = EINVAL;
       KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));

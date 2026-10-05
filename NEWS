@@ -1,4 +1,248 @@
 ============
+VERSION 80.1
+============
+
+Version 80.1 is a maintenance release containing one correctness fix and
+several source and documentation corrections.
+
+unvis
+-----
+
+strunvis() and strnunvis() now reject incomplete escape sequences at the
+end of the input instead of silently accepting them.
+
+Source and documentation
+------------------------
+
+Corrected missing, truncated, anonymous and incorrectly attributed copyright
+and licence notices, restoring upstream provenance where applicable.
+
+Inaccurate or incomplete revision histories in bcopy.c and select.c have
+been corrected, and the explicit_bzero.c documentation has been clarified.
+
+Planned AF_UNIX datagram, connection-timeout and socket-option work has
+been moved from BUGS to TODO, where implementation work is documented.
+
+Removed the obsolete lseekw()	compatibility wrapper, its library vector
+and its public declaration.
+
+Updated BUGS with the remaining rare SIGWINCH/input.device teardown
+freeze.
+
+Updated TODO with planned investigation and teardown hardening.
+
+Added BUGS_SIGWINCH document
+
+============
+VERSION 80.0
+============
+
+This release represents a substantial update of ixemul.library, with emphasis
+on correctness, stability, compatibility with more recent Unix software, and
+improved performance on m68k systems.
+
+New libc, BSD and POSIX interfaces
+----------------------------------
+
+A large number of libc, BSD and POSIX interfaces have been added, including
+new string and memory functions, 64-bit integer conversion functions, aligned
+and overflow-checked allocation interfaces, pathname helpers, resolver
+functions, clock and sleep interfaces, poll(), flock(), strsignal(),
+byte-order and byte-swap helpers, BSD bitstring support, and functional
+AF_UNIX / AF_LOCAL stream socket support.
+
+Additional mathematical functions have also been added to the 68881-compatible
+math interface.
+
+See the separate new-functions documentation for the complete list and
+individual interface descriptions.
+
+
+Memory allocation
+-----------------
+
+The memory allocation subsystem has received substantial work.
+
+The buddy allocator has been updated to improve memory management and allocator
+behaviour, and a number of correctness problems in the malloc subsystem have
+been fixed.
+
+New allocation interfaces such as reallocarray() and posix_memalign() have
+also been added.
+
+Detailed allocator changes are documented in the revision comments of the
+corresponding source files.
+
+
+String and memory routines
+--------------------------
+
+A number of string and memory routines have been reviewed, corrected and
+optimized.
+
+CPU-specific m68k implementations have been added or improved for important
+memory-copy operations, with separate paths where appropriate for the 68020,
+68030, 68040 and 68060.  Particular attention has been paid to overlap safety,
+alignment, small copies and tail handling.
+
+Several existing routines have received correctness fixes, while additional
+BSD and GNU-compatible string and memory interfaces have been added.
+
+snprintf() and vsnprintf() now implement the expected bounded formatting
+semantics, including correct count-only operation.
+
+
+TTY, PTY and terminal handling
+------------------------------
+
+The TTY and PTY subsystem has received extensive correctness and robustness
+work.
+
+Terminal window-size handling has been hardened, including safer TIOCGWINSZ
+processing and sensible default terminal dimensions when valid console
+information cannot be obtained.
+
+PTY packet-mode reads now provide the expected packet header.
+
+Terminal I/O, console state handling and related descriptor cleanup have been
+reviewed to avoid invalid state and unsafe accesses.
+
+SIGWINCH handling has also been corrected.  Installation of the Amiga
+input.device resize handler is now idempotent, preventing repeated installation
+from losing the previous handler/request and making cleanup impossible.
+
+Further implementation details are recorded in the revision comments of the
+TTY, PTY and SIGWINCH source files.
+
+
+File descriptors and close handling
+-----------------------------------
+
+Descriptor and file lifetime handling has been substantially hardened.
+
+The close paths have been reviewed to avoid unsafe accesses and invalid
+lifetime assumptions.  File-name storage and ownership have also been revised
+so that normal pathnames can be kept directly in the file structure while
+retaining explicit ownership information for dynamically allocated storage.
+
+These changes are intended primarily to improve correctness and robustness in
+descriptor-heavy applications and during process cleanup.
+
+
+select() and poll()
+-------------------
+
+select() has received a major correctness and robustness review.
+
+Descriptor scanning, readiness handling, asynchronous descriptor processing,
+timer cleanup and cancellation paths have been tightened.  CPU-specific
+descriptor scanning is used where appropriate while preserving the historical
+ixemul signal semantics.
+
+A BSD-style poll() interface has been added on top of ixemul's existing
+descriptor readiness mechanism.
+
+The select protocol used by pipes and local sockets has also been extended with
+proper cancellation handling so that abandoned registrations do not remain
+attached to waiting tasks.
+
+
+Unix domain sockets
+-------------------
+
+AF_UNIX/AF_LOCAL stream sockets are now functional through ixemul's existing
+socket interface.
+
+The implementation supports pathname-based bind(), listen(), accept() and
+connect(), bidirectional stream I/O, shutdown(), socket-name queries,
+select() integration and limited SOL_SOCKET option handling.
+
+The Unix socket implementation has also received substantial lifetime and
+concurrency work.  Socket, pathname and stream objects now use explicit
+ownership/reference tracking, queued connections are handled safely when a
+listener closes, and address handling is bounded and validated.
+
+The accept queue has been changed to an index-based circular queue, avoiding
+linear queue shifting during normal accept processing.
+
+Unix domain datagram sockets are not implemented, and connect() currently has
+no connection timeout.
+
+
+Stdio
+-----
+
+The stdio implementation has received a number of correctness fixes.
+
+snprintf() and vsnprintf() now provide the expected bounded-output semantics,
+including correct behaviour when the output size is zero.
+
+The internal fwrite/fvwrite path has also been hardened for large writes,
+string streams, newline handling and integer-overflow cases.
+
+
+Filesystem and pathname handling
+--------------------------------
+
+A number of filesystem and pathname operations have been corrected or
+extended.
+
+New interfaces include realpath(), mkdtemp(), basename() and dirname().
+Existing pathname handling has been hardened in several areas, including
+readlink processing and path-component handling.
+
+chdir() and chroot() have received correctness fixes while retaining ixemul's
+existing AmigaOS pathname model.
+
+
+Pipes and low-level I/O
+-----------------------
+
+Pipe and low-level descriptor I/O have received a number of correctness fixes.
+
+Read and write handling has been tightened, including terminal newline
+translation and PTY packet-mode behaviour.  Pipe-handler seek and pathname
+handling have also been corrected.
+
+The existing pipe lifecycle model has otherwise been retained.
+
+
+Networking
+----------
+
+Additional network compatibility interfaces include inet_ntop(), inet_pton()
+and host/network byte-order conversion functions.
+
+Socket address handling has been hardened to avoid writing beyond caller
+buffers, and several socket operations now perform stricter argument and state
+validation.
+
+
+m68k support and performance
+----------------------------
+
+A number of frequently used low-level operations have been optimized for the
+m68k targets supported by ixemul.
+
+Memory-copy routines include CPU-specific implementations for later 68k
+processors, while portable or 68000-compatible paths remain available for
+older systems.
+
+Performance work has deliberately been kept secondary to correctness where the
+two goals conflict.
+
+
+General robustness
+------------------
+
+Many smaller fixes have been made throughout the library, including signal,
+timer, pathname, descriptor, socket, stdio and memory-management code.
+
+The source files contain detailed revision comments describing the individual
+changes.  Those comments should be regarded as the authoritative technical
+history for changes not listed individually in this NEWS file.
+
+============
 VERSION 48.2
 ============
 

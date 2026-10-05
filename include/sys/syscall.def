@@ -629,3 +629,59 @@ SYSTEM_CALL (__ix_wb_parse,610)
 SYSTEM_CALL (__ix_install_sigwinch,611)
 SYSTEM_CALL (__ix_remove_sigwinch,612)
 SYSTEM_CALL (__ix_init_ids,613)
+/* 64-bit integer conversion */
+SYSTEM_CALL (strtoll,614)
+SYSTEM_CALL (strtoull,615)
+SYSTEM_CALL (atoll,616)
+SYSTEM_CALL (strtonum,617)
+/* allocation */
+SYSTEM_CALL (reallocarray,618)
+SYSTEM_CALL (posix_memalign,619)
+/* stdio extensions */
+SYSTEM_CALL (asprintf,620)
+SYSTEM_CALL (vasprintf,621)
+/* time */
+SYSTEM_CALL (nanosleep,622)
+SYSTEM_CALL (clock_gettime,623)
+SYSTEM_CALL (clock_getres,624)
+SYSTEM_CALL (clock_nanosleep,625)
+/* integer operations */
+SYSTEM_CALL (bswap16,626)
+SYSTEM_CALL (bswap32,627)
+SYSTEM_CALL (bswap64,628)
+SYSTEM_CALL (fls,629)
+/* memory operations */
+SYSTEM_CALL (explicit_bzero,630)
+SYSTEM_CALL (memmem,631)
+SYSTEM_CALL (mempcpy,632)
+/* string operations */
+SYSTEM_CALL (strcasestr,633)
+SYSTEM_CALL (strlcpy,634)
+SYSTEM_CALL (strlcat,635)
+SYSTEM_CALL (stpcpy,636)
+SYSTEM_CALL (strndup,637)
+SYSTEM_CALL (strnlen,638)
+SYSTEM_CALL (memrchr,639)
+SYSTEM_CALL (popcount32,640)
+SYSTEM_CALL (popcount64,641)
+/* pathname operations */
+SYSTEM_CALL (mkdtemp,642)
+SYSTEM_CALL (realpath,643)
+SYSTEM_CALL (basename,644)
+SYSTEM_CALL (dirname,645)
+/* network presentation conversion */
+SYSTEM_CALL (inet_ntop,646)
+SYSTEM_CALL (inet_pton,647)
+/* network byte order conversion */
+SYSTEM_CALL (htonl,648)
+SYSTEM_CALL (htons,649)
+SYSTEM_CALL (ntohl,650)
+SYSTEM_CALL (ntohs,651)
+/* BSD vis/unvis additions */
+SYSTEM_CALL (strnvis,652)
+SYSTEM_CALL (stravis,653)
+SYSTEM_CALL (strnunvis,654)
+/* signal description */
+SYSTEM_CALL (strsignal,655)
+/* descriptor polling */
+SYSTEM_CALL (poll,656)

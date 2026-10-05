@@ -21,6 +21,11 @@
  *  __load_seg.c,v
  * Revision 1.1.1.1  1994/04/04  04:30:54  amiga
  * Initial CVS check in.
+ * 
+ *  Revision 1.1.1.2  2026/07/06  JJ, ChatGPT implementation
+ *  Rename internal basename() helper to loadseg_basename().
+ *  This avoids a duplicate public basename symbol now that basename.c
+ *  provides the library basename() implementation.
  *
  *  Revision 1.5  1992/09/14  01:38:35  mwild
  *  fix a bug with #! expansion (forgot separating /)
@@ -40,7 +45,7 @@
  */
 
 /* This module implements:
- * - basename(fullpath) -> filename
+ * - loadseg_basename(fullpath) -> filename
  * - loadseg() functions
  *   __load_seg(name, args): 
  *     magic load_seg, with script-sniffing, stashes clean-up information
@@ -63,7 +68,8 @@ extern void *kmalloc (size_t size);
 
 static struct my_seg *load_seg_or_script (BPTR lock, char *name, char **args, char *progname);
 
-char *basename(char *tmp)
+static char *
+loadseg_basename(char *tmp)
 {
   char *cp = rindex (tmp, '/');
 
@@ -125,7 +131,7 @@ check_and_load_resident (char *filename)
      the ability to explicitly load the disk version even if a 
      resident version is installed */
 
-  base = basename(filename);
+  base = loadseg_basename(filename);
   Forbid();
   seg = FindSegment(base, 0, 0);
   if (seg)
@@ -287,7 +293,7 @@ __load_seg (char *name, char **args)
       if (Examine (lock, fib))
         seg = load_seg_or_script (parent, fib->fib_FileName, args, name);
       else
-        seg = load_seg_or_script (parent, basename(name), args, name);
+        seg = load_seg_or_script (parent, loadseg_basename(name), args, name);
       err = errno;
 
       __unlock (parent);

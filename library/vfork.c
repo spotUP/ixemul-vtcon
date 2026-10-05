@@ -16,8 +16,68 @@
  *  You should have received a copy of the GNU Library General Public
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+ 
+/*
+ * vfork.c,v
  *
- *  $Id: vfork.c,v 1.9 1994/06/19 15:18:29 rluebbert Exp $
+ * Revision 1.13  2026/08/14  ChatGPT modifications (JJ)
+ *
+ *    Restore the 1.11 normal wait4() zombie-reaping path and process-chain
+ *    traversal, relying on the existing vfork death-message sleep/wakeup
+ *    lifetime invariant instead of defensive stale-pointer validation in the
+ *    normal reaping and sibling-management paths.
+ *
+ *    Keep the 1.12 death-message preallocation, balanced exit handshake,
+ *    startup-error handling and reply-pointer lifetime fixes unchanged.
+ *    Retain the guarded pid < -1 process-group test in wait4().
+ *
+ * Revision 1.12  2026/08/10  ChatGPT modifications (JJ)
+ *
+ *    Preallocate each vfork child's death message in the parent before
+ *    CreateNewProc(), pass ownership through a per-process pending pointer,
+ *    and keep the vfork_msg layout unchanged. This removes allocator work
+ *    from the Forbid-protected exit handshake without moving existing
+ *    struct user member offsets.
+ *
+ *    Make send_death_msg() own and balance its Forbid()/Permit() section,
+ *    validate the parent user area before dereferencing it, clear the vfork
+ *    reply pointer immediately after ReplyMsg(), and release an unused death
+ *    message when no valid parent remains.
+ *
+ *    Harden sibling traversal, process reparenting and wait4() against stale
+ *    process pointers returned by safe_getuser(). A queued death message is
+ *    treated as authoritative exit information even if the child's user area
+ *    is no longer available.
+ *
+ *    Return -1 correctly when child startup reports an error through vm_rc,
+ *    and clear the child-side vfork reply pointer before ReplyMsg() in the
+ *    vfork_resume path so the parent cannot free a still-referenced message.
+ *
+ * Revision 1.11  2026/08/05  ChatGPT modifications (JJ)
+ *
+ *    Copy the parent's h_errno pointer together with errno while a vfork
+ *    child borrows the parent's runtime variables.
+ *
+ *    Rebind the child's private SocketBase after selecting borrowed or
+ *    private errno and h_errno storage.
+ *
+ *    Rebind the network error pointers again when vfork_own_malloc() moves
+ *    borrowed error storage into the child's private allocation pool.
+ * 
+ * Revision 1.10  2026/06/11  ChatGPT modifications  (JJ)
+ *
+ * Fixes in vfork support code:
+ *  - possible_childs(): avoid shadowing of u_ptr; correct process-group test
+ *    so wait4(0,...) matches the caller's pgrp as intended.
+ *  - ruadd(): correct off-by-one and use portable field count calculation
+ *    to ensure all rusage counters are accumulated.
+ *
+ * No functional changes beyond these correctness fixes.
+ */
+  
+/*
+ *   $Id: vfork.c,v 1.9 1994/06/19 15:18:29 rluebbert Exp $
  *
  *  $Log: vfork.c,v $
  *  Revision 1.9  1994/06/19  15:18:29  rluebbert
@@ -54,7 +114,6 @@
  *
  * Revision 1.1  1992/05/14  19:55:40  mwild
  * Initial revision
- *
  */
 
 #define _KERNEL
@@ -77,6 +136,7 @@
 void vfork_own_malloc ();
 void volatile vfork_longjmp (jmp_buf, int);
 void ruadd(struct rusage *ru, struct rusage *ru2);
+void send_death_msg(struct user *mu);
 
 struct death_msg {
   struct ixnode	        dm_node;
@@ -173,10 +233,14 @@ launcher (void)
 	  /* borrow the variables of the parent */
 	  mu->u_environ = pu->u_environ;
 	  mu->u_errno = pu->u_errno;
+	  mu->u_h_errno = pu->u_h_errno;
 	  
 	  /* tell malloc to use the parents malloc lists */
 	  mu->u_mdp = pu->u_mdp;
 	}
+
+      if (mu->u_ixnetbase)
+	netcall(NET_set_errno, mu->u_errno, mu->u_h_errno);
 
       
       /* and inherit several other things as well, upto not including u_md */
@@ -256,6 +320,15 @@ launcher (void)
       mu->u_is_root = pu->u_is_root;
       mu->u_a4 = pu->u_a4;
 
+      /*
+       * The parent reserved this death message before CreateNewProc().
+       * Transfer it while the process lists are still serialized. The parent
+       * remains blocked in vfork(), so clearing its pending pointer completes
+       * the ownership handoff without changing struct vfork_msg.
+       */
+      mu->p_death_msg = pu->p_pending_death_msg;
+      pu->p_pending_death_msg = 0;
+
       /* copying finished, allow other processes to vfork() as well ;-)) */
       ix_unlock_base ();
       
@@ -301,14 +374,13 @@ launcher (void)
 
 	  KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
 
-	  /* this whole thing only happens if our parent is still alive ! */
-	  Forbid ();
-	  if (mu->p_pptr && mu->p_pptr != (struct Process *) 1)
-	    send_death_msg((struct user *)mu);
-	  else
-	    {
-	      KPRINTF (("vforked: couldn't send death_msg\n"));
-	    }
+          /*
+           * send_death_msg() owns the complete scheduler-critical handshake
+           * and returns with task switching enabled. CloseLibrary() must not
+           * inherit a Forbid() because library teardown may need to wait.
+           */
+          send_death_msg((struct user *)mu);
+
 	  KPRINTF (("vforked: now closing library\n"));
 	  CloseLibrary (ixb);
 
@@ -337,44 +409,105 @@ launcher (void)
 void
 send_death_msg(struct user *mu)
 {
-  struct death_msg *dm = 0;
+  struct death_msg *dm;
+  struct Process *parent;
+  struct user *pu;
+  struct vfork_msg *vm;
 
-  /* KPRINTF (("vforked: parent alive, zombie-sig = %ld, vfork_msg = $%lx.\n",
-		 pu->p_zombie_sig, mu->p_vfork_msg));*/
-
-  struct user *pu = safe_getuser(mu->p_pptr);
-
-  /* send the parent a death message with our return code */
-  dm = (struct death_msg *) kmalloc (sizeof (struct death_msg));
+  /*
+   * The parent allocated the death message before CreateNewProc(). Taking it
+   * out of the user structure here makes ownership explicit: from this point
+   * it is either queued on the parent's zombie list or freed here. No
+   * allocator call is required inside the Forbid()-protected handshake.
+   */
+  dm = mu->p_death_msg;
+  mu->p_death_msg = 0;
+  parent = mu->p_pptr;
+  vm = mu->p_vfork_msg;
 
   if (dm)
     {
       dm->dm_status = mu->p_xstat;
       dm->dm_rusage = mu->u_ru;
       ruadd (&dm->dm_rusage, (struct rusage *)&mu->u_cru);
-      dm->dm_child = (struct Process *) FindTask (0);
-      dm->dm_pgrp  = mu->p_pgrp;
-      KPRINTF (("vfork-exit: Adding child $%lx to $%lx\n", dm->dm_child, mu->p_pptr));
-      ixaddtail ((struct ixlist *) &pu->p_zombies, (struct ixnode *) dm);
+      dm->dm_child = (struct Process *)FindTask (0);
+      dm->dm_pgrp = mu->p_pgrp;
+    }
+  else
+    KPRINTF (("vfork-exit: missing preallocated death message\n"));
+
+  /*
+   * Forbid() closes the lifetime race between validating the parent user area
+   * and linking the death message into that parent's zombie list. This
+   * function owns the matching Permit() on every path.
+   */
+  Forbid ();
+
+  if (!parent || parent == (struct Process *)1)
+    {
+      mu->p_vfork_msg = 0;
+      Permit ();
+
+      if (dm)
+        kfree (dm);
+
+      KPRINTF (("vforked: no live parent for death message\n"));
+      return;
     }
 
-  _psignal ((struct Task *)mu->p_pptr, SIGCHLD);
+  pu = safe_getuser(parent);
+  if (!pu)
+    {
+      /*
+       * The Process pointer is no longer backed by a valid ixemul user area.
+       * Do not dereference it or reply through a possibly stale message port.
+       */
+      mu->p_vfork_msg = 0;
+      Permit ();
 
-  /* have to wakeup the parent `by hand' to make sure it gets
-     out of its sleep, since it might have SIGCHLD masked out or
-     ignored at the moment */
-  if (pu->p_stat == SSLEEP && pu->p_wchan == (caddr_t) pu)
+      if (dm)
+        kfree (dm);
+
+      KPRINTF (("vforked: parent user area disappeared before death message\n"));
+      return;
+    }
+
+  if (dm)
+    {
+      KPRINTF (("vfork-exit: Adding child $%lx to $%lx\n",
+                dm->dm_child, parent));
+      ixaddtail ((struct ixlist *)&pu->p_zombies, (struct ixnode *)dm);
+    }
+
+  _psignal ((struct Task *)parent, SIGCHLD);
+
+  /*
+   * Wake wait4() explicitly even when SIGCHLD is masked or ignored. The state
+   * test and wakeup are protected by the same Forbid() as the zombie-list
+   * insertion, preventing a lost-wakeup window.
+   */
+  if (pu->p_stat == SSLEEP && pu->p_wchan == (caddr_t)pu)
     ix_wakeup ((u_int)pu);
 
-  if (mu->p_vfork_msg)
-    ReplyMsg ((struct Message *) mu->p_vfork_msg);
+  if (vm)
+    {
+      /*
+       * ReplyMsg() makes the parent runnable and allows it to free the vfork
+       * message immediately. Clear the child-side pointer before replying and
+       * never dereference vm again afterwards.
+       */
+      mu->p_vfork_msg = 0;
+      ReplyMsg ((struct Message *)vm);
+    }
 
-  /* this is necessary for process synchronisation, this process
-     will be unlinked from the process chain by wait4(), which will
-     also take care of reparenting the process if it was PT_ATTACHed
-      by a debugger */
+  /*
+   * A normal vfork child remains alive until wait4() consumes the queued
+   * death message. wait4() wakes this exact address after unlinking it.
+   */
   if (dm)
     ix_sleep ((caddr_t)dm, "vfork-dm");
+
+  Permit ();
 }
 
 /* This function is used by vfork_resume and execve. Perhaps it should be made
@@ -400,6 +533,9 @@ vfork_own_malloc (void)
       *p->u_errno = 0;
       p->u_h_errno = (int *) malloc (4);
       *p->u_h_errno = 0;
+
+      if (p->u_ixnetbase)
+        netcall(NET_set_errno, p->u_errno, p->u_h_errno);
     }
 }
 
@@ -503,8 +639,17 @@ _vfork_resume (u_int *copy_from_sp)
       me->pr_Task.tc_SPUpper = (void *)(*vm)->vm_cupper;
       set_sp ((u_int) sp);
 
-      ReplyMsg ((struct Message *) *vm);
-      *vm = 0;
+      /*
+       * The parent may free the message as soon as ReplyMsg() makes it
+       * runnable. Clear our pointer before the reply and retain the message
+       * only in a local variable until ReplyMsg() has consumed it.
+       */
+      {
+        struct vfork_msg *reply_vm = *vm;
+
+        *vm = 0;
+        ReplyMsg ((struct Message *)reply_vm);
+      }
     }
 }
 
@@ -539,6 +684,7 @@ _vfork (int own_malloc, struct reg_parms rp)
   u_int plower, pupper;
   /* those *have* to be in registers to survive the stack deallocation */
   register struct vfork_msg *vm asm ("a2");
+  struct death_msg *dm;
   struct Process *child;
   int i;
 
@@ -554,6 +700,21 @@ _vfork (int own_malloc, struct reg_parms rp)
   vm = (struct vfork_msg *) kmalloc (sizeof (struct vfork_msg));
   if (!vm)
     {
+      errno = ENOMEM;
+      KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+      return -1;
+    }
+
+  /*
+   * Reserve the child's eventual wait4() notification before signals are
+   * blocked, sockets are released, or CreateNewProc() is attempted. This
+   * guarantees that a successfully started child never has to allocate its
+   * death message from the scheduler-critical exit path.
+   */
+  dm = (struct death_msg *)kmalloc (sizeof (struct death_msg));
+  if (!dm)
+    {
+      kfree (vm);
       errno = ENOMEM;
       KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
       return -1;
@@ -575,6 +736,14 @@ _vfork (int own_malloc, struct reg_parms rp)
    * way to do it */
   vm->vm_rc = vm->vm_omask = syscall (SYS_sigsetmask, ~0);
 
+  /*
+   * Publish the reserved notification only after signals are blocked. This
+   * avoids exposing a half-created vfork operation to a signal handler that
+   * might itself call vfork(). The child takes this pointer while the process
+   * lists are serialized in launcher().
+   */
+  u.p_pending_death_msg = dm;
+
   /* save the passed frame in our user structure, since the child will
      deallocate it from the stack when it `returns' to user code */
   bcopy (&rp, &u.u_vfork_frame, sizeof (rp));
@@ -594,6 +763,11 @@ _vfork (int own_malloc, struct reg_parms rp)
       /* do I have to close input/output here? Or does the startup close
          them no matter whether it succeeds or not ? */
       syscall (SYS_sigsetmask, vm->vm_omask);
+      if (u.p_pending_death_msg)
+        {
+          kfree (u.p_pending_death_msg);
+          u.p_pending_death_msg = 0;
+        }
       kfree (vm);
       errno = EPROCLIM;
       KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
@@ -620,17 +794,29 @@ _vfork (int own_malloc, struct reg_parms rp)
   pupper = vm->vm_pupper;
   me = vm->vm_pptr;
   
-  child = vm->vm_self;
-  // restore u_ptr
+  /* restore u_ptr */
   u_ptr = getuser(me);
 
   if (vm->vm_rc)
     {
-      errno = (int) vm->vm_rc;
+      errno = (int)vm->vm_rc;
       KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
-      vm->vm_self = (struct Process *) -1;
+
+      /*
+       * A launcher startup failure is reported as vfork() == -1. If startup
+       * never completed, the child never cleared the parent's pending death
+       * message, so reclaim it here before freeing the vfork message.
+       */
+      child = (struct Process *)-1;
+      if (u.p_pending_death_msg)
+        {
+          kfree (u.p_pending_death_msg);
+          u.p_pending_death_msg = 0;
+        }
     }
-      
+  else
+    child = vm->vm_self;
+
   /* this is the parent return, so we pass the id of the new child */
   kfree (vm);
   
@@ -652,7 +838,9 @@ void ruadd(struct rusage *ru, struct rusage *ru2)
 	if (ru->ru_maxrss < ru2->ru_maxrss)
 		ru->ru_maxrss = ru2->ru_maxrss;
 	ip = &ru->ru_first; ip2 = &ru2->ru_first;
-	for (i = &ru->ru_last - &ru->ru_first; i > 0; i--)
+	i = (int)((offsetof(struct rusage, ru_last) -
+	    offsetof(struct rusage, ru_first)) / sizeof(long)) + 1;
+	for (; i > 0; i--)
 		*ip++ += *ip2++;
 }
 
@@ -704,15 +892,15 @@ possible_childs(int pid, struct Process *cptr)
 
   while (cptr)
   {
-    struct user *u_ptr = safe_getuser(cptr);
+    struct user *cu = safe_getuser(cptr);
 
-    if (u_ptr->p_stat != SZOMB)
+    if (cu->p_stat != SZOMB)
       if (pid == -1 ||
-	  (pid == 0 && u_ptr->p_pgrp == u.p_pgrp) ||
-	  (pid < -1 && u_ptr->p_pgrp == -pid) ||
+	  (pid == 0 && cu->p_pgrp == u.p_pgrp) ||
+	  (pid < -1 && cu->p_pgrp == -pid) ||
 	  (pid == (int)cptr))
         return TRUE;
-    cptr = u_ptr->p_osptr;
+    cptr = cu->p_osptr;
   }
   return FALSE;
 }
@@ -805,7 +993,7 @@ wait4 (int pid, int *status, int options, struct rusage *rusage)
 	      pu = safe_getuser(p);
               if (pid == -1
 	          || ((int) p) == pid
-	          || pu->p_pgrp == -pid
+                  || (pid < -1 && pu->p_pgrp == -pid)
 	          || (pid == 0
 	              && u.p_pgrp == pu->p_pgrp))
 	        {	      

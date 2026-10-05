@@ -183,7 +183,29 @@ read_directory:
        * data, it could (in the future) be shared by other tasks 
        */
       f->f_name = (void *)kmalloc(strlen(pathname) + 2);
-      if (f->f_name)
+      if (!f->f_name)
+        {
+          /* kmalloc failed: free the directory buffer and undo partial init */
+          if (buf.buf)
+            kfree(buf.buf);
+
+          /* undo partial memfile init */
+          f->f_type = 0;
+          f->f_mf.mf_offset = 0;
+          f->f_mf.mf_buffer = NULL;
+          f->f_read = 0;
+          f->f_close = 0;
+          f->f_ioctl = 0;
+          f->f_select = 0;
+          f->f_stb.st_size = 0;
+
+          errno = ENOMEM;
+          if (lock)
+            __unlock(lock);
+          return NULL;
+        }
+
+      /* copy pathname into f->f_name */
       {
         char *p = strchr(pathname, ':');
 

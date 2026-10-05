@@ -42,7 +42,7 @@ CPUOSONLY =	ixnet
 
 
 # Directories that depend on the CPU, FPU and OS type
-CPUFPUOS =	general string stdlib stdio library
+CPUFPUOS =	general intops string stdlib stdio library
 
 
 # Directories that depend on both baserel/baserel32/no-baserel and CPU/FPU type
@@ -186,7 +186,7 @@ $(cpu-os-targets):
 		echo mkdir -p $(dir)/$(cpu)/$(os);			\
 		mkdir -p $(dir)/$(cpu)/$(os);				\
 	fi;								\
-	if [ $(cpu) = "notrap" ]; then				\
+	if [ $(cpu) = "notrap" ]; then					\
 		(cd $(dir)/$(cpu)/$(os) ; 				\
 		 $(MAKE) -f ../../Makefile $(FLAGS_TO_PASS) 		\
 		  CPU=68000 "OTHER_CFLAGS=$(OTHER_CFLAGS) -DNOTRAP"); 	\
@@ -204,10 +204,10 @@ $(cpu-fpu-os-targets):
 		echo mkdir -p $(dir)/$(cpu)/$(fpu)/$(os);	\
 		mkdir -p $(dir)/$(cpu)/$(fpu)/$(os);		\
 	fi;						        \
-	if [ $(cpu) = "notrap" ]; then			\
+	if [ $(cpu) = "notrap" ]; then				\
 		(cd $(dir)/$(cpu)/$(fpu)/$(os) ; 		\
 		 $(MAKE) -f ../../../Makefile $(FLAGS_TO_PASS) 	\
-		  CPU=68000 "OTHER_CFLAGS=$(OTHER_CFLAGS) -DNOTRAP"); \
+		 CPU=68000 "OTHER_CFLAGS=$(OTHER_CFLAGS) -DNOTRAP"); \
 	else							\
 		(cd $(dir)/$(cpu)/$(fpu)/$(os) ; 		\
 		 $(MAKE) -f ../../../Makefile $(FLAGS_TO_PASS));\
@@ -314,7 +314,7 @@ clean:
 clobber:
 	@-for i in $(DIRS) libsrc utils man; \
 		do (cd $$i ; $(MAKE) $(FLAGS_TO_PASS) clobber) ; done
-	-rm -f Makefile config.* conftest.c gcc-ok
+	-rm -f Makefile config.cache config.log config.status conftest.c gcc-ok
 
 
 # Build source and binary distribution files.
@@ -336,7 +336,6 @@ $(ixdist-targets):
 		cpu=$(ixcpu); 						\
 	fi;								\
 	os=;	 							\
-	fi;								\
 	mkdir -p gg/Sys/libs;	 					\
 	cp -p library/$(cpu)/$(fpu)/$(os)/ixemul.$$ext	 		\
 		gg/Sys/libs/ixemul$$cpu$$fpu$$os.library;		\
@@ -403,7 +402,6 @@ dist:	dist-prepare $(ixdist-targets)
 	cp -p libsrc/libc_p.a gg/lib/libc_p.a && strip -g gg/lib/libc_p.a
 	cp -pr $(srcdir)/include gg/include
 	mkdir gg/man
-	cp -pr man/cat? gg/man
 	find gg -name CVS -print | xargs rm -rf
 	(cd gg && lha -mraxeq a /distrib/ixemul-sdk.lha lib include man)
 	sleep 5

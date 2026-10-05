@@ -36,6 +36,19 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Revision 1.12  2026/07/01  Copilot modifications (JJ)
+ * Modernization: remove legacy __P() prototype macros.
+ *
+ * This change updates fnmatch.c to use standard ANSI C function
+ * prototypes instead of the historical BSD __P() macro. The update
+ * is purely syntactic and does not alter behavior, semantics, or
+ * binary compatibility. No functional logic is changed.
+ *
+ * This aligns fnmatch.c with the rest of the ixemul codebase, which
+ * already uses ANSI prototypes exclusively.
+ */
+ 
 #if defined(LIBC_SCCS) && !defined(lint)
 #if 0
 static char sccsid[] = "@(#)fnmatch.c	8.2 (Berkeley) 4/16/94";
@@ -57,12 +70,10 @@ static char rcsid[] = "$NetBSD: fnmatch.c,v 1.11 1995/02/27 03:43:06 cgd Exp $";
 
 #define	EOS	'\0'
 
-static const char *rangematch __P((const char *, int, int));
+static const char *rangematch(const char *pattern, int test, int flags);
 
 int
-fnmatch(pattern, string, flags)
-	const char *pattern, *string;
-	int flags;
+fnmatch(const char *pattern, const char *string, int flags)
 {
 	const char *stringstart;
 	char c, test;
@@ -141,10 +152,7 @@ fnmatch(pattern, string, flags)
 	/* NOTREACHED */
 }
 
-static const char *
-rangematch(pattern, test, flags)
-	const char *pattern;
-	int test, flags;
+static const char *rangematch(const char *pattern, int test, int flags)
 {
 	int negate, ok;
 	char c, c2;

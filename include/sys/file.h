@@ -15,6 +15,16 @@
  *  You should have received a copy of the GNU Library General Public
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ *
+ * Revision 1.3  2026/07/27  ChatGPT modifications (JJ)
+ *  - Added f_fs_blocksize for cached filesystem block size used by fstat().
+ *
+ * Revision 1.2  2026/05/31  ChatGPT modifications (JJ)
+ *  - Added per-file inline filename storage to struct file.
+ *  - Added f_name_buf[256] for short pathnames.
+ *  - Added f_name_inline ownership flag to distinguish inline storage
+ *    from heap-allocated f_name.
  */
 
 #ifndef _SYS_FILE_H
@@ -55,6 +65,9 @@ struct tty_glue {
 
 struct file {
   char *f_name;	     /* the name as used with open() */
+  char f_name_buf[256];
+  int  f_name_inline;
+  long f_fs_blocksize; /* cached filesystem block size, 0 if unknown */
   int f_stb_dirty,   /* gets == 1, if changes have been made to 'stb' */
       f_type,	     /* can be a file or some amiga..devices */
       f_flags,	     /* see fcntl.h */

@@ -18,6 +18,17 @@
  */
 
 /*
+ * __plock.c,v
+ *
+ * Revision 1.1  2026/08/02  ChatGPT modifications (JJ)
+ *
+ *    Added separate input and output buffers for
+ *    ACTION_READ_LINK for SFS compatibility.
+ *    Added safe and optimized pseudoterminal name
+ *    validation.
+ */
+
+/*
  * Lock() and LLock() emulation. Takes care of expanding paths that contain
  * symlinks. 
  * Call __plock() if you need a lock to the parent directory as used in
@@ -59,12 +70,24 @@ static int readlink(struct lockinfo *info)
 {
   usetup;
   struct StandardPacket *sp = &info->sp;
+  unsigned int len;
+  char buf[256];
+
+  /*
+   * SFS doesn't like it if dp_Arg2 == dp_Arg3.  Copy only the
+   * actual BSTR contents; unlike strncpy(), this does not zero-fill
+   * the rest of the 256-byte buffer.
+   */
+  len = (unsigned char)info->str[0];
+  if (len)
+    bcopy(info->str + 1, buf, len);
+  buf[len] = '\0';
 
   sp->sp_Pkt.dp_Port = __srwport;
   sp->sp_Pkt.dp_Type = ACTION_READ_LINK;
   sp->sp_Pkt.dp_Arg1 = info->parent_lock;
-  sp->sp_Pkt.dp_Arg2 = (long)info->str + 1; /* read as cstr */
-  sp->sp_Pkt.dp_Arg3 = (long)info->str + 1; /* write as cstr, same place */
+  sp->sp_Pkt.dp_Arg2 = (long)buf;           /* read as cstr */
+  sp->sp_Pkt.dp_Arg3 = (long)info->str + 1; /* write as cstr */
   sp->sp_Pkt.dp_Arg4 = 255; /* what a BSTR can address */
 
   PutPacket(info->handler, sp);
@@ -75,17 +98,38 @@ static int readlink(struct lockinfo *info)
 
 int is_pseudoterminal(char *name)
 {
-  int i = 1;
+  int prefix;
 
-  if (!memcmp(name, "/dev/", 5) || !(i = memcmp(name, "dev:", 4)))
+  if (!name)
+    return 0;
+
+  /*
+   * Compare one character at a time.  C's short-circuit evaluation
+   * stops at the first mismatch or terminating null byte, avoiding
+   * both library calls and reads beyond short strings.
+   */
+  if (name[0] == '/' && name[1] == 'd' && name[2] == 'e'
+      && name[3] == 'v' && name[4] == '/')
     {
-      if (i)
-        name++;
-      if ((name[4] == 'p' || name[4] == 't') && name[5] == 't'
-          && name[6] == 'y' && name[7] >= 'p' && name[7] <= 'u'
-          && strchr("0123456789abcdef", name[8]) && !name[9])
-        return i + 4;
+      name += 5;
+      prefix = 5;
     }
+  else if (name[0] == 'd' && name[1] == 'e'
+           && name[2] == 'v' && name[3] == ':')
+    {
+      name += 4;
+      prefix = 4;
+    }
+  else
+    return 0;
+
+  if ((name[0] == 'p' || name[0] == 't') && name[1] == 't'
+      && name[2] == 'y' && name[3] >= 'p' && name[3] <= 'u'
+      && ((name[4] >= '0' && name[4] <= '9')
+          || (name[4] >= 'a' && name[4] <= 'f'))
+      && name[5] == '\0')
+    return prefix;
+
   return 0;
 }
 

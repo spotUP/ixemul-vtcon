@@ -1,6 +1,9 @@
+/*	$OpenBSD: bitstring.h,v 1.7 2024/08/26 11:52:54 bluhm Exp $	*/
+/*	$NetBSD: bitstring.h,v 1.5 1997/05/14 15:49:55 pk Exp $	*/
+
 /*
- * Copyright (c) 1989 The Regents of the University of California.
- * All rights reserved.
+ * Copyright (c) 1989, 1993
+ *	The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Paul Vixie.
@@ -13,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -33,12 +32,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)bitstring.h	5.5 (Berkeley) 4/3/91
+ *	@(#)bitstring.h	8.1 (Berkeley) 7/19/93
  */
 
 #ifndef _BITSTRING_H_
 #define	_BITSTRING_H_
 
+#include <stdlib.h>
+
+/* modified for SV/AT and bitstring bugfix by M.R.Murphy, 11oct91
+ * bitstr_size changed gratuitously, but shorter
+ * bit_alloc   spelling error fixed
+ * the following were efficient, but didn't work, they've been made to
+ * work, but are no longer as efficient :-)
+ * bit_nclear, bit_nset, bit_ffc, bit_ffs
+ */
 typedef	unsigned char bitstr_t;
 
 /* internal macros */
@@ -53,81 +61,76 @@ typedef	unsigned char bitstr_t;
 /* external macros */
 				/* bytes in a bitstring of nbits bits */
 #define	bitstr_size(nbits) \
-	((((nbits) - 1) >> 3) + 1)
+	(((nbits) + 7) >> 3)
 
 				/* allocate a bitstring */
 #define	bit_alloc(nbits) \
-	(bitstr_t *)calloc(1, \
-	    (unsigned int)_bitstr_size(nbits) * sizeof(bitstr_t))
+	(bitstr_t *)calloc((size_t)bitstr_size(nbits), sizeof(bitstr_t))
 
 				/* allocate a bitstring on the stack */
 #define	bit_decl(name, nbits) \
-	(name)[bitstr_size(nbits)]
+	((name)[bitstr_size(nbits)])
 
 				/* is bit N of bitstring name set? */
-#define	bit_test(name, bit) \
-	((name)[_bit_byte(bit)] & _bit_mask(bit))
+#define	bit_test(name, bit) ({ \
+	register int __tbit = (bit); \
+	((name)[_bit_byte(__tbit)] & _bit_mask(__tbit)); \
+})
 
 				/* set bit N of bitstring name */
-#define	bit_set(name, bit) \
-	(name)[_bit_byte(bit)] |= _bit_mask(bit)
+#define	bit_set(name, bit) do { \
+	register int __sbit = (bit); \
+	((name)[_bit_byte(__sbit)] |= _bit_mask(__sbit)); \
+} while(0)
 
 				/* clear bit N of bitstring name */
-#define	bit_clear(name, bit) \
-	(name)[_bit_byte(bit)] &= ~_bit_mask(bit)
+#define	bit_clear(name, bit) do { \
+	register int __cbit = (bit); \
+	((name)[_bit_byte(__cbit)] &= ~_bit_mask(__cbit)); \
+} while(0)
 
 				/* clear bits start ... stop in bitstring */
-#define	bit_nclear(name, start, stop) { \
-	register bitstr_t *_name = name; \
-	register int _start = start, _stop = stop; \
-	register int _startbyte = _bit_byte(_start); \
-	register int _stopbyte = _bit_byte(_stop); \
-	_name[_startbyte] &= 0xff >> (8 - (_start&0x7)); \
-	while (++_startbyte < _stopbyte) \
-		_name[_startbyte] = 0; \
-	_name[_stopbyte] &= 0xff << ((_stop&0x7) + 1); \
-}
+#define	bit_nclear(name, start, stop) do { \
+	register bitstr_t *__name = (name); \
+	register int __start = (start), __stop = (stop); \
+	while (__start <= __stop) { \
+		bit_clear(__name, __start); \
+		__start++; \
+		} \
+} while(0)
 
 				/* set bits start ... stop in bitstring */
-#define	bit_nset(name, start, stop) { \
-	register bitstr_t *_name = name; \
-	register int _start = start, _stop = stop; \
-	register int _startbyte = _bit_byte(_start); \
-	register int _stopbyte = _bit_byte(_stop); \
-	_name[_startbyte] |= 0xff << ((start)&0x7); \
-	while (++_startbyte < _stopbyte) \
-	    _name[_startbyte] = 0xff; \
-	_name[_stopbyte] |= 0xff >> (7 - (_stop&0x7)); \
-}
+#define	bit_nset(name, start, stop) do { \
+	register bitstr_t *__name = (name); \
+	register int __start = (start), __stop = (stop); \
+	while (__start <= __stop) { \
+		bit_set(__name, __start); \
+		__start++; \
+		} \
+} while(0)
 
 				/* find first bit clear in name */
-#define	bit_ffc(name, nbits, value) { \
-	register bitstr_t *_name = name; \
-	register int _byte, _nbits = nbits; \
-	register int _stopbyte = _bit_byte(_nbits), _value = -1; \
-	for (_byte = 0; _byte <= _stopbyte; ++_byte) \
-		if (_name[_byte] != 0xff) { \
-			_value = _byte << 3; \
-			for (_stopbyte = _name[_byte]; (_stopbyte&0x1); \
-			    ++_value, _stopbyte >>= 1); \
+#define	bit_ffc(name, nbits, value) do { \
+	register bitstr_t *__name = (name); \
+	register int __bit, __nbits = (nbits), __value = -1; \
+	for (__bit = 0; __bit < __nbits; ++__bit) \
+		if (!bit_test(__name, __bit)) { \
+			__value = __bit; \
 			break; \
 		} \
-	*(value) = _value; \
-}
+	*(value) = __value; \
+} while(0)
 
 				/* find first bit set in name */
-#define	bit_ffs(name, nbits, value) { \
-	register bitstr_t *_name = name; \
-	register int _byte, _nbits = nbits; \
-	register int _stopbyte = _bit_byte(_nbits), _value = -1; \
-	for (_byte = 0; _byte <= _stopbyte; ++_byte) \
-		if (_name[_byte]) { \
-			_value = _byte << 3; \
-			for (_stopbyte = _name[_byte]; !(_stopbyte&0x1); \
-			    ++_value, _stopbyte >>= 1); \
+#define	bit_ffs(name, nbits, value) do { \
+	register bitstr_t *__name = (name); \
+	register int __bit, __nbits = (nbits), __value = -1; \
+	for (__bit = 0; __bit < __nbits; ++__bit) \
+		if (bit_test(__name, __bit)) { \
+			__value = __bit; \
 			break; \
 		} \
-	*(value) = _value; \
-}
+	*(value) = __value; \
+} while(0)
 
 #endif /* !_BITSTRING_H_ */

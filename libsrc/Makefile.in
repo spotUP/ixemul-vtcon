@@ -104,7 +104,7 @@ libb32c.a:	$(LBASELIBS)
 
 version.h:	$(srcdir)/../library/parse_version.c $(srcdir)/../version.in
 		gcc -o parse_version $<
-		./parse_version $(srcdir) >$@
+		./parse_version $(srcdir)/../ > $@
 		rm -f parse_version
 
 clean:

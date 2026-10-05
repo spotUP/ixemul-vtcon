@@ -15,6 +15,11 @@
  *  You should have received a copy of the GNU Library General Public
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * 
+ * 
+ *  Revision 1.3  2026/06/08  Copilot/ChatGPT modification  (JJ)
+ *  Removed unnecessary (char *) cast in __make_link() call.
+ *  Matches updated const-correct prototype.
  *
  *  symlink.c,v 1.1.1.1 1994/04/04 04:30:36 amiga Exp
  *
@@ -100,8 +105,8 @@ int symlink (const char *old, const char *new)
   /* is long-alignment needed here? This is DOS, isn't it... */
   lstr = alloca (strlen (old) + 4);
   lstr = LONG_ALIGN (lstr);
-  u2a(old, lstr);
-  if (__make_link ((char *)new, (BPTR)lstr, LINK_SOFT))
+  u2a(old, (char *)lstr);
+  if (__make_link (new, (BPTR)lstr, LINK_SOFT))
     return 0;
   errno = __ioerr_to_errno(IoErr());
   return -1;

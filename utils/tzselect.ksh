@@ -1,4 +1,7 @@
 #! /bin/ksh
+
+# '@(#)tzselect.ksh	1.7'
+
 # Ask the user about the time zone, and output the resulting TZ value to stdout.
 # Interact with the user via stderr and stdin.
 
@@ -10,21 +13,25 @@
 # If your host lacks the Korn shell,
 # you can use either of the following free programs instead:
 #
+#	<a href=ftp://ftp.gnu.org/pub/gnu/>
 #	Bourne-Again shell (bash)
-#	<URL:ftp://ftp.gnu.ai.mit.edu/pub/gnu/>
+#	</a>
 #
+#	<a href=ftp://ftp.cs.mun.ca/pub/pdksh/pdksh.tar.gz>
 #	Public domain ksh
-#	<URL:ftp://ftp.cs.mun.ca/pub/pdksh/pdksh.tar.gz>
+#	</a>
 #
 # This script also uses several features of modern awk programs.
 # If your host lacks awk, or has an old awk that does not conform to Posix.2,
 # you can use either of the following free programs instead:
 #
+#	<a href=ftp://ftp.gnu.org/pub/gnu/>
 #	GNU awk (gawk)
-#	<URL:ftp://ftp.gnu.ai.mit.edu/pub/gnu/>
+#	</a>
 #
+#	<a href=ftp://ftp.whidbey.net/pub/brennan/>
 #	mawk
-#	<URL:ftp://ftp.whidbey.net/pub/brennan/>
+#	</a>
 
 
 # Specify default values for environment variables if they are unset.
@@ -242,8 +249,8 @@ while
 	extra_info=
 	for i in 1 2 3 4 5 6 7 8
 	do
-		TZdate=$(LANG=C TZ="$TZ_for_date" /gg/bin/date)
-		UTdate=$(LANG=C TZ=UTC0 /gg/bin/date)
+		TZdate=$(LANG=C TZ="$TZ_for_date" date)
+		UTdate=$(LANG=C TZ=UTC0 date)
 		TZsec=$(expr "$TZdate" : '.*:\([0-5][0-9]\)')
 		UTsec=$(expr "$UTdate" : '.*:\([0-5][0-9]\)')
 		case $TZsec in
@@ -285,5 +292,17 @@ Universal Time is now:	$UTdate."
 do :
 done
 
-# Output the answer.
+case $SHELL in
+*csh) file=.login line="setenv TZ '$TZ'";;
+*) file=.profile line="TZ='$TZ'; export TZ"
+esac
+
+echo >&2 "
+You can make this change permanent for yourself by appending the line
+	$line
+to the file '$file' in your home directory; then log out and log in again.
+
+Here is that TZ value again, this time on standard output so that you
+can use the $0 command in shell scripts:"
+
 echo "$TZ"

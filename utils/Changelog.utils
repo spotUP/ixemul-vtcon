@@ -1,0 +1,40 @@
+2026-09-19  JJ
+
+	* ixpipe-handler.c: Check both lseek() operations used by
+	  ACTION_SEEK and translate failures to DOS errors. Bound the
+	  ACTION_EXAMINE_FH BSTR filename to the available FileInfoBlock
+	  storage. Harden signal recovery so that a NULL or already returned
+	  DosPacket is not dereferenced.
+
+	* localtime.c: Update the timezone implementation from tzcode 7.61
+	  to 7.75. Add validation of TZif counts, record indexes and input
+	  lengths, default DST rules, the re-entrant localtime_r(), gmtime_r()
+	  and ctime_r() interfaces, and improved leap-second and mktime()
+	  handling.
+
+	* util.c: Check settings-file reads and writes, reject incompatible
+	  settings versions, fall back to defaults for invalid settings, and
+	  correct requester error formatting.
+
+	* ixstack.c: Correct mmap() failure handling, use a writable mapping,
+	  release mappings on every exit path, avoid uninitialized descriptor
+	  use, and replace implementation-dependent multi-character constants
+	  with explicit 32-bit values.
+
+	* ixtimezone.c: Store IXGMTOFFSET in an explicit five-byte format,
+	  remove structure-padding and byte-order dependencies, use the Amiga
+	  epoch constant, validate time conversion results, and make
+	  battclock.resource patch installation and removal safer.
+
+	* ixtrace.c: Replace unbounded interactive input, make SIGINT state
+	  signal-safe, correct trace-output length handling, and bound syscall
+	  formatting to the output buffer.
+
+	* ixtrace.h: Synchronize the trace table with the new
+	  ixemul.library v80 system-call interfaces.
+
+	* amiga_gui.c: Correct pointer values passed through GadTools tag
+	  lists and simplify equivalent array-address expressions.
+
+	* ixrun.c: Correct Unix-style /volume/path conversion without
+	  modifying argv[] or its strings, and correct allocation diagnostics.

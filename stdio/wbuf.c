@@ -34,6 +34,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * wbuf.c,v 1.4.1 2026/02/15 Copilot, JJ
+ *  
+ * Minor optimization in __swbuf(): replace pre-increment logic with direct buffer
+ * offset calculation. Eliminates one ALU dependency while preserving full BSD
+ * semantics.
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -90,7 +96,8 @@ __swbuf(c, fp)
 	}
 	fp->_w--;
 	*fp->_p++ = c;
-	if (++n == fp->_bf._size || (fp->_flags & __SLBF && c == '\n'))
+	n = fp->_p - fp->_bf._base;
+	if (n == fp->_bf._size || (fp->_flags & __SLBF && c == '\n'))
 		if (fflush(fp))
 			return (EOF);
 	return (c);

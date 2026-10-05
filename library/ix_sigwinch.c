@@ -24,6 +24,18 @@
  *  *** empty log message ***
  *
  */
+
+/* 
+ * Revision 1.3  2026/07/03 ChatGPT modification (JJ)
+ *
+ * Make __ix_install_sigwinch() idempotent.
+ *
+ * Guard against installing the input.device SIGWINCH handler more than
+ * once for the same task.  A repeated install would overwrite u.u_idev_req
+ * and make the previous handler/request unreachable, preventing
+ * __ix_remove_sigwinch() from removing it during cleanup.
+ */
+
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
@@ -60,6 +72,16 @@ void __ix_install_sigwinch (void)
   struct Process *me = (struct Process *) FindTask(0);
   struct user *u_ptr = getuser(me);
   struct StandardPacket *sp;
+
+  /*
+   * Avoid installing the input.device SIGWINCH handler twice for the
+   * same task.  A second install would overwrite u.u_idev_req and make
+   * the first handler/request unreachable, leaving __ix_remove_sigwinch()
+   * unable to remove it later.
+   */
+
+  if (u.u_idev_req)
+      return;
 
   info = alloca (sizeof (struct InfoData) + 2);
   info = LONG_ALIGN (info);

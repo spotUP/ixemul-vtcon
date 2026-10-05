@@ -34,6 +34,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * setvbuf.c,v 1.7.1 2026/02/15 Copilot, JJ
+ * Avoid redundant second malloc() attempt when size == iosize in setvbuf().
+ * Behavior unchanged; simplifies logic and removes dead fallback path.
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -107,10 +111,13 @@ setvbuf(fp, buf, mode, size)
 
 	/* Allocate buffer if needed. */
 	if (buf == NULL) {
-		if ((buf = malloc(size)) == NULL) {
+		buf = malloc(size);
+		if (buf == NULL) {
 			/*
 			 * Unable to honor user's request.  We will return
 			 * failure, but try again with file system size.
+			 *
+			 * If size == iosize, retrying is pointless, so skip it.
 			 */
 			ret = EOF;
 			if (size != iosize) {

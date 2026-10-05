@@ -19,12 +19,18 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+ * Revision 1.3  2026/06/07  Copilot/ChatGPT modifications (JJ)
+ *  Fix sethostname() prototype to match unistd.h (size_t).
+ */
+
 /* Miscellaneous functions */
 
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
 #include <stdlib.h>
+#include <string.h>
 
 int
 getpid(void)
@@ -122,16 +128,16 @@ gethostname(char *name, int namelen)
 }
 
 int
-sethostname(char *name, int namelen)
+sethostname(const char *name, size_t namelen)
 {
-  int len;
+  size_t len;
   usetup;
 
   if (u.u_ixnetbase)
     return netcall(NET_sethostname, name, namelen);
 
-  len = namelen < sizeof (hostname) - 1 ? namelen : sizeof (hostname) - 1;
-  strncpy (hostname, name, len);
+  len = namelen < sizeof(hostname) - 1 ? namelen : sizeof(hostname) - 1;
+  strncpy(hostname, name, len);
   hostname[len] = 0;
   return 0;
 }

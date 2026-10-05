@@ -19,6 +19,22 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+ * Revision 1.1  2026/06/23  ChatGPT modifications (JJ)
+ *
+ * Added allocator cleanup on ix_init() failure path.
+ *
+ * If initialization has progressed past init_buddy() but later fails,
+ * ix_init() now calls cleanup_buddy() before closing the supporting
+ * libraries.
+ *
+ * This prevents the PoolMem/buddy allocator backend from being left
+ * initialized after a failed global library setup.
+ *
+ * Normal successful initialization and per-process ix_open()/ix_close()
+ * behaviour are unchanged.
+ */
+
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
@@ -222,8 +238,8 @@ struct ixemul_base *ix_init (struct ixemul_base *ixbase)
   else
     ix_panic ("out of memory");
 
+  cleanup_buddy ();
   close_libraries();
   
   return 0;
-}      
-
+}

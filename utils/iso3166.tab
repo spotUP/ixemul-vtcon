@@ -1,11 +1,17 @@
 # ISO 3166 2-letter country codes
 #
-# From Paul Eggert <eggert@twinsun.com> (1996-09-03):
+# @(#)iso3166.tab	1.8
+#
+# From Paul Eggert <eggert@twinsun.com> (1999-10-13):
 #
 # This file contains a table with the following columns:
-# 1.  ISO 3166 2-character country code.
+# 1.  ISO 3166-1:1999 2-character country code.  See:
+#	<a href="http://www.din.de/gremien/nas/nabd/iso3166ma/codlstp1.html">
+#	ISO 3166-1: The Code List
+#	</a>.
 # 2.  The usual English name for the country,
 #	chosen so that alphabetic sorting of subsets produces helpful lists.
+#	This is not the same as the English name in the ISO 3166 tables.
 #
 # Columns are separated by a single tab.
 # The table is sorted by country code.
@@ -51,8 +57,9 @@ BY	Belarus
 BZ	Belize
 CA	Canada
 CC	Cocos (Keeling) Islands
+CD	Congo (Dem. Rep.)
 CF	Central African Rep.
-CG	Congo
+CG	Congo (Rep.)
 CH	Switzerland
 CI	Cote d'Ivoire
 CK	Cook Islands
@@ -122,7 +129,7 @@ JM	Jamaica
 JO	Jordan
 JP	Japan
 KE	Kenya
-KG	Kirgizstan
+KG	Kyrgyzstan
 KH	Cambodia
 KI	Kiribati
 KM	Comoros
@@ -187,6 +194,7 @@ PL	Poland
 PM	St Pierre & Miquelon
 PN	Pitcairn
 PR	Puerto Rico
+PS	Palestine
 PT	Portugal
 PW	Palau
 PY	Paraguay
@@ -250,5 +258,4 @@ YT	Mayotte
 YU	Yugoslavia
 ZA	South Africa
 ZM	Zambia
-ZR	Zaire
 ZW	Zimbabwe

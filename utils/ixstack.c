@@ -1,3 +1,22 @@
+/*
+ * Revision 1.3.1  2026/04/29  JJ, Copilot
+ *  - Added MAP_FAILED fallback definition for ixemul builds.
+ *  - Replaced multi-character constants 'StCk'/'sTcK' with 32-bit literals
+ *    to ensure C89 portability and eliminate compiler warnings.
+ *
+ * Revision 1.3  2026/04/06  JJ, Copilot
+ *  - Fixed uninitialized fd usage in the stat() failure path.
+ *  - Corrected mmap() error handling (test addr == MAP_FAILED).
+ *  - Enabled writable mmap() (PROT_READ | PROT_WRITE) to match write()
+ *    operations on the underlying file.
+ *  - Ensured munmap() is called in all exit paths to avoid leaks.
+ *  - Replaced long* magic reads with uint32_t for clarity; semantics unchanged.
+ *  - Added <ctype.h> and corrected isdigit() usage with unsigned char cast.
+ *  - Made main() explicitly return int.
+ *  These changes remove undefined behaviour and resource leaks while preserving
+ *  the original ixstack functionality and file format semantics.
+ */
+
 #define UTILITY_TAGITEM_H
 #define _SIZE_T
 #define __AMIGA_TYPES__
@@ -10,6 +29,13 @@
 #include <ixemul.h>
 #include <ix.h>
 #include <proto/exec.h>
+#include <ctype.h>
+
+#include <stdint.h>
+
+#ifndef MAP_FAILED
+#define MAP_FAILED ((void *)-1)
+#endif
 
 char VERSION[] = "\000$VER: ixstack 1.1 (14.06.97)";
 
@@ -22,26 +48,32 @@ void setstack(long size, char *filename)
   static int printed_header = 0;
   
   if (stat(filename, &s) == -1 || !S_ISREG(s.st_mode))
-  {
-    close(fd);
     return;
-  }
+
   fd = open(filename, O_RDWR);
   if (fd == -1)
   {
     perror(filename);
     return;
   }
+
   len = lseek(fd, 0, SEEK_END);
-  addr = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
-  if (fd == -1)
+  if (len <= 0)
+  {
+    close(fd);
+    return;
+  }
+
+  addr = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (addr == MAP_FAILED)
   {
     perror(filename);
     close(fd);
     return;
   }
   for (i = 0; i < len - 12; i += 2)
-    if (*(long *)(addr + i) == 'StCk' && *(long *)(addr + i + 8) == 'sTcK')
+    if (*(uint32_t *)(addr + i) == 0x5374436B &&
+        *(uint32_t *)(addr + i + 8) == 0x7354634B)
     {
       if (size >= 0)
       {
@@ -55,12 +87,13 @@ void setstack(long size, char *filename)
           printed_header = 1;
           printf("stacksize  filename\n---------  --------\n");
         }
-        printf("%9d  %s\n", *(long *)(addr + i + 4), filename);
+        printf("%9ld  %s\n", *(long *)(addr + i + 4), filename);
       }
       munmap(addr, len);
       close(fd);
       return;
     }
+  munmap(addr, len);
   close(fd);
   if (size)
     printf("cannot set stack: %s\n", filename);
@@ -114,7 +147,7 @@ static void show(void)
 }
 
 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
   long size;
 
@@ -122,9 +155,9 @@ main(int argc, char **argv)
     show();
   if (argc < 3)
   {
-    fprintf(stderr, "set stacksize:   ixstack <stacksize> <files ...>
-show stacksize:  ixstack -l <files ...>
-show stackusage: ixstack -s\n");
+    fprintf(stderr, "set stacksize:   ixstack <stacksize> <files ...>\n"
+                    "show stacksize:  ixstack -l <files ...>\n"
+                    "show stackusage: ixstack -s\n");
     exit(1);
   }
 
@@ -135,7 +168,7 @@ show stackusage: ixstack -s\n");
     int i;
     
     for (i = 0; argv[1][i]; i++)
-      if (!isdigit(argv[1][i]))
+      if (!isdigit((unsigned char)argv[1][i]))
       {
         fprintf(stderr, "stacksize %s is not a number\n", argv[1]);
         exit(1);

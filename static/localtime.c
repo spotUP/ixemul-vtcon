@@ -3,6 +3,30 @@
 ** 1996-06-05 by Arthur David Olson (arthur_david_olson@nih.gov).
 */
 
+/*
+ * Revision 1.1.1.3  2026/06/22  ChatGPT modifications  (JJ)
+ *
+ * localtime.c: silence legacy C prototype/linkage warnings.
+ *
+ * - Keep tzsetwall() externally linked to match ixemul/header
+ *   declarations and avoid static-after-non-static warnings.
+ * - Convert localtime() from K&R-style definition to prototype form
+ *   so GCC does not warn when localtime_r is mapped through headers.
+ *
+ * No timezone parsing or runtime semantics changed.
+ *
+ * Revision 1.1.1.2  2026/06/18  ChatGPT/Deepseek (JJ)
+ * localtime.c: fix timezone state and tzfile header handling.
+ *
+ * - Use the WILDABBR macro when initializing the fallback
+ * 	timezone abbreviation string instead of the literal "WILDABBR".
+ * - Validate that tzload() read at least a complete tzfile header
+ * 	before decoding header fields.
+ * - Read ttisgmtcnt and ttisstdcnt in the correct tzfile header order.
+ * - Make the empty TZ="" fast-path initialize a complete single-type
+ * 	GMT state by setting typecnt and tt_isdst explicitly.
+ */
+
 #ifndef lint
 #ifndef NOID
 static char	elsieid[] = "@(#)localtime.c	7.61";
@@ -55,7 +79,7 @@ static char	elsieid[] = "@(#)localtime.c	7.61";
 #define WILDABBR	"   "
 #endif /* !defined WILDABBR */
 
-static char		wildabbr[] = "WILDABBR";
+static char		wildabbr[] = WILDABBR;
 
 static const char	gmt[] = "GMT";
 
@@ -307,11 +331,13 @@ register struct state * const	sp;
 		i = read(fid, buf, sizeof buf);
 		if (close(fid) != 0)
 			return -1;
+		if (i < (int) sizeof (struct tzhead))
+			return -1;
 		p = buf;
 		p += sizeof tzhp->tzh_reserved;
-		ttisstdcnt = (int) detzcode(p);
-		p += 4;
 		ttisgmtcnt = (int) detzcode(p);
+		p += 4;
+		ttisstdcnt = (int) detzcode(p);
 		p += 4;
 		sp->leapcnt = (int) detzcode(p);
 		p += 4;
@@ -907,13 +933,10 @@ struct state * const	sp;
 		(void) tzparse(gmt, sp, TRUE);
 }
 
-#if !defined(STD_INSPIRED) && !defined(__ixemul__)
 /*
-** A non-static declaration of tzsetwall in a system header file
-** may cause a warning about this upcoming static declaration...
+** Keep tzsetwall externally linked here: ixemul headers may declare it
+** non-static before this definition.
 */
-static
-#endif /* !defined STD_INSPIRED */
 void
 tzsetwall P((void))
 {
@@ -967,7 +990,9 @@ tzset P((void))
 		*/
 		lclptr->leapcnt = 0;		/* so, we're off a little */
 		lclptr->timecnt = 0;
+		lclptr->typecnt = 1;
 		lclptr->ttis[0].tt_gmtoff = 0;
+		lclptr->ttis[0].tt_isdst = 0;
 		lclptr->ttis[0].tt_abbrind = 0;
 		(void) strcpy(lclptr->chars, gmt);
 	} else if (tzload(name, lclptr) != 0)
@@ -1033,8 +1058,7 @@ struct tm * const	tmp;
 }
 
 struct tm *
-localtime(timep)
-const time_t * const	timep;
+localtime(const time_t * const	timep)
 {
 	tzset();
 	localsub(timep, 0L, &tm);

@@ -1,8 +1,8 @@
-/*	$NetBSD: fread.c,v 1.6 1995/02/02 02:09:34 jtc Exp $	*/
+/*  $NetBSD: fread.c,v 1.6 1995/02/02 02:09:34 jtc Exp $  */
 
 /*-
  * Copyright (c) 1990, 1993
- *	The Regents of the University of California.  All rights reserved.
+ *  The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Chris Torek.
@@ -17,8 +17,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *  This product includes software developed by the University of
+ *  California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,9 +36,29 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * fread.c,v
+ *
+ * Revision 1.6.2  2026/08/04  ChatGPT modifications (JJ)
+ *
+ *  Restrict usetup to the overflow error path.
+ *
+ * Revision 1.6.1 2026/06/25 JJ
+ *
+ *  Modernize fread() along the lines of later NetBSD stdio:
+ *
+ *  - Add overflow check before count * size using MUL_NO_OVERFLOW.
+ *  - Set errno (EOVERFLOW/ERANGE) and __SERR on invalid total size.
+ *  - Replace legacy _r<0 fixup with a cleaner _r<=0 refill path.
+ *  - Use (int) cast when adjusting fp->_r to match field type.
+ *
+ *  No intentional change to BSD stdio semantics; improves robustness
+ *  while preserving original buffering and refill behavior.
+ */
+
 #if defined(LIBC_SCCS) && !defined(lint)
 #if 0
-static char sccsid[] = "@(#)fread.c	8.2 (Berkeley) 12/11/93";
+static char sccsid[] = "@(#)fread.c  8.2 (Berkeley) 12/11/93";
 #endif
 static char rcsid[] = "$NetBSD: fread.c,v 1.6 1995/02/02 02:09:34 jtc Exp $";
 #endif /* LIBC_SCCS and not lint */
@@ -46,44 +66,65 @@ static char rcsid[] = "$NetBSD: fread.c,v 1.6 1995/02/02 02:09:34 jtc Exp $";
 #define _KERNEL
 #include "ixemul.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
+#define MUL_NO_OVERFLOW ((size_t)1 << (sizeof(size_t) * 4))
+
 size_t
 fread(buf, size, count, fp)
-	void *buf;
-	size_t size, count;
-	register FILE *fp;
+    void *buf;
+    size_t size, count;
+    register FILE *fp;
 {
-	register size_t resid;
-	register char *p;
-	register int r;
-	size_t total;
+    register size_t resid;
+    register char *p;
+    register int r;
+    size_t total;
 
-	/*
-	 * The ANSI standard requires a return value of 0 for a count
-	 * or a size of 0.  Peculiarily, it imposes no such requirements
-	 * on fwrite; it only requires fread to be broken.
-	 */
-	if ((resid = count * size) == 0)
-		return (0);
-	if (fp->_r < 0)
-		fp->_r = 0;
-	total = resid;
-	p = buf;
-	while (resid > (r = fp->_r)) {
-		(void)memcpy((void *)p, (void *)fp->_p, (size_t)r);
-		fp->_p += r;
-		/* fp->_r = 0 ... done in __srefill */
-		p += r;
-		resid -= r;
-		if (__srefill(fp)) {
-			/* no more input: return partial result */
-			return ((total - resid) / size);
-		}
-	}
-	(void)memcpy((void *)p, (void *)fp->_p, resid);
-	fp->_r -= resid;
-	fp->_p += resid;
-	return (count);
+    /*
+     * The ANSI standard requires a return value of 0 for a count
+     * or a size of 0.
+     */
+    if ((size >= MUL_NO_OVERFLOW || count >= MUL_NO_OVERFLOW) &&
+        size > 0 && count > (size_t)-1 / size) {
+#if defined(EOVERFLOW) || defined(ERANGE)
+        usetup;
+#endif
+#ifdef EOVERFLOW
+        errno = EOVERFLOW;
+#elif defined(ERANGE)
+        errno = ERANGE;
+#endif
+        fp->_flags |= __SERR;
+        return (0);
+    }
+
+    if ((resid = count * size) == 0)
+        return (0);
+
+    total = resid;
+    p = buf;
+
+    if (fp->_r <= 0)
+        goto refill;
+
+    while (resid > (size_t)(r = fp->_r)) {
+        (void)memcpy((void *)p, (void *)fp->_p, (size_t)r);
+        fp->_p += r;
+        p += r;
+        resid -= r;
+
+refill:
+        if (__srefill(fp)) {
+            return ((total - resid) / size);
+        }
+    }
+
+    (void)memcpy((void *)p, (void *)fp->_p, resid);
+    fp->_r -= (int)resid;
+    fp->_p += resid;
+
+    return (count);
 }

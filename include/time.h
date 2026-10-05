@@ -41,6 +41,21 @@
  *	@(#)time.h	5.12 (Berkeley) 3/9/91
  */
 
+/*
+ * time.h,v
+ *
+ * Revision 1.2  2026/08/13  ChatGPT modifications (JJ)
+ *
+ *    Use the same _STRUCT_TIMESPEC_DECLARED guard as <sys/time.h> to
+ *    prevent duplicate struct timespec definitions regardless of header
+ *    include order.  Retain _TIMESPEC_DECLARED as a compatibility alias.
+ *
+ * Revision 1.1  2026/08/12  ChatGPT modifications (JJ)
+ *
+ *    Added CLOCK_MONOTONIC and TIMER_ABSTIME definitions together with
+ *    clock_getres() and clock_nanosleep() declarations.
+ */
+
 #ifndef _TIME_H_
 #define	_TIME_H_
 
@@ -58,6 +73,40 @@ typedef	_BSD_CLOCK_T_	clock_t;
 #ifdef	_BSD_TIME_T_
 typedef	_BSD_TIME_T_	time_t;
 #undef	_BSD_TIME_T_
+#endif
+
+/*
+ * POSIX clock support.
+ *
+ * ixemul provides CLOCK_REALTIME and CLOCK_MONOTONIC.
+ */
+#ifndef _CLOCKID_T_DECLARED
+typedef int clockid_t;
+#define _CLOCKID_T_DECLARED
+#endif
+
+#ifndef CLOCK_REALTIME
+#define CLOCK_REALTIME	0
+#endif
+
+#ifndef CLOCK_MONOTONIC
+#define CLOCK_MONOTONIC	1
+#endif
+
+#ifndef TIMER_ABSTIME
+#define TIMER_ABSTIME	1
+#endif
+
+#ifndef _STRUCT_TIMESPEC_DECLARED
+#define _STRUCT_TIMESPEC_DECLARED
+struct timespec {
+	time_t	tv_sec;		/* seconds */
+	long	tv_nsec;	/* nanoseconds */
+};
+#endif
+
+#ifndef _TIMESPEC_DECLARED
+#define _TIMESPEC_DECLARED
 #endif
 
 #ifdef	_BSD_SIZE_T_
@@ -93,6 +142,11 @@ struct tm *localtime __P((const time_t *));
 time_t mktime __P((struct tm *));
 size_t strftime __P((char *, size_t, const char *, const struct tm *));
 time_t time __P((time_t *));
+int nanosleep __P((const struct timespec *, struct timespec *));
+int clock_gettime __P((clockid_t, struct timespec *));
+int clock_getres __P((clockid_t, struct timespec *));
+int clock_nanosleep __P((clockid_t, int, const struct timespec *,
+                         struct timespec *));
 
 #if !defined(_ANSI_SOURCE)
 #define CLK_TCK		100

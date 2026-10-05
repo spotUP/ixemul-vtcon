@@ -16,6 +16,11 @@
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
+ * Revision 1.2  2026/06/13  ChatGPT modifications  (JJ)
+ *
+ *  Fix read() so fd is range-checked before indexing u.u_ofile[].
+ *  Handle zero-length reads after validating the descriptor.
+ *
  *  read.c,v 1.1.1.1 1994/04/04 04:30:30 amiga Exp
  *
  *  read.c,v
@@ -35,21 +40,34 @@
 ssize_t read(int fd, void *buf, size_t len)
 {
   usetup;
-  struct file *f = u.u_ofile[fd];
+  struct file *f;
 
-  /* if this is an open fd */
-  if (fd >= 0 && fd < NOFILE && f)
-      if (f->f_read)
-        return (*f->f_read)(f, buf, len);
-      else
-	{
-	  errno = EIO;
-	  KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
-	}
-  else
+  /*
+   * Validate the descriptor before indexing u.u_ofile[].
+   * The old code initialized f from u.u_ofile[fd] before checking
+   * whether fd was within range.
+   */
+  if (fd < 0 || fd >= NOFILE || !(f = u.u_ofile[fd]))
     {
       errno = EBADF;
       KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+      return -1;
     }
-  return -1;
+
+  /* valid fd, but no read handler */
+  if (!f->f_read)
+    {
+      errno = EIO;
+      KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+      return -1;
+    }
+
+  /*
+   * POSIX-style zero-length read: succeeds, but only after the
+   * descriptor and read operation have been validated.
+   */
+  if (len == 0)
+    return 0;
+
+  return (*f->f_read)(f, buf, len);
 }

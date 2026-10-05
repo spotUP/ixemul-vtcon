@@ -36,6 +36,16 @@ static char sccsid[] = "@(#)initgroups.c        5.7 (Berkeley) 2/23/91";
 #endif /* LIBC_SCCS and not lint */
 
 /*
+ * initgroups.c,v
+ *
+ * Revision 1.1  2026/08/05  ChatGPT modifications (JJ)
+ *
+ *    Use AmiTCP's initgroups() only when usergroup.library is available.
+ *    Roadshow without that optional library now follows the existing local
+ *    group-database implementation.
+ */
+
+/*
  * initgroups
  */
 #define _KERNEL
@@ -57,7 +67,8 @@ initgroups(const char *uname, int agroup)
     register int i;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
 
-    if (p->u_networkprotocol == IX_NETWORK_AMITCP) {
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase) {
         return UG_initgroups(uname,agroup);
     }
 

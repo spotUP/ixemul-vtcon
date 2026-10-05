@@ -17,17 +17,20 @@ RM =		rm
 DEFS =		@DEFS@
 LIBS =		@LIBS@
 CFLAGS =	@CFLAGS@
+UTIL_CFLAGS =	-fomit-frame-pointer
 LDFLAGS =	@LDFLAGS@
+UTIL_LDFLAGS =	-s
 
 #### End system configuration section ####
 
 INCLUDES =	-I$(srcdir) -I$(srcdir)/../include -I$(srcdir)/../library -I$(srcdir)/../static -I. -I/p
 DEFS =          -DHAVE_STRERROR -Dunix
-OUR_CFLAGS =	$(DEFS) $(INCLUDES) $(CFLAGS)
-OUR_LDFLAGS =	$(LDFLAGS) -B../libsrc/ -L../libsrc
+OUR_CFLAGS =	$(DEFS) $(INCLUDES) $(CFLAGS) $(UTIL_CFLAGS)
+IXPIPE_02060_CFLAGS = -m68020-60
+OUR_LDFLAGS =	$(LDFLAGS) $(UTIL_LDFLAGS) -B../libsrc/ -L../libsrc
 
 DATABASES =	africa antarctica asia australasia europe northamerica southamerica \
-		pacificnew etcetera backward systemv solar87 solar88 solar89
+		pacificnew etcetera backward systemv
 
 IXPREFS_OBJ =	main.o cli.o amiga.o amiga_gui.o amiga_functions.o util.o
 
@@ -54,7 +57,7 @@ POSIXRULES =	America/New_York
 		$(CC) -c $(OUR_CFLAGS) $<
 
 all :		ixprefs ixtrace ixrun ixtimezone ixstack ixpipe-handler \
-		ipcs ipcrm tzselect zoneinfo/GMT
+		ixpipe-handler_020-60 ipcs ipcrm tzselect zoneinfo/GMT
 
 ixprefs :	$(IXPREFS_OBJ) getopt.o getopt1.o
 		$(CC) $(OUR_LDFLAGS) -o $@ $^
@@ -72,7 +75,7 @@ amiga_gui.o:	amiga_gui.c
 		    -e 's/LayoutMenus( ixprefsMenus, VisualInfo, TAG_DONE )/LayoutMenus( ixprefsMenus, VisualInfo, GTMN_NewLookMenus, TRUE, TAG_DONE )/' \
 		    -e 's/WA_PubScreenFallBack,	TRUE/WA_PubScreenFallBack,	TRUE, WA_NewLookMenus,	TRUE/' \
 		    <$^ >>tmp_amiga_gui.c
-		echo "#endif /* NO AMIGAOS SUPPORT */" >>tmp_amiga_gui.c
+		echo "#endif /* NO_AMIGAOS SUPPORT */" >>tmp_amiga_gui.c
 		$(CC) -c $(OUR_CFLAGS) -o $@ tmp_amiga_gui.c
 		rm -f tmp_amiga_gui.c
 
@@ -89,7 +92,13 @@ ixtimezone:	ixtimezone.o
 		$(CC) $(OUR_LDFLAGS) -o $@ $^ $(LIBS)
 
 ixpipe-handler:	ixpipe-handler.o
-		$(CC) -nostdlib -o $@ $? -lc
+		$(CC) $(LDFLAGS) $(UTIL_LDFLAGS) -nostdlib -o $@ $? -lc
+
+ixpipe-handler_020-60.o: ixpipe-handler.c
+		$(CC) -c $(OUR_CFLAGS) $(IXPIPE_02060_CFLAGS) -o $@ $<
+
+ixpipe-handler_020-60: ixpipe-handler_020-60.o
+		$(CC) $(LDFLAGS) $(UTIL_LDFLAGS) $(IXPIPE_02060_CFLAGS) -nostdlib -o $@ $? -lc
 
 ipcs:		ipcs.o
 		$(CC) $(OUR_LDFLAGS) -o $@ $^ $(LIBS)
@@ -97,8 +106,8 @@ ipcs:		ipcs.o
 ipcrm:		ipcrm.o
 		$(CC) $(OUR_LDFLAGS) -o $@ $^ $(LIBS)
 
-zic:		zic.o ialloc.o scheck.o getopt.o
-		$(CC) -o $@ $^ $(LIBS)
+zic:		zic.o ialloc.o scheck.o localtime.o asctime.o
+		$(CC) $(LDFLAGS) $(UTIL_LDFLAGS) -o $@ $^ $(LIBS)
 
 tzselect:	tzselect.ksh
 		sed \
@@ -118,18 +127,14 @@ zoneinfo/GMT:	zic yearistype
 		rootme=`pwd` ; cd $(srcdir)/databases ; \
 		$$rootme/zic -d $$rootme/zoneinfo -y "sh $$rootme/yearistype" -p $(POSIXRULES) $(DATABASES)
 
-version.h:	../library/parse_version.c ../version.in
+version.h:	$(srcdir)/../library/parse_version.c $(srcdir)/../version.in
 		gcc -o parse_version $<
-		./parse_version $(srcdir) >$@
+		./parse_version $(srcdir)/../ > $@
 		rm -f parse_version
-
-#
-#	Clean up the local directory.
-#
 
 clean :
 		rm -f *.o ixtrace ixprefs ixrun ixtimezone ixstack tzselect ipcs ipcrm
-		rm -f zic yearistype ixpipe-handler tmp_amiga_gui.c
+		rm -f zic yearistype ixpipe-handler ixpipe-handler_020-60 tmp_amiga_gui.c
 		rm -rf zoneinfo
 
 clobber :	clean

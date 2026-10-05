@@ -19,6 +19,12 @@
  *  select.h,v 1.1.1.1 1994/04/04 04:30:08 amiga Exp
  *
  *  select.h,v
+ *
+ * Revision 1.3  2026/08/29  ChatGPT modifications (JJ)
+ *
+ *  Declare helpers for process-private ACTION_WAIT_CHAR packet state.
+ *  Keep the historical select command values and SELPKT_IN_USE macro.
+ *
  * Revision 1.1.1.1  1994/04/04  04:30:08  amiga
  * Initial CVS check in.
  *
@@ -67,6 +73,21 @@
 #define SELMODE_OUT	1
 #define SELMODE_EXC	2
 
+/*
+ * Undo caller-specific state established by SELCMD_PREPARE.
+ * Must be idempotent and must not report readiness.
+ */
+#define SELCMD_CANCEL 3
+
 #define SELPKT_IN_USE(f) ((f)->f_select_sp.sp_Pkt.dp_Port)
+
+#ifdef _KERNEL
+struct file;
+struct StandardPacket;
+
+struct StandardPacket *__fselect_get_packet(struct file *f);
+void __fselect_release_file(struct file *f);
+void __fselect_cleanup_process(void);
+#endif
 
 #endif

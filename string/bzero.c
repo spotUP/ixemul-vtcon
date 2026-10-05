@@ -21,6 +21,10 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+/* 1.1  2026/06/07  Copilot modifications (JJ)
+ *      Add explicit zero-length check in bzero() to avoid stray write on
+ *      odd-aligned destinations when count == 0.
+ */
 
 #include "defs.h"
 
@@ -37,7 +41,8 @@ ENTRY(bzero)
 asm("
 	movl	sp@(4),a0	/* destination */
 	movl	sp@(8),d0	/* count */
-	jeq	bzdone		/* nothing to do */
+	tstl	d0			/* explicit zero-length check */
+	jeq		bzdone		/* avoid stray write on odd address */
 	movl	a0,d1
 	btst	#0,d1		/* address odd? */
 	jeq	bzeven		/* no, skip alignment */

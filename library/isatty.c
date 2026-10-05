@@ -19,6 +19,10 @@
  *  isatty.c,v 1.1.1.1 1994/04/04 04:30:26 amiga Exp
  *
  *  isatty.c,v
+ * 
+ * Revision 1.2  2026/06/13  ChatGPT modifications (JJ)
+ *  Validate the file descriptor before indexing u.u_ofile[] in isatty().
+ *
  * Revision 1.1.1.1  1994/04/04  04:30:26  amiga
  * Initial CVS check in.
  *
@@ -34,10 +38,10 @@ int
 isatty(int fd)
 {
   usetup;
-  struct file *f = u.u_ofile[fd];
+  struct file *f;
   int result = 0;
 
-  if (fd >= 0 && fd < NOFILE && f)
+  if (fd >= 0 && fd < NOFILE && (f = u.u_ofile[fd]))
     {
       if (f->f_type == DTYPE_FILE)
         result = IsInteractive(CTOBPTR(f->f_fh)) ? 1 : 0;

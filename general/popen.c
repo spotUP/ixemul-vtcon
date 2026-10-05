@@ -32,6 +32,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ * 
+ *
+ * 37.12  2026-06-02  ChatGPT modification (JJ)
+ * Fix malloc size for u_popen_pids: use sizeof(pid_t) instead of sizeof(int).
+ * Prevents incorrect allocation on systems where pid_t differs from int.
+ *
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
@@ -66,7 +72,7 @@ popen(program, type)
 	if (u.u_popen_pids == NULL) {
 		if ((fds = getdtablesize()) <= 0)
 			return (NULL);
-		if ((u.u_popen_pids = (pid_t *)malloc((u_int)(fds * sizeof(int)))) == NULL)
+		if ((u.u_popen_pids = (pid_t *)malloc((u_int)(fds * sizeof(pid_t)))) == NULL)
 			return (NULL);
 		bzero((char *)u.u_popen_pids, fds * sizeof(pid_t));
 	}

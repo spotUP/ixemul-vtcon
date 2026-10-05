@@ -16,6 +16,36 @@
  *  You should have received a copy of the GNU Library General Public
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * 
+ *
+ * Revision 1.7  2026/06/15  ChatGPT modifications (JJ)
+ *
+ *  Reduced repeated pathname scans in open().
+ *
+ *  Added a small open_path_info helper to classify pathnames once.
+ *  Replaced repeated strchr()/strcmp()/strcasecmp() checks with
+ *  cached pathname flags.
+ *  Reused the precomputed pathname length for f_name storage.
+ *
+ *  Preserved /dev/tty, console:, *, PTY and normal __open() behavior.
+ *
+ *  No change to open/stat ordering, descriptor semantics, PTY lifecycle,
+ *  directory conversion, O_CASE handling or deferred metadata updates.
+ * 
+ *  Revision 1.6 2026/06/07  Copilot modifications (JJ)
+ *    -Fixed open() to seek to file end for O_APPEND,
+ *     ensure seek occurs after O_TRUNC.
+ *    -Fixed open(NULL, ...) to set errno = EACCES and return -1
+ *     instead of returning EACCES as a file descriptor value.
+ *
+ *  Revision 1.5  2026/05/31  ChatGPT modifications (JJ)
+ *  - Replaced heap-only f_name allocation with per-file inline name buffer.
+ *  - Short pathnames are stored in struct file::f_name_buf.
+ *  - Longer pathnames continue to use kmalloc().
+ *  - Added f_name_inline ownership flag initialization after falloc().
+ *  - Fixed PTY pathname construction to use writable stack storage instead
+ *    of modifying a string literal.
+ *  - No change to open(), stat(), PTY state, or descriptor semantics.
  *
  *  $Id: open.c,v 1.4 1994/06/19 15:14:07 rluebbert Exp $
  *
@@ -48,6 +78,46 @@ extern int __mread(), __mclose(), __mselect();
 
 static struct ix_mutex open_sem;
 
+struct open_path_info
+{
+  size_t len;
+  int has_colon;
+  int is_dev_tty;
+  int is_star;
+  int is_console;
+};
+
+static void
+open_parse_path(char *name, struct open_path_info *pi)
+{
+  char *p;
+
+  pi->len = 0;
+  pi->has_colon = 0;
+  pi->is_dev_tty = 0;
+  pi->is_star = 0;
+  pi->is_console = 0;
+
+  p = name;
+  while (*p)
+    {
+      if (*p == ':')
+        pi->has_colon = 1;
+      p++;
+    }
+
+  pi->len = (size_t)(p - name);
+
+  if (pi->len == 8 && !strcmp(name, "/dev/tty"))
+    pi->is_dev_tty = 1;
+
+  if (pi->len == 1 && name[0] == '*')
+    pi->is_star = 1;
+
+  if (pi->len == 8 && !strcasecmp(name, "console:"))
+    pi->is_console = 1;
+}
+
 int
 open(char *name, int mode, int perms)
 {
@@ -59,10 +129,22 @@ open(char *name, int mode, int perms)
   char ptymask = 0;
   int ptyindex = 0;
   int amode = 0, i;
+  char ptyname[32];
+  struct open_path_info pathinfo;
+  size_t final_namelen;
+  int use_direct_open;
   usetup;
 
   if (name == NULL)     /* sanity check */
-    return EACCES;
+    {
+      errno = EACCES;
+      return -1;
+    }
+
+  open_parse_path(name, &pathinfo);
+  final_namelen = pathinfo.len + 1;
+  use_direct_open = pathinfo.is_star || pathinfo.is_console;
+
   mode = FFLAGS(mode);
 
   /* inhibit signals */
@@ -79,9 +161,13 @@ open(char *name, int mode, int perms)
   /* we now got the file, ie. since its count is > 0, no other process
    * will get it with falloc() */
 
+  /* initialize inline filename ownership state */
+  f->f_name = 0;
+  f->f_name_inline = 0;
+
   late_stat = 0;
 
-  // The code between the stat() and the actual open() is critical
+  /* The code between the stat() and the actual open() is critical */
   ix_mutex_lock(&open_sem);
 
   if (stat(name, &f->f_stb) < 0)
@@ -123,7 +209,7 @@ open(char *name, int mode, int perms)
   __init_std_packet ((void *)&f->f_select_sp);
 
   /* check for case-sensitive filename */
-  if ((mode & O_CASE) && !late_stat && !strchr(name, ':') && filenamecmp(name))
+  if ((mode & O_CASE) && !late_stat && !pathinfo.has_colon && filenamecmp(name))
     {
       error = ENOENT;
       goto error;
@@ -166,16 +252,28 @@ open(char *name, int mode, int perms)
 
   amode = (mode & O_CREAT) ? MODE_READWRITE : MODE_OLDFILE;
 
-  if (!strcmp(name, "/dev/tty"))
-    name = "*";
+  if (pathinfo.is_dev_tty)
+    {
+      name = "*";
+      final_namelen = 2;     /* "*" plus NUL */
+      use_direct_open = 1;
+    }
   else if ((i = is_pseudoterminal(name)))
     {
       char *orig_name = name;
       char mask;
 
-      name = "/fifo/ptyXX/rweksm";
-      memcpy(name + 7, orig_name + i + 1, 4);
-      name[17] = (orig_name[i] == 'p' ? 'm' : 'c');
+      /*
+       * Build writable PTY handler pathname.
+       * Do not modify the string literal directly.
+       */
+      strcpy(ptyname, "/fifo/ptyXX/rweksm");
+      memcpy(ptyname + 7, orig_name + i + 1, 4);
+      ptyname[17] = (orig_name[i] == 'p' ? 'm' : 'c');
+      name = ptyname;
+      final_namelen = sizeof("/fifo/ptyXX/rweksm");
+      use_direct_open = 0;
+
       mask = (name[17] == 'm' ? IX_PTY_MASTER : IX_PTY_SLAVE) | IX_PTY_CLOSE;
       ptyindex = (name[9] - 'p') * 16 + name[10] - (name[10] >= 'a' ? 'a' - 10 : '0');
       ix_lock_base();
@@ -192,7 +290,7 @@ open(char *name, int mode, int perms)
 
   do
   {
-    if (!strcmp(name, "*") || !strcasecmp(name, "console:"))
+    if (use_direct_open)
       /* Temporary patch for KingCON 1.3, which seems to have problems with
 	 ACTION_FINDINPUT of "*"/"console:" when "dp_Port" of the packet is
 	 not set to sender's "pr_MsgPort" - that's what IXEmul makes on
@@ -218,7 +316,7 @@ open(char *name, int mode, int perms)
       }
   } while (!fh);
 
-  // End of critical section
+  /* End of critical section */
   ix_mutex_unlock(&open_sem);
 
   /* now.. we're lucky, we actually opened the file! */
@@ -235,12 +333,26 @@ open(char *name, int mode, int perms)
   f->f_type   = DTYPE_FILE;
 
   /*
-   * have to use kmalloc() instead of malloc(), because this is no task-private
-   * data, it could (in the future) be shared by other tasks 
-   */
-  f->f_name = (void *) kmalloc (strlen (name) + 1);
-  if (f->f_name)
-    strcpy (f->f_name, name);
+ * Store the filename in the per-file inline buffer when it fits.
+ * Longer names use kmalloc(), because the file object may be shared.
+ */
+  {
+    size_t namelen = final_namelen;
+
+    if (namelen <= sizeof(f->f_name_buf))
+      {
+        f->f_name = f->f_name_buf;
+        f->f_name_inline = 1;
+      }
+    else
+      {
+        f->f_name = kmalloc(namelen);
+        f->f_name_inline = 0;
+      }
+
+    if (f->f_name)
+      strcpy(f->f_name, name);
+  }
 
 ret_ok:
   /* ok, we're almost done. If desired, init the stat buffer to the
@@ -284,11 +396,17 @@ ret_ok:
       f->f_stb_dirty |= FSDF_UTIME;
     }
 
+  /* Honor O_APPEND: seek to end after any truncation. */
+  if (!error && (mode & O_APPEND) && f->f_type == DTYPE_FILE)
+    {
+      Seek(CTOBPTR(f->f_fh), 0, OFFSET_END);
+    }
+
   /* return the descriptor */
   return fd;
 
 error:
-  // End of critical section
+  /* End of critical section */
   ix_mutex_unlock(&open_sem);
 
   /* free the file */

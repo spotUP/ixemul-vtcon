@@ -116,23 +116,23 @@ struct NewGadget ixprefsNGad[] = {
 };
 
 ULONG ixprefsGTags[] = {
-	(TAG_DONE),
-	(TAG_DONE),
-	(TAG_DONE),
-	(TAG_DONE),
-	(GTIN_Number), 0, (GTIN_MaxChars), 10, (TAG_DONE),
-	(GTIN_Number), 0, (GTIN_MaxChars), 10, (TAG_DONE),
-	(TAG_DONE),
-	(TAG_DONE),
-	(TAG_DONE),
-	(TAG_DONE),
-	(TAG_DONE),
-	(GTCY_Labels), (ULONG)&networking0Labels[ 0 ], (TAG_DONE),
-	(TAG_DONE),
-	(GTCY_Labels), (ULONG)&profilemethod0Labels[ 0 ], (TAG_DONE),
-	(TAG_DONE),
-	(TAG_DONE),
-	(TAG_DONE)
+    (TAG_DONE),
+    (TAG_DONE),
+    (TAG_DONE),
+    (TAG_DONE),
+    (GTIN_Number), 0, (GTIN_MaxChars), 10, (TAG_DONE),
+    (GTIN_Number), 0, (GTIN_MaxChars), 10, (TAG_DONE),
+    (TAG_DONE),
+    (TAG_DONE),
+    (TAG_DONE),
+    (TAG_DONE),
+    (TAG_DONE),
+    (GTCY_Labels), (ULONG)networking0Labels, (TAG_DONE),
+    (TAG_DONE),
+    (GTCY_Labels), (ULONG)profilemethod0Labels, (TAG_DONE),
+    (TAG_DONE),
+    (TAG_DONE),
+    (TAG_DONE)
 };
 
 static UWORD ComputeX( UWORD value )
@@ -291,10 +291,10 @@ int OpenixprefsWindow( void )
 				WA_Height,	wh + OffY + Scr->WBorBottom,
 				WA_IDCMP,	BUTTONIDCMP|CHECKBOXIDCMP|INTEGERIDCMP|CYCLEIDCMP|IDCMP_MENUPICK|IDCMP_CLOSEWINDOW|IDCMP_REFRESHWINDOW,
 				WA_Flags,	WFLG_DRAGBAR|WFLG_DEPTHGADGET|WFLG_CLOSEGADGET|WFLG_SMART_REFRESH|WFLG_ACTIVATE,
-				WA_Gadgets,	ixprefsGList,
-				WA_Title,	ixprefsWdt,
-				WA_ScreenTitle,	"ixprefs",
-				WA_PubScreen,	Scr,
+				WA_Gadgets,	(ULONG)ixprefsGList,
+				WA_Title,	(ULONG)ixprefsWdt,
+				WA_ScreenTitle,	(ULONG)"ixprefs",
+				WA_PubScreen,	(ULONG)Scr,
 				WA_AutoAdjust,	TRUE,
 				WA_PubScreenFallBack,	TRUE,
 				TAG_DONE )))
@@ -328,4 +328,3 @@ void CloseixprefsWindow( void )
 		ixprefsFont = NULL;
 	}
 }
-

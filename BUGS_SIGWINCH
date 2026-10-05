@@ -1,0 +1,70 @@
+What we actually changed around the suspected race condition falls into
+two separate groups.
+
+The first three changes were primarily made to fix the original GUI
+trashing / memory overwrite problem:
+
+- In `library/ix_sigwinch.c`, we made handler installation idempotent
+  by adding:
+
+      if (u.u_idev_req) return;
+
+  This prevents duplicate `IND_ADDHANDLER` calls and avoids losing or
+  overwriting an already active request/handler.
+
+- In `library/createextio.c`, we changed the initialization from only
+  clearing `sizeof(struct IORequest)` to clearing the entire requested
+  allocation:
+
+      memset(ioReq, '\0', size);
+
+  This was important because the SIGWINCH code uses an extended request,
+  such as `IOStdReq`, and uninitialized data in the remaining part of
+  the structure could cause unsafe behaviour.
+
+- We removed the unconditional installation of the SIGWINCH handler
+  before `main()`, first discussed around `_main.c` and later changed
+  concretely in `library/ix_exec_entry.c`. The handler is now installed
+  lazily from `library/kern_sig.c`, only when a program actually installs
+  a real handler for `SIGWINCH`.
+
+  This greatly reduces unnecessary `input.device` add/remove cycles.
+  Programs that never use `SIGWINCH` no longer need an input handler at
+  all.
+
+Those changes addressed the original GUI trashing / memory overwrite
+problem. They were not primarily race-condition fixes.
+
+The later race-condition work focused on process teardown:
+
+- We kept explicit cleanup through `__ix_remove_sigwinch()` during
+  process teardown, including from `ix_close.c`, and made sure that
+  handler removal was performed outside the `Forbid()` section.
+
+  The teardown sequence was still essentially:
+
+      IND_REMHANDLER
+      CloseDevice()
+      delete/free IO-request
+      u.u_idev_req = 0
+
+The important point is that we never proved that the race itself had
+been completely eliminated. The teardown changes reduced the apparent
+race window and made the failure much harder to reproduce.
+
+A potential lifetime problem still remains because the handler keeps
+references involving `is_Data = me`, `getuser(me)`, `u.u_idev_int` and
+`u.u_window`. Correctness therefore still depends on `IND_REMHANDLER`
+being fully completed before any handler-related data is released, and
+on no input event reaching data that is already being torn down.
+
+In short:
+
+The duplicate/unnecessary installation and request-initialization fixes
+addressed the original GUI trashing / memory overwrite problem. The
+later teardown changes reduced the suspected SIGWINCH/input.device race,
+but did not redesign the mechanism in a way that makes such a race
+structurally impossible.
+
+That is consistent with the freeze becoming much harder to trigger while
+still potentially being reproducible with sufficiently precise timing.

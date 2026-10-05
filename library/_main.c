@@ -21,6 +21,28 @@
  *  _main.c,v
  * Revision 1.1.1.1  1994/04/04  04:30:43  amiga
  * Initial CVS check in.
+ * 
+ * Revision 1.5  2026/07/23  ChatGPT modifications (JJ)
+ *
+ *  Removed the unconditional SIGWINCH input.device handler installation
+ *  from process startup.  Processes now avoid opening input.device
+ *  unless they install a real SIGWINCH signal handler through the
+ *  signal API.
+ * 
+ * Revision 1.4  2026/06/17  ChatGPT modifications (JJ)
+ *
+ *  Harden get_global_environment() error handling and environment-vector
+ *  allocation.
+ *
+ * - Close the ENV: directory before returning on environment-vector
+ *   allocation failure.
+ * - Check SYS_read return value before using it as part of the output
+ *   index.
+ * - Avoid decrementing the output index when no bytes were read.
+ * - Skip ENV: entries whose generated "ENV:<name>" path would not fit
+ *   in the local envfile buffer.
+ * - Use sizeof(char *) instead of a hard-coded 4 when allocating and
+ *   reallocating environment pointer vectors.
  *
  *  Revision 1.3  1992/08/09  20:41:54  amiga
  *  change to use 2.x header files by default
@@ -31,8 +53,10 @@
  *
  * Revision 1.1  1992/05/17  21:01:29  mwild
  * Initial revision
- *
- *
+ */
+
+/*
+
  */
 
 #define _KERNEL
@@ -78,11 +102,14 @@ char **get_global_environment(void)
       de = (struct dirent *) syscall (SYS_readdir, dp);
     }
 
-  if ((cp = (char **)kmalloc((num_env + 1) * 4)))
+  if ((cp = (char **)kmalloc((num_env + 1) * sizeof(char *))))
     env = cp;
   else
-    /* out of memory !!! */
-    return NULL;
+    {
+      /* out of memory !!! */
+      syscall (SYS_closedir, dp);
+      return NULL;
+    }
 	  
   for (; de; de = (struct dirent *) syscall (SYS_readdir, dp))
     {
@@ -93,6 +120,9 @@ char **get_global_environment(void)
       /* Don't include variables with funny names, and don't include
          multiline variables either, they totally confuse ksh.. */
       if (strchr(de->d_name, '.'))
+        continue;
+
+      if (de->d_namlen + 4 >= sizeof(envfile))
         continue;
 
       sprintf (envfile, "ENV:%s", de->d_name);
@@ -114,14 +144,24 @@ char **get_global_environment(void)
 
     	  if (len)
             {
+              int nread;
+
     	      fd = syscall(SYS_open, envfile, 0);
-    	      if (fd >= 0)
+    	      if (fd >= 0) /* Check if open succeeded */
     	        {
-    	          written += syscall(SYS_read, fd, *cp + written, len);
+    	          nread = syscall(SYS_read, fd, *cp + written, len);
+    	          syscall(SYS_close, fd); /* Close fd regardless of read success */
+
+    	          if (nread < 0) /* Check if read failed */
+    	            {
+    	              kfree(*cp); /* Free the allocated buffer for this entry */
+    	              continue; /* Skip to the next environment variable */
+    	            }
+
+    	          written += nread;
     	          (*cp)[written] = 0;
-    	          if ((*cp)[--written] == '\n')
-    		    (*cp)[written] = 0;
-    	          syscall(SYS_close, fd);
+    	          if (written > 0 && (*cp)[written - 1] == '\n') /* Check written > 0 before accessing written - 1 */
+    		    (*cp)[written - 1] = 0;
     	        }
     	    
     	      /* now filter out those multiliners (that is, 
@@ -163,7 +203,7 @@ char **__ix_get_environ (void)
     if (lv->lv_Node.ln_Type == LV_VAR)
       num_local++;
 
-  if ((cp = (char **) syscall (SYS_malloc, (num_local + 1) * 4)))
+  if ((cp = (char **) syscall (SYS_malloc, (num_local + 1) * sizeof(char *))))
     {
       env = cp;
       for (lv = (void *)me->pr_LocalVars.mlh_Head;
@@ -209,7 +249,7 @@ char **__ix_get_environ (void)
 
   for (num_env = 0, tmp = ix.ix_global_environment; *tmp; tmp++, num_env++);
 
-  tmp = (char **)syscall (SYS_realloc, env, (num_local + num_env + 1) * 4);
+  tmp = (char **)syscall (SYS_realloc, env, (num_local + num_env + 1) * sizeof(char *));
   if (tmp == NULL)
     return env;
   env = tmp;
@@ -341,8 +381,6 @@ _main (union { char *_aline; struct WBStartup *_wb_msg; } a1,
      the user area entry is valid for getenv() calls. */
   u.u_environ = &env;
 
-  __ix_install_sigwinch ();
-  
   /* init the uid/gid handling NP */ 
 
   __ix_init_ids();

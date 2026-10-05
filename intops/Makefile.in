@@ -1,0 +1,45 @@
+# intops/Makefile.in
+#
+# CPU/FPU-specific integer helper routines for ixemul.library.
+# This template intentionally accepts CC, CFLAGS, CPPFLAGS and RANLIB from
+# the top-level build.  It can also be used directly as intops/Makefile.
+
+CC      ?= gcc
+AR      ?= ar
+RANLIB  ?= ranlib
+RM      ?= rm -f
+
+ifneq ($(wildcard bswap16.s),)
+SRCDIR = .
+else
+SRCDIR = ../../..
+endif
+
+VPATH = $(SRCDIR)
+
+OBJS = \
+	bswap16.o \
+	bswap32.o \
+	bswap64.o
+
+LIB = libintops.a
+
+INTOPS_CPPFLAGS = -I$(SRCDIR)/.. -I$(SRCDIR)/../include
+
+.PHONY: all clean clobber
+
+all: $(LIB)
+
+$(LIB): $(OBJS)
+	$(RM) $@
+	$(AR) rc $@ $(OBJS)
+	$(RANLIB) $@
+
+%.o: $(SRCDIR)/%.s
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(INTOPS_CPPFLAGS) -c $< -o $@
+
+clean:
+	$(RM) $(OBJS) $(LIB) *.o *.a
+	rm -rf 68000 68020 68040 68060 notrap
+
+clobber: clean

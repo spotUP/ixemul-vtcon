@@ -15,6 +15,11 @@
  *  You should have received a copy of the GNU Library General Public
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * 
+ *
+ *  Revision 1.2  2026/06/08  Copilot/ChatGPT modification  (JJ)
+ *  Changed __lock() and __llock() to take const char * instead of char *.
+ *  No functional change; matches __plock() semantics and avoids unnecessary casts.
  *
  *  __lock.c,v 1.1.1.1 1994/04/04 04:30:10 amiga Exp
  *
@@ -56,7 +61,7 @@ __lock_func (struct lockinfo *info, struct lock_vec *lv, int *error)
   return lv->resolve_last;
 }
 
-BPTR __lock (char *name, int mode)
+BPTR __lock (const char *name, int mode)
 {
   struct lock_vec lv;
 
@@ -66,7 +71,7 @@ BPTR __lock (char *name, int mode)
   return __plock (name, __lock_func, &lv);
 }
 
-BPTR __llock (char *name, int mode)
+BPTR __llock (const char *name, int mode)
 {
   struct lock_vec lv;
 

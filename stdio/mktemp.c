@@ -21,6 +21,18 @@
 static char sccsid[] = "@(#)mktemp.c	5.9 (Berkeley) 6/1/90";
 #endif /* LIBC_SCCS and not lint */
 
+/*
+ * mktemp.c,v
+ *
+ * Revision 1.1  2026/09/10  ChatGPT modifications (JJ)
+ *
+ *    Prevent pointer underflow on empty and all-X templates.
+ *    Restore the parent-directory separator before every error return.
+ *    Use lstat() for name-only checks so existing symbolic links are detected.
+ *    Add mkdtemp() using atomic mkdir() creation with mode 0700 and
+ *    require at least six trailing X characters for the new interface.
+ */
+
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
@@ -28,37 +40,68 @@ static char sccsid[] = "@(#)mktemp.c	5.9 (Berkeley) 6/1/90";
 #include <ctype.h>
 
 static int
-_gettemp(char *path, int *doopen)
+_gettemp(char *path, int *doopen, int domkdir)
 {
-	register char *start, *trv;
+	register char *start, *trv, *end;
 	struct stat sbuf;
 	u_int pid;
+	int rval;
 	usetup;
 
+	if (doopen && domkdir) {
+		errno = EINVAL;
+		return(0);
+	}
+
+	/*
+	 * Locate the trailing X run without ever forming a pointer before
+	 * the start of the template.  Preserve the historical behaviour
+	 * that also accepts a template without trailing X characters.
+	 */
+	for (end = path; *end; ++end)
+		;
+	if (end == path) {
+		errno = EINVAL;
+		return(0);
+	}
+
+	for (start = end; start > path && start[-1] == 'X'; --start)
+		;
+
+	/* mkdtemp() requires at least six trailing X characters. */
+	if (domkdir && end - start < 6) {
+		errno = EINVAL;
+		return(0);
+	}
+
 	pid = syscall (SYS_getpid);
-	for (trv = path; *trv; ++trv);		/* extra X's get set to 0's */
-	while (*--trv == 'X') {
+	for (trv = end; trv > start;) {
+		--trv;
 		*trv = (pid % 10) + '0';
 		pid /= 10;
 	}
 
 	/*
-	 * check the target directory; if you have six X's and it
-	 * doesn't exist this runs for a *very* long time.
+	 * Check the target directory.  Temporarily terminate the path at
+	 * the slash, but always restore the slash before inspecting the
+	 * result or returning.
 	 */
-	for (start = trv + 1;; --trv) {
-		if (trv <= path)
+	for (trv = start; trv > path;) {
+		--trv;
+		if (trv == path)
 			break;
 		if (*trv == '/') {
 			*trv = '\0';
-			if (syscall (SYS_stat, path, &sbuf))
+			rval = syscall (SYS_stat, path, &sbuf);
+			*trv = '/';
+			if (rval)
 				return(0);
 			if (!S_ISDIR(sbuf.st_mode)) {
 				errno = ENOTDIR;
-  				KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+				KPRINTF (("&errno = %lx, errno = %ld\n",
+				    &errno, errno));
 				return(0);
 			}
-			*trv = '/';
 			break;
 		}
 	}
@@ -71,7 +114,13 @@ _gettemp(char *path, int *doopen)
 			if (errno != EEXIST)
 				return(0);
 		}
-		else if (syscall (SYS_stat, path, &sbuf))
+		else if (domkdir) {
+			if (syscall (SYS_mkdir, path, 0700) == 0)
+				return(1);
+			if (errno != EEXIST)
+				return(0);
+		}
+		else if (syscall (SYS_lstat, path, &sbuf))
 			return(errno == ENOENT ? 1 : 0);
 
 		/* tricky little algorithm for backward compatibility */
@@ -97,11 +146,17 @@ mkstemp(char *path)
 {
 	int fd;
 
-	return (_gettemp(path, &fd) ? fd : -1);
+	return (_gettemp(path, &fd, 0) ? fd : -1);
 }
 
 char *
 mktemp(char *path)
 {
-	return(_gettemp(path, (int *)NULL) ? path : (char *)NULL);
+	return(_gettemp(path, (int *)NULL, 0) ? path : (char *)NULL);
+}
+
+char *
+mkdtemp(char *path)
+{
+	return(_gettemp(path, (int *)NULL, 1) ? path : (char *)NULL);
 }

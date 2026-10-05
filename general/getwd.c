@@ -22,6 +22,33 @@
  * Thanks Ray !
  */
 
+/*
+ * Revision 1.1.1.1  2026/06/16  JJ/ChatGPT
+ *
+ * Updated getwd.c/getcwd() for safer and slightly faster current
+ * directory resolution.
+ *
+ * - Moved signal masking from _GetPathFromLock() to _get_pwd(), so
+ *   GetCurrentDirName(), NameFromLock() and the fallback lock-walk all
+ *   run under the same signal mask; _GetPathFromLock() no longer keeps
+ *   a private omask.
+ * - Added ERANGE handling for too-small buffers in root, non-process
+ *   and fallback path-construction cases.
+ * - Fixed slash-translation buffer accounting by reducing buffer_length
+ *   after reserving one byte for the leading slash.
+ * - Added getcwd(..., 0) rejection with EINVAL.
+ * - Fixed getcwd(NULL, size) error cleanup so internally allocated
+ *   buffers are freed if _get_pwd() fails.
+ * - Guarded use of pr_CurrentDir to avoid passing a NULL current-directory
+ *   lock to NameFromLock() or the fallback _GetPathFromLock() path.
+ * - Added DupLock() failure handling in _GetPathFromLock() to avoid
+ *   dereferencing a NULL path pointer when the fallback lock-walk cannot start.
+ * - Limited ERROR_LINE_TOO_LONG handling to the no-current-lock case so
+ *   explicit errno values from the fallback lock-walk are not overwritten.
+ *
+ * ABI unchanged.
+ */
+
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
@@ -45,8 +72,8 @@ _GetPathFromLock (BPTR lock, char *buffer, int buffer_length)
   char *p;
   BPTR fl, next_fl;
   int length;
+  int ioerr;
   struct FileInfoBlock *fib;
-  int omask;
   char *result = 0;
 
   /* Allocate space on stack for fib. */
@@ -64,8 +91,14 @@ _GetPathFromLock (BPTR lock, char *buffer, int buffer_length)
   /* Duplicate the lock so that the directory structure can't change
      while we're doing this. */
 
-  omask = syscall (SYS_sigsetmask, ~0);
   fl = DupLock (lock);
+  if (fl == 0L)
+    {
+      ioerr = IoErr();
+      errno = ioerr ? __ioerr_to_errno(ioerr) : ENOENT;
+      KPRINTF(("&errno = %lx, errno = %ld\n", &errno, errno));
+      goto ret;
+    }
 
   /* Follow the chain of directories and build the name in 'buffer' */
 
@@ -74,7 +107,8 @@ _GetPathFromLock (BPTR lock, char *buffer, int buffer_length)
       if (Examine (fl, fib) == DOSFALSE)
 	{
 	  errno = __ioerr_to_errno(IoErr());
-	  KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+	  KPRINTF(("&errno = %lx, errno = %ld\n", &errno, errno));
+
 	  UnLock (fl);
 	  goto ret;
 	}
@@ -100,9 +134,10 @@ _GetPathFromLock (BPTR lock, char *buffer, int buffer_length)
 	{
 	  if (next_fl != 0L)
 	    UnLock (next_fl);
+	  errno = ERANGE;
 	  goto ret;
 	}
-      bcopy (fib->fib_FileName, p, length);
+      memcpy (p, fib->fib_FileName, length);
       fl = next_fl;
     }
 
@@ -113,7 +148,6 @@ _GetPathFromLock (BPTR lock, char *buffer, int buffer_length)
   result = buffer;
 
 ret:
-  syscall (SYS_sigsetmask, omask);
   return result;
 }
 
@@ -124,42 +158,76 @@ _get_pwd (char *buffer, int buffer_length)
   usetup;
   struct Process *proc;
   char *result, *colon;
-  extern char *index (const char *, int);
+  int omask;
+  BPTR cwdlock;
 
   if (u.u_is_root)
     {
+      if (buffer_length < 2)
+	{
+	  errno = ERANGE;
+	  return 0L;
+	}
       strcpy(buffer, "/");
       return buffer;
     }
 
-  proc = (struct Process *) FindTask (0L);
+  proc = (struct Process *) FindTask(0L);
 
   /* Just return an empty string if this is not a process. */
 
   if (proc == 0L || proc->pr_Task.tc_Node.ln_Type != NT_PROCESS)
     {
+      if (buffer_length < 1)
+	{
+	  errno = ERANGE;
+	  return 0L;
+	}
       buffer[0] = '\0';
       return buffer;
     }
 
   /* make room for slash */
   if (ix.ix_flags & ix_translate_slash)
-    buffer++;
+    {
+      if (buffer_length < 2)
+	{
+	  errno = ERANGE;
+	  return 0L;
+	}
+
+      buffer++;
+      buffer_length--;
+    }
+
+  omask = syscall (SYS_sigsetmask, ~0);
+  cwdlock = (BPTR)proc->pr_CurrentDir;
 
   if (GetCurrentDirName (buffer, buffer_length) ||
-      NameFromLock((BPTR)proc->pr_CurrentDir, buffer, buffer_length))
+      (cwdlock != 0L && NameFromLock(cwdlock, buffer, buffer_length)))
     {
       result = buffer;
-      goto returnit;
     }
-  /* and as the last chance resort to the 1.3 algorithm */
+  else if (cwdlock != 0L)
+    {
+      /* and as the last chance resort to the 1.3 algorithm */
 
-  result = _GetPathFromLock((BPTR)proc->pr_CurrentDir, buffer, buffer_length);
+      result = _GetPathFromLock(cwdlock, buffer, buffer_length);
+    }
+  else
+    {
+      if (IoErr() == ERROR_LINE_TOO_LONG)
+	errno = ERANGE;
+      else
+	errno = ENOENT;
+      result = 0L;
+    }
 
-returnit:
+  syscall (SYS_sigsetmask, omask);
+
   if ((ix.ix_flags & ix_translate_slash) && result)
     {
-      colon = index (result, ':');
+      colon = strchr (result, ':');
       if (colon)
         {
 	  *colon = '/';
@@ -193,22 +261,36 @@ getwd (char *buffer)
   return path;
 }
 
-
 char *
 getcwd (char *buffer, size_t buffer_length)
 {
+  int allocated = 0;
+  char *res;
   usetup;
+
+  if (buffer_length == 0)
+    {
+      errno = EINVAL;
+      KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+      return 0L;
+    }
 
   if (buffer == 0L)
     {
       buffer = (char *) syscall (SYS_malloc, buffer_length + 2);
-      if (buffer == 0L)
-	{
-	  errno = ENOMEM;
-	  KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
-	  return 0L;
-	}
+      if (buffer == 0L) { errno = ENOMEM; return 0L; }
+      allocated = 1;
     }
 
-  return _get_pwd (buffer, buffer_length);
+  res = _get_pwd (buffer, buffer_length);
+
+  if (res == 0L && allocated)
+    {
+      int saved_errno = errno;
+
+      syscall (SYS_free, buffer);
+      errno = saved_errno;
+    }
+
+  return res;
 }

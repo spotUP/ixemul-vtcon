@@ -35,12 +35,30 @@
  *	@(#)inet.h	5.7 (Berkeley) 4/3/91
  */
 
+/*
+ * Revision 1.1  2026/08/01  ChatGPT modification (JJ)
+ *
+ *  Add IPv4 inet_ntop() and inet_pton() declarations, INET_ADDRSTRLEN,
+ *  and a guarded socklen_t definition for standalone <arpa/inet.h> use.
+ */
+
 #ifndef _INET_H_
 #define	_INET_H_
 
 /* External definitions for functions in inet(3) */
 
+#include <sys/types.h>
+#include <netinet/in.h>
 #include <sys/cdefs.h>
+
+#ifndef _IXEMUL_SOCKLEN_T_DEFINED
+typedef int socklen_t;
+#define _IXEMUL_SOCKLEN_T_DEFINED
+#endif
+
+#ifndef INET_ADDRSTRLEN
+#define INET_ADDRSTRLEN 16
+#endif
 
 __BEGIN_DECLS
 unsigned long	inet_addr __P((const char *));
@@ -50,6 +68,8 @@ struct in_addr	inet_makeaddr __P((u_long, u_long));
 unsigned long	inet_netof __P((struct in_addr));
 unsigned long	inet_network __P((const char *));
 char		*inet_ntoa __P((struct in_addr));
+const char	*inet_ntop __P((int, const void *, char *, socklen_t));
+int		inet_pton __P((int, const char *, void *));
 __END_DECLS
 
 #endif /* !_INET_H_ */

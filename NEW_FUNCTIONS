@@ -1,0 +1,283 @@
+
+New functions and interfaces added beyond ixemul 48.2
+=======================================================
+
+The following functions and interfaces extend ixemul with additional libc,
+POSIX, BSD/GNU and mathematical functionality. Entries include ixemul.library
+system calls as well as header-only interfaces where explicitly noted.
+No AmigaOS-specific extensions are provided unless explicitly stated.
+
+
+64-bit integer conversion
+=========================
+
+strtoll(), strtoull(), atoll(), strtonum()
+    Standard 64-bit integer conversion functions. strtonum() follows the
+    OpenBSD interface, including range checking and error reporting. All
+    functions operate entirely inside ixemul without AmigaOS interaction.
+
+
+Allocation
+==========
+
+reallocarray()
+    Overflow-checked allocation helper from OpenBSD. Performs safe
+    multiplication of nmemb * size before calling realloc(). No memory
+    pool integration is performed.
+
+posix_memalign()
+    POSIX aligned-memory allocation interface implemented on top of ixemul's
+    existing memalign(). Validates alignment, returns POSIX error numbers
+    directly, preserves the caller's errno value, and leaves *memptr unchanged
+    on failure.
+
+
+Stdio extensions
+================
+
+asprintf(), vasprintf()
+    OpenBSD-style allocated formatted-output interfaces. vasprintf() first uses
+    ixemul's vsnprintf() count-only path, allocates the exact required buffer,
+    and then formats the result. asprintf() is the variadic wrapper around
+    vasprintf(). Both return the formatted length on success and -1 on failure.
+
+
+Time
+====
+
+nanosleep()
+    Implements POSIX nanosleep(). Resolution is limited by AmigaOS timer
+    device granularity. Sleep may be interrupted by signals and return
+    EINTR as expected.
+
+clock_gettime()
+    Provides CLOCK_REALTIME and CLOCK_MONOTONIC. CLOCK_REALTIME uses
+    gettimeofday(), while CLOCK_MONOTONIC uses the AmigaOS E-Clock through
+    ReadEClock() and is not affected by changes to the system wall clock.
+
+clock_getres()
+    Reports the resolution of CLOCK_REALTIME and CLOCK_MONOTONIC.
+    CLOCK_REALTIME reports microsecond resolution. CLOCK_MONOTONIC derives
+    its resolution from the actual E-Clock frequency returned by ReadEClock().
+
+clock_nanosleep()
+    Implements POSIX clock_nanosleep() for CLOCK_REALTIME and
+    CLOCK_MONOTONIC. Supports both relative sleeps and absolute deadlines
+    through TIMER_ABSTIME. Relative CLOCK_MONOTONIC sleeps use the monotonic
+    clock when calculating remaining time after EINTR. As required by POSIX,
+    errors are returned directly as error numbers rather than through -1
+    and errno.
+
+
+Integer operations
+==================
+
+bswap16(), bswap32(), bswap64()
+    Standard byte-swap operations identical to BSD/GNU implementations.
+
+fls()
+    Find-last-set bit. Returns the index (1-based) of the highest set bit.
+
+
+Bitstring operations
+====================
+
+bitstring.h
+    BSD bitstring compatibility interface provided as header macros rather
+    than ixemul.library system calls. The implementation is based on the
+    Berkeley bitstring API as carried by OpenBSD/NetBSD.
+
+bitstr_size()
+    Returns the number of bytes required to store a bitstring containing
+    the requested number of bits.
+
+bit_alloc()
+    Allocates a zero-initialized bitstring using calloc().
+
+bit_decl()
+    Declares storage for a bitstring with the requested number of bits.
+
+bit_test(), bit_set(), bit_clear()
+    Test, set or clear an individual bit.
+
+bit_nclear(), bit_nset()
+    Clear or set an inclusive range of bits.
+
+bit_ffc(), bit_ffs()
+    Find the first clear or first set bit. The resulting bit index is
+    returned through the caller-provided pointer, or -1 if no matching
+    bit exists.
+
+
+Memory operations
+=================
+
+explicit_bzero()
+    Secure zeroing function. Uses volatile operations to prevent compiler
+    optimization and guarantees memory is overwritten.
+
+memmem()
+    Searches for a byte sequence within another buffer.
+
+mempcpy()
+    Copies memory and returns a pointer to the end of the destination
+    buffer. Matches glibc semantics.
+
+
+String operations
+=================
+
+strcasestr()
+    Case-insensitive substring search.
+
+strlcpy(), strlcat()
+    Safe string copy and concatenation functions from OpenBSD. Return
+    values follow OpenBSD semantics (total length of the string attempted
+    to be created).
+
+stpcpy()
+    Copies a string and returns a pointer to the terminating null byte.
+
+strndup()
+    Allocates and copies up to n bytes from a string.
+
+strnlen()
+    Returns the length of a string up to a maximum limit.
+
+memrchr()
+    Searches backward through a bounded memory block for the last occurrence
+    of a byte value. The comparison uses unsigned-byte semantics and the
+    function returns NULL when no matching byte is found.
+
+strnvis()
+    Size-bounded BSD vis(3) string encoder. Writes at most siz - 1 bytes,
+    NUL-terminates the destination when siz is non-zero, and returns the
+    complete encoded length required for the input string.
+
+stravis()
+    BSD vis(3) convenience interface that allocates the destination buffer,
+    encodes the NUL-terminated source string, and returns the encoded length.
+
+strnunvis()
+    Size-bounded BSD unvis(3) string decoder. Decodes a NUL-terminated
+    vis-encoded string, stores at most sz - 1 bytes when sz is non-zero,
+    NUL-terminates the destination when possible, and returns the complete
+    decoded length or -1 for an invalid escape sequence.
+
+popcount32()
+    Counts the number of set bits in a 32-bit unsigned value. The ixemul
+    implementation is ported from NetBSD and uses its 32-bit population-count
+    algorithm.
+
+popcount64()
+    Counts the number of set bits in a 64-bit unsigned value. On ixemul's
+    32-bit m68k target the value is split into two 32-bit halves and counted
+    through popcount32(), matching NetBSD's 32-bit-platform implementation.
+
+
+Pathname operations
+===================
+
+mkdtemp()
+    Creates a unique directory from a writable pathname template using
+    ixemul's existing _gettemp() machinery. Returns the supplied pathname on
+    success and NULL on failure.
+
+realpath()
+    Canonicalizes a pathname. Uses ixemul's virtual filesystem layer.
+    Symbolic links and relative components are resolved according to
+    ixemul semantics.
+
+basename(), dirname()
+    Pure string operations implementing POSIX basename() and dirname().
+    These functions do not access the filesystem.
+
+
+
+RFC2553 resolver additions
+==========================
+
+inet_ntop()
+    Converts an IPv4 address from binary network format to presentation
+    format. Writes the result to a caller-provided buffer and returns
+    ENOSPC if the buffer is too small. The current ixemul implementation
+    supports AF_INET only.
+
+inet_pton()
+    Converts an IPv4 address from presentation format to binary network
+    format. Accepts strict decimal dotted-quad notation and leaves the
+    destination buffer unchanged when the address is invalid. The current
+    ixemul implementation supports AF_INET only.
+
+
+Host/network byte order conversion
+==================================
+
+htonl(), htons(), ntohl(), ntohs()
+    Standard host/network byte-order conversion functions. On big-endian m68k
+    host order is already network order, so the ixemul implementations use the
+    minimal NetBSD m68k assembler paths. The 16-bit variants explicitly
+    zero-extend the return value.
+
+
+Signal description
+==================
+
+strsignal()
+    Returns the signal description from ixemul's existing sys_siglist table for
+    valid signal numbers. Out-of-range values are formatted as
+    "Unknown signal: N".
+
+
+Descriptor polling
+==================
+
+poll()
+    BSD-style descriptor polling implemented through ixemul's existing
+    f_select() readiness protocol. Supports millisecond timeouts, POLLIN,
+    POLLOUT and POLLPRI readiness, per-entry POLLNVAL reporting, duplicate
+    pollfd entries, and pipe POLLHUP/POLLERR conditions.
+
+
+File locking
+============
+
+flock()
+    BSD advisory whole-file locking interface. Supports shared locks (LOCK_SH),
+    exclusive locks (LOCK_EX), unlocking (LOCK_UN) and non-blocking operation
+    through LOCK_NB. Lock ownership is associated with ixemul's open file
+    object, and held locks are released when the final reference to that file
+    object is closed.
+
+
+Unix domain socket support
+==========================
+
+AF_UNIX / AF_LOCAL SOCK_STREAM
+    Provides functional Unix domain stream socket support through ixemul's
+    existing socket interface. Supports pathname-based bind(), listen(),
+    accept() and connect(), bidirectional stream I/O, shutdown(), socket name
+    queries, select() integration and limited SOL_SOCKET option handling.
+    Datagram sockets are not supported, and connection timeouts are not
+    implemented.
+
+
+Mathematical header additions
+=============================
+
+expf(), exp2(), exp2f(), log2(), log2f(), log10f(), roundf(), truncf()
+    C99-style mathematical additions provided by the current <math-68881.h>
+    when the 68881-compatible FPU header path is selected through
+    __HAVE_68881__. These functions are implemented as static inline
+    definitions and are compiled into each translation unit that uses this
+    header path. Their presence in <math-68881.h> does not by itself imply
+    that matching external symbols are exported by ixemul.library or exist
+    in the separately linked libm.
+
+    The CPU option and FPU option are separate: for example, -m68060 alone
+    does not select this header path, while -m68060 -m68881 does in the
+    GCC 2.95.3 environment verified for ixemul.
+
+
+End of new function and interface documentation
+===============================================

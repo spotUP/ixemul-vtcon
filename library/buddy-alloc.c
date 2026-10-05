@@ -16,325 +16,278 @@
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- *  $Id: buddy-alloc.c,v 1.4 1994/06/19 15:02:51 rluebbert Exp $
+ * Revision 1.5  2026/06/29  ChatGPT modifications  (JJ)
  *
- *  $Log: buddy-alloc.c,v $
- *  Revision 1.4  1994/06/19  15:02:51  rluebbert
- *  *** empty log message ***
+ * Replaced the original small-block buddy backend with an Exec PoolMem
+ * based backend while preserving the b_alloc()/b_free() interface and
+ * the historical small/large allocation split.
  *
- *  Revision 1.2  1992/09/14  01:40:24  mwild
- *  change from using aligned blocks (obtained thru an AllocMem/FreeMem/AllocAbs
- *  hack) to using non-aligned blocks. The price for this is an additional
- *  field in every allocated block.
+ * - Uses separate private/public PoolMem pools.
+ * - Uses two PoolMem size classes, 1K and 2K, selected by total block size.
+ * - Keeps direct AllocMem()/FreeMem() for blocks larger than the pooled range.
+ * - Adds a small internal PoolMem header for validation and correct FreePooled().
  *
- *  In the same run, change Forbid/Permit into Semaphore locking.
- *
- *  Revision 1.1  1992/05/22  01:42:33  mwild
- *  Initial revision
- *
+ * No public ABI change.
  */
+
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
 #include <exec/memory.h>
 #include <stddef.h>
+#include <limits.h>
 
-/* this provides a straight replacement for AllocMem() and FreeMem().
-   Being this, it does *not* remember the size of allocation, the
-   clients have to do this instead. */
+#define MINLOG2         4
+#define MINSIZE         (1 << MINLOG2)
 
-/* NOTE: currently only two pools are supported, MEMF_PUBLIC and
-         ! MEMF_PUBLIC. No MEMF_CHIP pools are needed by the library
-         and are thus not supported */
+#define MAXLOG2         15
+#define MAXSIZE         (1 << MAXLOG2)
 
+#define BUDDY_LIMIT     (1 << (MAXLOG2 - 5))   /* 1024 */
 
-/* TUNING: The two parameters that can be adjusted to fine tune
-           allocation strategy are MAXSIZE and BUDDY_LIMIT. By setting
-           MAXSIZE larger than BUDDY_LIMIT results in less Exec
-           overhead, since blocks stay longer in the buddy system.
-           Setting MAXSIZE==BUDDY_LIMIT sets memory usage to the
-           minimum, at the cost of more Exec calls. */
+#define PRIVATE_POOL    0
+#define PUBLIC_POOL     1
+#define NUMPOOLS        2
 
+#define BPOOL_CLASS_1K      0
+#define BPOOL_CLASS_2K      1
+#define BPOOL_NUM_CLASSES   2
 
-/* no request for memory can be lower than this */
-#define MINLOG2		4
-#define MINSIZE		(1 << MINLOG2)
+#define BPOOL_LIMIT_1K      BUDDY_LIMIT        /* 1024 */
+#define BPOOL_LIMIT_2K      (BUDDY_LIMIT << 1) /* 2048 */
 
-/* this is the size the buddy system gets memory pieces from Exec */
-#define MAXLOG2		15	/* get 32K chunks */
-#define MAXSIZE		(1 << MAXLOG2)
+#define BPOOL_MAGIC     0x42504f4cUL  /* 'BPOL' */
+#define BPOOL_ALIGN     8
+#define BPOOL_MASK      (BPOOL_ALIGN - 1)
+#define BPOOL_HDR_SIZE  ((sizeof (struct bpool_hdr) + BPOOL_MASK) & ~BPOOL_MASK)
 
-/* this is the limit for b_alloc to go straight to Exec */
-#define BUDDY_LIMIT	(1 << (MAXLOG2 - 5))	/* but serve only upto 1K */
-
-#define PRIVATE_POOL	0
-#define PUBLIC_POOL	1
-#define NUMPOOLS	2	/* public and !public */
-/* attention: don't go larger than 3 pools, or you'll have to change the
-              encoding in free_block (only 2 bits for now) */
-
-struct free_list {
-  u_int  exec_attr;
-  struct ix_mutex sem;
-  struct ixlist buckets[MAXLOG2 - MINLOG2];
-} free_list[NUMPOOLS] = { { 0, }, { MEMF_PUBLIC, } };
-
-
-struct free_block {
-  /* to make the smallest allocatable block 16, and not 32 byte, stuff both
-     the freelist information and the exec-block address into one long. */
-  u_int	pool:2,		/* 0: block is free, > 0: POOL + 1 */
-  	exec_block:30;	/* shift left twice to get the real address */
-
-  /* from here on, fields only exist while the block is on the free list.
-     The application sees a block as a chunk of memory starting at &next */
-  struct free_block *next, *prev;	/* ixnode compatible */
-  int index;
+struct bpool_hdr {
+  u_int magic;
+  u_int pool;
+  u_int size;
+  u_int total;
 };
 
+static void *poolmem_pool[NUMPOOLS][BPOOL_NUM_CLASSES];
+static struct ix_mutex poolmem_private_sem;
+
+/*
+ * PRIVATE_POOL is protected by ix_mutex. PUBLIC_POOL keeps the
+ * historical Forbid()/Permit() protection, since public allocations
+ * may occur in contexts where semaphore waiting would be unsafe.
+ */
+
+void cleanup_buddy (void);
+
+static int
+bpool_class_for_total (size_t total)
+{
+  if (total <= BPOOL_LIMIT_1K)
+    return BPOOL_CLASS_1K;
+
+  if (total <= BPOOL_LIMIT_2K)
+    return BPOOL_CLASS_2K;
+
+  return -1;
+}
 
 void
 init_buddy (void)
 {
-  int i, l; 
+  poolmem_pool[PRIVATE_POOL][BPOOL_CLASS_1K] =
+    CreatePool (0, MAXSIZE, BPOOL_LIMIT_1K);
 
-  /* don't want such a nightmare of bug-hunt any more... */
-  if (sizeof (struct free_block) > MINSIZE)
+  poolmem_pool[PRIVATE_POOL][BPOOL_CLASS_2K] =
+    CreatePool (0, MAXSIZE, BPOOL_LIMIT_2K);
+
+  poolmem_pool[PUBLIC_POOL][BPOOL_CLASS_1K] =
+    CreatePool (MEMF_PUBLIC, MAXSIZE, BPOOL_LIMIT_1K);
+
+  poolmem_pool[PUBLIC_POOL][BPOOL_CLASS_2K] =
+    CreatePool (MEMF_PUBLIC, MAXSIZE, BPOOL_LIMIT_2K);
+
+  if (!poolmem_pool[PRIVATE_POOL][BPOOL_CLASS_1K] ||
+      !poolmem_pool[PRIVATE_POOL][BPOOL_CLASS_2K] ||
+      !poolmem_pool[PUBLIC_POOL][BPOOL_CLASS_1K] ||
+      !poolmem_pool[PUBLIC_POOL][BPOOL_CLASS_2K])
     {
-      ix_panic ("buddy-system: MINSIZE/MINLOG2 too small, increase!");
+      cleanup_buddy ();
+      ix_panic ("poolmem allocator: failed to create memory pools!");
       Wait (0);
     }
-
-  for (l = 0; l < NUMPOOLS; l++)
-    {
-      for (i = 0; i < MAXLOG2 - MINLOG2; i++)
-	ixnewlist ((struct ixlist *)&free_list[l].buckets[i]);
-    }
 }
 
-static inline struct free_block *
-unlink_block (u_int free_pool, u_char ind, void *block)
-{
-  struct free_block *fb = (struct free_block *) block;
-  struct free_list *fl = free_list + free_pool;
-
-  if (! fb)
-    {
-      fb = (struct free_block *)ixremhead((struct ixlist *)&fl->buckets[ind]);
-      if (fb)
-	{
-	  fb = (struct free_block *) ((int)fb - offsetof (struct free_block, next));
-	  fb->pool = free_pool + 1;
-	  KPRINTF(("    unlink_block (%s, %ld) == $%lx\n", 
-	     free_pool == PRIVATE_POOL ? "PRIVATE" : (free_pool == PUBLIC_POOL ? "PUBLIC" : "BOGOUS"), ind, fb));
-
-	}
-    }
-  else
-    {
-      KPRINTF(("    unlink_block (%s, %ld, $%lx)\n", 
-	 free_pool == PRIVATE_POOL ? "PRIVATE" : (free_pool == PUBLIC_POOL ? "PUBLIC" : "BOGOUS"), ind, fb));
-
-      fb->pool = free_pool + 1;
-      ixremove ((struct ixlist *)&fl->buckets[fb->index], (struct ixnode *)&fb->next);
-    }
-
-  return fb;
-}
-
-static void inline
-link_block (u_int free_pool, u_char ind, void *block)
-{
-  struct free_block *fb = (struct free_block *) block;
-  struct free_list *fl = free_list + free_pool;
-
-  KPRINTF(("    link_block (%s, %ld, $%lx)\n", 
-     free_pool == PRIVATE_POOL ? "PRIVATE" : (free_pool == PUBLIC_POOL ? "PUBLIC" : "BOGOUS"), ind, fb));
-
-  fb->pool = 0;	/* we're on the freelist of this pool */
-  fb->index = ind; /* and of this size */
-  ixaddhead ((struct ixlist *)&fl->buckets[ind], (struct ixnode *)&fb->next);
-}
-
-/* this is a very special log2() function that knows the upper bound
-   of its argument, and also automatically rounds to the next upper
-   power of two */
-
-static inline int const
-log2 (int size)
-{
-  int pow = MAXLOG2;
-  int lower_bound = 1 << (MAXLOG2 - 1);
-
-  for (;;)
-    {
-      if (size > lower_bound)
-        return pow;
-
-      lower_bound >>= 1;
-      pow--;
-    }
-}
-
-
-static inline struct free_block *
-get_block (u_int free_pool, u_char index)
-{
-  struct free_block *fb, *buddy;
-  struct free_list *fl = free_list + free_pool;
-
-  KPRINTF(("  get_block (%s, %ld)\n", 
-     free_pool == PRIVATE_POOL ? "PRIVATE" : (free_pool == PUBLIC_POOL ? "PUBLIC" : "BOGOUS"), index, fb));
-
-  if (index == (MAXLOG2 - MINLOG2))
-    {
-      fb = (struct free_block *) AllocMem (MAXSIZE, fl->exec_attr);
-      if (! fb)
-        return 0;
-
-      fb->exec_block = (int)fb >> 2; /* buddies are relative to this base address */
-      fb->pool = free_pool + 1; /* not free */
-
-      return fb;
-    }
-  else 
-    {
-      if ((fb = unlink_block (free_pool, index, 0)))
-        return fb;
-    }
-
-
-  fb = get_block (free_pool, index + 1);
-
-  if (fb)
-    {
-      /* when splitting a block, we always free the upper buddy. So
-         we can just add the size, instead of or'ing the offset to the
-         Exec memory block */
-      buddy = (struct free_block *)((int)fb + (1 << (index + MINLOG2)));
-
-      buddy->exec_block = fb->exec_block;
-
-      link_block (free_pool, index, buddy);
-    }
-
-  return fb;
-}
-
-
-static inline void
-free_block (u_int free_pool, u_char index, struct free_block *fb)
-{
-  struct free_block *buddy;
-
-  buddy = (struct free_block *)
-	  ((((int)fb - (fb->exec_block<<2)) ^ (1 << (index + MINLOG2)))
-	   + (fb->exec_block<<2));
-
-  if (index == (MAXLOG2 - MINLOG2))
-    {
-      FreeMem (fb, MAXSIZE);
-      return;
-    }
-  else if (buddy->pool || buddy->index != index)
-    {
-      /* too bad, buddy is not on freelist or of wrong size */
-      link_block (free_pool, index, fb);
-      return;
-    }
-
-  /* reserve the buddy, then recombine both */
-  unlink_block (free_pool, index, buddy);
-
-  /* since the buddy is free as well, recombine both blocks
-     and free the twice as large block */
-  free_block (free_pool, index + 1, fb < buddy ? fb : buddy);
-}
-
+/*
+ * b_alloc()/b_free() are size-aware internal allocation primitives.
+ * The caller must pass the same size to b_free() that was used for
+ * b_alloc(). Sizes smaller than MINSIZE are normalized internally.
+ *
+ * Blocks whose total size, including bpool_hdr, fits within the 1K/2K
+ * classes are allocated from PoolMem. Larger blocks are passed directly
+ * to AllocMem()/FreeMem().
+ */
 
 void *
 b_alloc (int size, unsigned pool)
 {
-  u_char bucket;
-  struct free_block *block;
-  struct free_list *fl = free_list + pool;
+  struct bpool_hdr *hdr;
+  size_t total;
+  void *mem;
+  void *ppool;
+  int bclass;
 
-  if (size < 0)	/* Ridiculous size */
+  if (size < 0)
     return 0;
+
+  pool = (pool & MEMF_PUBLIC) ? PUBLIC_POOL : PRIVATE_POOL;
+
   if (size < MINSIZE)
     size = MINSIZE;
 
-  /* the additional bytes are needed for the freelist pointer at
-     the beginning of each block in use and the base block originally
-     obtained from Exec. */
+  if ((size_t)size > (size_t)-1 - BPOOL_HDR_SIZE)
+    return 0;
 
-  if (size >= BUDDY_LIMIT - offsetof (struct free_block, next))
+  total = (size_t)size + BPOOL_HDR_SIZE;
+  if (total > (size_t)UINT_MAX)
+    return 0;
+
+  bclass = bpool_class_for_total (total);
+  if (bclass < 0)
     return AllocMem (size, pool == PUBLIC_POOL ? MEMF_PUBLIC : 0);
 
-  size += offsetof (struct free_block, next);
+  ppool = poolmem_pool[pool][bclass];
+  if (!ppool)
+    return 0;
 
-  bucket = log2 (size) - MINLOG2;
-
-  /* have to differentiate between PUBLIC and PRIVATE memory here, sigh. 
-     PRIVATE memory can safely be accessed by using a semaphore, PUBLIC
-     memory however is allocated and free'd inside Forbid(), and using a
-     semaphore there would possibly break a Forbid..
-     Note: this is safe for use in GigaMem, as GigaMem only uses non-PUBLIC
-	   memory, if you don't fiddle with attribute masks.. */
   if (pool == PRIVATE_POOL)
-  {
-    ix_mutex_lock(&fl->sem);
-    block = get_block (pool, bucket);
-    ix_mutex_unlock(&fl->sem);
-  }
+    {
+      ix_mutex_lock (&poolmem_private_sem);
+      hdr = (struct bpool_hdr *)AllocPooled (ppool, total);
+      ix_mutex_unlock (&poolmem_private_sem);
+    }
   else
-  {
-    Forbid();
-    block = get_block (pool, bucket);
-    Permit();
-  }
+    {
+      Forbid ();
+      hdr = (struct bpool_hdr *)AllocPooled (ppool, total);
+      Permit ();
+    }
 
-  if (block)
-    return (void *) & block->next;
-  else
-    return block;
+  if (!hdr)
+    return 0;
+
+  hdr->magic = BPOOL_MAGIC;
+  hdr->pool = pool;
+  hdr->size = size;
+  hdr->total = total;
+
+  mem = (void *)((u_char *)hdr + BPOOL_HDR_SIZE);
+  return mem;
 }
-
 
 void
 b_free (void *mem, int size)
 {
-  u_char bucket;
-  struct free_list *fl;
-  struct free_block *fb;
-  int free_pool;
+  struct bpool_hdr *hdr;
+  unsigned pool;
+  void *ppool;
+  size_t total;
+  int bclass;
+
+  if (!mem)
+    return;
+
+  if (size < 0)
+    return;
 
   if (size < MINSIZE)
     size = MINSIZE;
-    
-  if (size >= BUDDY_LIMIT - offsetof (struct free_block, next))
+
+  if ((size_t)size > (size_t)-1 - BPOOL_HDR_SIZE)
     {
       FreeMem (mem, size);
       return;
     }
 
-  size += offsetof (struct free_block, next);
+  total = (size_t)size + BPOOL_HDR_SIZE;
+  if (total > (size_t)UINT_MAX)
+    {
+      FreeMem (mem, size);
+      return;
+    }
 
-  bucket = log2 (size) - MINLOG2;
-  fb = (struct free_block *) ((int)mem - offsetof (struct free_block, next));
-  free_pool = fb->pool - 1;
-  fl = free_list + free_pool;
+  bclass = bpool_class_for_total (total);
+  if (bclass < 0)
+    {
+      FreeMem (mem, size);
+      return;
+    }
 
-  if (free_pool == PRIVATE_POOL)
-  {
-    ix_mutex_lock(&fl->sem);
-    free_block (free_pool, bucket, fb);
-    ix_mutex_unlock(&fl->sem);
-  }
+  hdr = (struct bpool_hdr *)((u_char *)mem - BPOOL_HDR_SIZE);
+
+  if (hdr->magic != BPOOL_MAGIC)
+    {
+      ix_panic ("poolmem allocator: corrupt block header!");
+      Wait (0);
+    }
+
+  pool = hdr->pool;
+  if (pool >= NUMPOOLS)
+    {
+      ix_panic ("poolmem allocator: corrupt pool id!");
+      Wait (0);
+    }
+
+  if (hdr->total < BPOOL_HDR_SIZE ||
+      hdr->size != hdr->total - BPOOL_HDR_SIZE)
+    {
+      ix_panic ("poolmem allocator: corrupt block size!");
+      Wait (0);
+    }
+
+  hdr->magic = 0;
+
+  bclass = bpool_class_for_total (hdr->total);
+  if (bclass < 0)
+    {
+      ix_panic ("poolmem allocator: corrupt pooled block size!");
+      Wait (0);
+    }
+
+  ppool = poolmem_pool[pool][bclass];
+  if (!ppool)
+    {
+      ix_panic ("poolmem allocator: missing pool!");
+      Wait (0);
+    }
+
+  if (pool == PRIVATE_POOL)
+    {
+      ix_mutex_lock (&poolmem_private_sem);
+      FreePooled (ppool, hdr, hdr->total);
+      ix_mutex_unlock (&poolmem_private_sem);
+    }
   else
-  {
-    Forbid();
-    free_block (free_pool, bucket, fb);
-    Permit();
-  }
+    {
+      Forbid ();
+      FreePooled (ppool, hdr, hdr->total);
+      Permit ();
+    }
+}
+
+void
+cleanup_buddy (void)
+{
+  int p, c;
+
+  for (p = 0; p < NUMPOOLS; p++)
+    {
+      for (c = 0; c < BPOOL_NUM_CLASSES; c++)
+        {
+          if (poolmem_pool[p][c])
+            {
+              DeletePool (poolmem_pool[p][c]);
+              poolmem_pool[p][c] = 0;
+            }
+        }
+    }
 }

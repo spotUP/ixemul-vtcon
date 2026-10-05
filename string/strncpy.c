@@ -23,23 +23,63 @@
 
 #include "defs.h"
 
+/*
+ * strncpy.c,v
+ *
+ * Revision 1.1  2026/08/16  ChatGPT modifications (JJ)
+ *
+ *    Replace the byte-copy loop with a DBEQ-based m68k loop that combines
+ *    NUL detection with low-word count control.
+ *    Replace byte-padding loop control with DBRA and extend both loops
+ *    correctly across the full 32-bit size_t range.
+ */
+
 ENTRY(strncpy)
 asm("
-	movl	sp@(4),d0	/* return value is toaddr */
-	movl	sp@(12),d1	/* count */
-	jeq	strncpydone	/* nothing to do */
-	movl	sp@(8),a0	/* a0 = fromaddr */
-	movl	d0,a1		/* a1 = toaddr */
-strncpyloop:
-	movb	a0@+,a1@+	/* copy a byte */
-	jeq	strncpyploop	/* copied null, go pad if necessary */
-	subql	#1,d1		/* adjust count */
-	jne	strncpyloop	/* more room, keep going */
-strncpydone:
+	movl	sp@(4),d0		/* return destination */
+	movl	sp@(12),d1		/* count */
+	jeq	.Lsn_done
+	movl	sp@(8),a0		/* source */
+	movl	d0,a1			/* destination */
+
+	/*
+	 * Bias the count for DBEQ.  Each DBEQ pass handles one 16-bit
+	 * count block while preserving the upper half of d1.
+	 */
+	subql	#1,d1
+
+.Lsn_copy:
+	movb	a0@+,a1@+
+	dbeq	d1,.Lsn_copy
+	jeq	.Lsn_pad_entry
+
+	/*
+	 * DBEQ exhausted the low word without copying NUL.
+	 * Advance to the next 16-bit block if the 32-bit count remains.
+	 */
+	clrw	d1
+	subql	#1,d1
+	jcc	.Lsn_copy
 	rts
-strncpyploop:
-	subql	#1,d1		/* adjust count */
-	jeq	strncpydone	/* no more room, all done */
-	clrb	a1@+		/* clear a byte */
-	jra	strncpyploop	/* keep going */
+
+.Lsn_pad_entry:
+	/*
+	 * The terminating NUL has already consumed one byte of the count.
+	 */
+	subql	#1,d1
+	jcs	.Lsn_done
+
+.Lsn_pad:
+	clrb	a1@+
+	dbra	d1,.Lsn_pad
+
+	/*
+	 * Continue padding when a higher 16-bit count block remains.
+	 */
+	clrw	d1
+	subql	#1,d1
+	jcc	.Lsn_pad
+
+.Lsn_done:
+	rts
 ");

@@ -15,6 +15,30 @@
  *  You should have received a copy of the GNU Library General Public
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * 
+ * 
+ * Revision 1.7  2026/08/09  ChatGPT modifications (JJ)
+ *
+ * - Added a memalign() upper alignment limit so the stored 24-bit
+ *   offset cannot overflow or be truncated.
+ * - Added ENOMEM reporting for malloc() size-overflow and allocation
+ *   failures.
+ * - Added ENOMEM reporting for memalign() size-overflow failures,
+ *   while retaining EINVAL for invalid alignment requests.
+ *
+ * Revision 1.6  2026/06/06  ChatGPT modifications (JJ)
+ *
+ * Minimal safety fixes for malloc(), memalign() and realloc().
+ *
+ * - Added overflow guards in malloc() before rounding and header addition
+ * - Added strict alignment validation and overflow guards in memalign()
+ * - Fixed realloc() to use (block->size - offset) for memalign() pointers
+ *   and to copy only the usable region
+ *
+ * No ABI changes; exported interfaces and block layout preserved.
+ * Allocator semantics for valid inputs are preserved; invalid alignment
+ * and integer-overflow cases now fail instead of relying on wraparound
+ * or undefined internal assumptions.
  *
  *  malloc.c,v 1.1.1.1 1994/04/04 04:30:29 amiga Exp
  *
@@ -47,6 +71,12 @@
 #include "kprintf.h"
 
 #include <stddef.h>
+#include <limits.h>
+
+/* ixemul's limits.h may not define SIZE_MAX */
+#ifndef SIZE_MAX
+#define SIZE_MAX ((size_t)-1)
+#endif
 
 #define mem_list (u.u_mdp->md_list)
 #define mem_used (u.u_mdp->md_malloc_sbrk_used)
@@ -75,6 +105,7 @@ struct memalign_ptr {
 };
 
 #define MEMALIGN_MAGIC 0xdd
+#define MEMALIGN_MAX_ALIGNMENT ((size_t)1 << 24)
 
 /* perhaps important later ;-) */
 #define PAGESIZE 2048
@@ -88,10 +119,28 @@ malloc (size_t size)
   /* We increase SIZE below which could cause an dangerous (system
      crash) overflow. -bw/09-Jun-98 */
   if ((signed long)size < 0)
-    return 0;
+    {
+      if (u.u_errno)
+        *(u.u_errno) = ENOMEM;
+      return 0;
+    }
+
+  if (size > SIZE_MAX - 3)
+    {
+      if (u.u_errno)
+        *(u.u_errno) = ENOMEM;
+      return 0;
+    }
 
   /* guarantee long sizes (so we can use CopyMemQuick in realloc) */
   size = (size + 3) & ~3; /* next highest multiple of 4 */
+
+  if (size > SIZE_MAX - sizeof (struct mem_block))
+    {
+      if (u.u_errno)
+        *(u.u_errno) = ENOMEM;
+      return 0;
+    }
   
   /* include management information */
   res = (struct mem_block *) b_alloc(size + sizeof (struct mem_block), 0); /* not MEMF_PUBLIC ! */
@@ -111,14 +160,46 @@ malloc (size_t size)
       mem_used += size;
       return &res->realblock;
     }
+
+  if (u.u_errno)
+    *(u.u_errno) = ENOMEM;
+
   return 0;
 }
 
 void *
 memalign (size_t alignment, size_t size)
 {
-  u_char *p = (u_char *) malloc (size + alignment + sizeof (struct memalign_ptr));
+  usetup;
+  u_char *p;
   struct memalign_ptr *al_start;
+  size_t extra;
+
+  if (alignment < 4 ||
+      (alignment & (alignment - 1)) != 0 ||
+      alignment > MEMALIGN_MAX_ALIGNMENT)
+    {
+      if (u.u_errno)
+        *(u.u_errno) = EINVAL;
+      return 0;
+    }
+
+  if (alignment > SIZE_MAX - sizeof (struct memalign_ptr))
+    {
+      if (u.u_errno)
+        *(u.u_errno) = ENOMEM;
+      return 0;
+    }
+
+  extra = alignment + sizeof (struct memalign_ptr);
+  if (size > SIZE_MAX - extra)
+    {
+      if (u.u_errno)
+        *(u.u_errno) = ENOMEM;
+      return 0;
+    }
+
+  p = (u_char *) malloc (size + extra);
 
   if (! p)
     return p;
@@ -217,6 +298,9 @@ realloc (void *mem, size_t size)
   struct mem_block *block;
   u_int *end_magic;
   void *res;
+  struct memalign_ptr *mp;
+  u_int memalign_offset = 0;
+  u_int usable_size;
   usetup;
 
   if (!mem)
@@ -234,10 +318,12 @@ realloc (void *mem, size_t size)
   /* duplicate the code in free() here so we don't have to check those magic
    * numbers twice */
   
-  if (((struct memalign_ptr *)mem - 1)->magic == MEMALIGN_MAGIC)
+  mp = ((struct memalign_ptr *)mem - 1);
+  if (mp->magic == MEMALIGN_MAGIC)
     {
+      memalign_offset = mp->alignment;
       block = (struct mem_block *)
-	      ((u_char *)block - ((struct memalign_ptr *)mem - 1)->alignment);
+	      ((u_char *)block - memalign_offset);
     }
 
    
@@ -255,9 +341,20 @@ realloc (void *mem, size_t size)
       syscall (SYS_exit, 20);
     }
 
+  usable_size = block->size;
+  if (memalign_offset != 0)
+    {
+      if (memalign_offset >= usable_size)
+        {
+          ix_panic ("realloc: memalign offset exceeds block size!");
+          syscall (SYS_exit, 20);
+        }
+      usable_size -= memalign_offset;
+    }
+
   /* now that the block is validated, check whether we have to really
    * realloc, or if we just can return the old block */
-  if (block->size >= size)
+  if (usable_size >= size)
     res = mem;
   else
     {
@@ -268,7 +365,7 @@ realloc (void *mem, size_t size)
           ixremove ((struct ixlist *)&mem_list, (struct ixnode *) block);
           Permit ();
 
-	  CopyMemQuick (mem, res, block->size);
+	  CopyMemQuick (mem, res, usable_size);
 
 	  /* according to the manpage, the old buffer should only be
 	   * freed, if the allocation of the new buffer was successful */

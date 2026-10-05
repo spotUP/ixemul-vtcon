@@ -1,8 +1,8 @@
-/*	$NetBSD: fwrite.c,v 1.5 1995/02/02 02:09:51 jtc Exp $	*/
+/*  $NetBSD: fwrite.c,v 1.5 1995/02/02 02:09:51 jtc Exp $   */
 
 /*-
  * Copyright (c) 1990, 1993
- *	The Regents of the University of California.  All rights reserved.
+ *  The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Chris Torek.
@@ -17,8 +17,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *  This product includes software developed by the University of
+ *  California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,9 +36,26 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * fwrite.c,v
+ *
+ * Revision 1.5.2  2026/08/04  ChatGPT modifications (JJ)
+ *
+ *   Restrict usetup to the overflow error path.
+ *
+ * Revision 1.5.1  2026/06/25  ChatGPT modifications  (JJ)
+ *
+ *  Modernized fwrite() along the lines of later NetBSD stdio:
+ *  add MUL_NO_OVERFLOW before the count * size overflow check, return 0 for
+ *  zero-size requests, build __suio with size_t uio_resid, and use the
+ *  NetBSD-style return path that adjusts count only on __sfvwrite() failure.
+ *
+ *  No intentional change to normal successful write semantics.
+ */
+
 #if defined(LIBC_SCCS) && !defined(lint)
 #if 0
-static char sccsid[] = "@(#)fwrite.c	8.1 (Berkeley) 6/4/93";
+static char sccsid[] = "@(#)fwrite.c    8.1 (Berkeley) 6/4/93";
 #endif
 static char rcsid[] = "$NetBSD: fwrite.c,v 1.5 1995/02/02 02:09:51 jtc Exp $";
 #endif /* LIBC_SCCS and not lint */
@@ -46,9 +63,12 @@ static char rcsid[] = "$NetBSD: fwrite.c,v 1.5 1995/02/02 02:09:51 jtc Exp $";
 #define _KERNEL
 #include "ixemul.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include "local.h"
 #include "fvwrite.h"
+
+#define MUL_NO_OVERFLOW ((size_t)1 << (sizeof(size_t) * 4))
 
 /*
  * Write `count' objects (each size `size') from memory to the given file.
@@ -56,25 +76,52 @@ static char rcsid[] = "$NetBSD: fwrite.c,v 1.5 1995/02/02 02:09:51 jtc Exp $";
  */
 size_t
 fwrite(buf, size, count, fp)
-	const void *buf;
-	size_t size, count;
-	FILE *fp;
+    const void *buf;
+    size_t size, count;
+    FILE *fp;
 {
-	size_t n;
-	struct __suio uio;
-	struct __siov iov;
+    size_t n;
+    struct __suio uio;
+    struct __siov iov;
 
-	iov.iov_base = (void *)buf;
-	uio.uio_resid = iov.iov_len = n = count * size;
-	uio.uio_iov = &iov;
-	uio.uio_iovcnt = 1;
+    /*
+     * Extension: catch integer overflow.
+     *
+     * Avoid the division in the common case.  If both operands are
+     * smaller than sqrt(SIZE_MAX + 1), the product cannot overflow.
+     */
+    if ((size >= MUL_NO_OVERFLOW || count >= MUL_NO_OVERFLOW) &&
+        size > 0 && count > (size_t)-1 / size) {
+#if defined(EOVERFLOW) || defined(ERANGE)
+        usetup;
+#endif
+#ifdef EOVERFLOW
+        errno = EOVERFLOW;
+#elif defined(ERANGE)
+        errno = ERANGE;
+#endif
+        fp->_flags |= __SERR;
+        return (0);
+    }
 
-	/*
-	 * The usual case is success (__sfvwrite returns 0);
-	 * skip the divide if this happens, since divides are
-	 * generally slow and since this occurs whenever size==0.
-	 */
-	if (__sfvwrite(fp, &uio) == 0)
-		return (count);
-	return ((n - uio.uio_resid) / size);
+    /*
+     * SUSv2 requires a return value of 0 for a count or a size of 0.
+     */
+    if ((n = count * size) == 0)
+        return (0);
+
+    iov.iov_base = (void *)buf;
+    uio.uio_resid = iov.iov_len = n;
+    uio.uio_iov = &iov;
+    uio.uio_iovcnt = 1;
+
+    /*
+     * The usual case is success (__sfvwrite returns 0);
+     * skip the divide if this happens, since divides are
+     * generally slow.
+     */
+    if (__sfvwrite(fp, &uio) != 0)
+        count = ((n - uio.uio_resid) / size);
+
+    return (count);
 }

@@ -27,6 +27,24 @@
  *
  */
 
+/*
+ * createextio.c,v
+ *
+ * Revision 1.1.1.3  2026/08/12  ChatGPT modifications (JJ)
+ *
+ *    Validate the caller-supplied size before allocation and reject
+ *    requests smaller than struct IORequest.
+ *
+ * Revision 1.1.1.2  2026/07/03 ChatGPT (JJ)
+ * Zero the full ix_create_extio() allocation.
+ *
+ * ix_create_extio() allocates the caller supplied size, but only cleared
+ * sizeof(struct IORequest).  Callers may request larger Exec-compatible
+ * I/O request structures such as struct IOStdReq or struct timerequest.
+ * Clear the complete allocation so device-visible extension fields cannot
+ * contain stale memory.
+ */
+
 #define _KERNEL
 #include "ixemul.h"
 #include <exec/io.h>
@@ -37,12 +55,20 @@ ix_create_extio(struct MsgPort *ioReplyPort, long size)
 {
   struct IORequest *ioReq;
  
-  if (! ioReplyPort) return NULL;
+  if (! ioReplyPort || size < (long) sizeof(struct IORequest))
+    return NULL;
 
   ioReq = (struct IORequest *) kmalloc (size);
   if (! ioReq) return NULL;
 
-  memset(ioReq, '\0', sizeof(struct IORequest));
+  /*
+   * Clear the full allocation, not only struct IORequest.
+   * Some callers request larger Exec I/O structures, for example
+   * struct IOStdReq or struct timerequest.  Leaving the extended part
+   * uninitialised can expose stale fields to devices.
+   */
+
+  memset(ioReq, '\0', size);
   
   ioReq->io_Message.mn_Node.ln_Type = NT_MESSAGE;
   ioReq->io_Message.mn_Length = size;

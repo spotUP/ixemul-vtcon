@@ -41,8 +41,8 @@
 #define	CHAR_BIT	8		/* number of bits in a char */
 #define	MB_LEN_MAX	1		/* no multibyte characters */
 
-#define	SCHAR_MIN	(-0x7f-1)	/* max value for a signed char */
-#define	SCHAR_MAX	0x7f		/* min value for a signed char */
+#define	SCHAR_MIN	(-0x7f-1)	/* min value for a signed char */
+#define	SCHAR_MAX	0x7f		/* max value for a signed char */
 
 #define	UCHAR_MAX	0xff		/* max value for an unsigned char */
 #define	CHAR_MAX	0x7f		/* max value for a char */
@@ -60,15 +60,27 @@
 #define	LONG_MAX	0x7fffffffL	/* max value for a long */
 #define	LONG_MIN	(-0x7fffffffL-1)	/* min value for a long */
 
+#ifndef LLONG_MAX
+#define	LLONG_MAX	0x7fffffffffffffffLL
+#endif
+
+#ifndef LLONG_MIN
+#define	LLONG_MIN	(-LLONG_MAX - 1LL)
+#endif
+
+#ifndef ULLONG_MAX
+#define	ULLONG_MAX	0xffffffffffffffffULL
+#endif
+
 #if !defined(_ANSI_SOURCE)
 #define SSIZE_MAX	INT_MAX		/* max value for a ssize_t */
 
 #if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)
 #define SIZE_T_MAX	UINT_MAX	/* max value for a size_t */
 
-#define	UQUAD_MAX	0xffffffffffffffffULL		/* max unsigned quad */
-#define	QUAD_MAX	0x7fffffffffffffffLL		/* max signed quad */
-#define	QUAD_MIN	(-0x7fffffffffffffffLL-1)	/* min signed quad */
+#define	UQUAD_MAX	0xffffffffffffffffULL	/* max unsigned quad */
+#define	QUAD_MAX	0x7fffffffffffffffLL	/* max signed quad */
+#define	QUAD_MIN	(-QUAD_MAX-1LL)		/* min signed quad */
 
 #endif /* !_POSIX_SOURCE && !_XOPEN_SOURCE */
 #endif /* !_ANSI_SOURCE */

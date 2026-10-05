@@ -19,6 +19,28 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+ * socket.c,v
+ *
+ * Revision 1.3  2026/09/16  ChatGPT modifications (JJ)
+ *
+ *  Make socket cleanup EINTR/EPIPE handling conditional on failure
+ *  of the socket operation that immediately preceded the cleanup.
+ *  Return EOPNOTSUPP for unsupported AF_UNIX sendto(), sendmsg(),
+ *  recvfrom() and recvmsg() operations.
+ *
+ * Revision 1.2  2026/07/28  ChatGPT modification  (JJ)
+ *
+ *  Added explicit SELCMD_CANCEL handling in the library-side socket
+ *  select callback.  CANCEL is consumed locally as an idempotent no-op
+ *  and is not forwarded to ixnet's NET__tcp_select implementation.
+ *
+ * Revision 1.1  2026/06/26  ChatGPT modifications (JJ)
+ * - Harden rollback cleanup after failed socket allocation in socket(),
+ *   accept() and ix_obtain_socket() by protecting descriptor/file-slot
+ *   reset with ix_lock_base().
+ */
+
 #define _KERNEL
 #include "ixemul.h"
 #include "unp.h"
@@ -33,6 +55,7 @@
 #include <netinet/in.h>
 #include <machine/param.h>
 #include <string.h>
+#include "select.h"
 
 static struct file *getsock (int fdes);
 static int soo_read   (struct file *fp, char *buf, int len);
@@ -41,7 +64,7 @@ static int soo_ioctl  (struct file *fp, int cmd, int inout, int arglen, caddr_t 
 static int soo_select (struct file *fp, int select_cmd, int io_mode, fd_set *ignored, u_long *also_ignored);
 static int soo_close  (struct file *fp);
 
-static void socket_cleanup(int ostat)
+static void socket_cleanup(int ostat, int failed)
 {
   usetup;
 
@@ -50,13 +73,13 @@ static void socket_cleanup(int ostat)
 
   u.p_stat = ostat;
 
-  if (errno == EINTR)
+  if (failed && errno == EINTR)
     setrun (FindTask (0));
 
   KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
 }
 
-static void socket_cleanup_epipe(int ostat)
+static void socket_cleanup_epipe(int ostat, int failed)
 {
   usetup;
 
@@ -66,10 +89,10 @@ static void socket_cleanup_epipe(int ostat)
   u.p_stat = ostat;
 
   /* the library doesn't send this to us of course ;-) */
-  if (errno == EPIPE)
+  if (failed && errno == EPIPE)
     _psignal (FindTask (0), SIGPIPE);
 
-  if (errno == EINTR)
+  if (failed && errno == EINTR)
     setrun (FindTask (0));
 
   KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
@@ -107,8 +130,10 @@ socket (int domain, int type, int protocol)
       if (err)
         {
 	  /* free the allocated fd */
+          ix_lock_base ();
           u.u_ofile[fd] = 0;
           fp->f_count = 0;
+          ix_unlock_base ();
           break;
         }
 
@@ -118,7 +143,7 @@ socket (int domain, int type, int protocol)
 
   syscall (SYS_sigsetmask, omask);
   errno = err;
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, err != 0);
   return err ? -1 : fd;
 }
 
@@ -139,7 +164,7 @@ bind (int s, const struct sockaddr *name, int namelen)
   ostat = u.p_stat;
   u.p_stat = SWAIT;
   error = netcall(NET__bind, fp, name, namelen);
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, error == -1);
   return error;
 }
 
@@ -160,7 +185,7 @@ listen (int s, int backlog)
   u.p_stat = SWAIT;
 
   error = netcall(NET__listen, fp, backlog);
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, error == -1);
   return error;
 }
 
@@ -193,8 +218,10 @@ accept (int s, struct sockaddr *name, int *namelen)
       if (err)
         {
           /* the second file */
+          ix_lock_base ();
           u.u_ofile[fd2] = 0;
           fp2->f_count = 0;
+          ix_unlock_base ();
           break;
         }
       domain = (fp->f_type == DTYPE_SOCKET) ? AF_INET : AF_UNIX;
@@ -203,7 +230,7 @@ accept (int s, struct sockaddr *name, int *namelen)
   while (0);
 
   errno = err;
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, err != 0);
   return err ? -1 : fd2;
 }
 
@@ -225,7 +252,7 @@ connect (int s, const struct sockaddr *name, int namelen)
   u.p_stat = SWAIT;
 
   error = netcall(NET__connect, fp, name, namelen);
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, error == -1);
   return error;
 }
 
@@ -246,14 +273,20 @@ sendto (int s, const void *buf, int len, int flags, const struct sockaddr *to, i
   int rc;
   usetup;
 
-  if (!fp || fp->f_type == DTYPE_USOCKET)
+  if (!fp)
     return -1;
+
+  if (fp->f_type == DTYPE_USOCKET)
+    {
+      errno = EOPNOTSUPP;
+      return -1;
+    }
 
   ostat = u.p_stat;
   u.p_stat = SWAIT;
 
   rc = netcall(NET__sendto, fp, buf, len, flags, to, tolen);
-  socket_cleanup_epipe(ostat);
+  socket_cleanup_epipe(ostat, rc == -1);
   return rc;
 }
 
@@ -276,7 +309,7 @@ send (int s, const void *buf, int len, int flags)
   u.p_stat = SWAIT;
 
   rc = netcall(NET__send, fp, buf, len, flags);
-  socket_cleanup_epipe(ostat);
+  socket_cleanup_epipe(ostat, rc == -1);
   return rc;
 }
 
@@ -288,14 +321,20 @@ sendmsg (int s, const struct msghdr *msg, int flags)
   int ostat, rc;
   usetup;
 
-  if (!fp || fp->f_type == DTYPE_USOCKET)
+  if (!fp)
     return -1;
+
+  if (fp->f_type == DTYPE_USOCKET)
+    {
+      errno = EOPNOTSUPP;
+      return -1;
+    }
 
   ostat = u.p_stat;
   u.p_stat = SWAIT;
 
   rc = netcall(NET__sendmsg, fp, msg, flags);
-  socket_cleanup_epipe(ostat);
+  socket_cleanup_epipe(ostat, rc == -1);
   return rc;
 }
 
@@ -307,14 +346,20 @@ recvfrom (int s, void *buf, int len, int flags, struct sockaddr *from, int *from
   int ostat, rc;
   usetup;
 
-  if (!fp || fp->f_type == DTYPE_USOCKET)
+  if (!fp)
     return -1;
+
+  if (fp->f_type == DTYPE_USOCKET)
+    {
+      errno = EOPNOTSUPP;
+      return -1;
+    }
 
   ostat = u.p_stat;
   u.p_stat = SWAIT;
 
   rc = netcall(NET__recvfrom, fp, buf, len, flags, from, fromlen);
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, rc == -1);
   return rc;
 }
 
@@ -336,7 +381,7 @@ recv (int s, void *buf, int len, int flags)
   u.p_stat = SWAIT;
 
   rc = netcall(NET__recv, fp, buf, len, flags);
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, rc == -1);
   return rc;
 }
 
@@ -348,14 +393,20 @@ recvmsg (int s, struct msghdr *msg, int flags)
   int ostat, rc;
   usetup;
 
-  if (!fp || fp->f_type == DTYPE_USOCKET)
+  if (!fp)
     return -1;
+
+  if (fp->f_type == DTYPE_USOCKET)
+    {
+      errno = EOPNOTSUPP;
+      return -1;
+    }
 
   ostat = u.p_stat;
   u.p_stat = SWAIT;
 
   rc = netcall(NET__recvmsg, fp, msg, flags);
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, rc == -1);
   return rc;
 }
 
@@ -377,7 +428,7 @@ shutdown (int s, int how)
   u.p_stat = SWAIT;
 
   err = netcall(NET__shutdown, fp, how);
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, err == -1);
   return err;
 }
 
@@ -399,7 +450,7 @@ setsockopt (int s, int level, int name, const void *val, int valsize)
   u.p_stat = SWAIT;
 
   err = netcall(NET__setsockopt, fp, level, name, val, valsize);
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, err == -1);
   return err;
 }
 
@@ -421,7 +472,7 @@ getsockopt (int s, int level, int name, void *val, int *valsize)
   u.p_stat = SWAIT;
 
   err = netcall(NET__getsockopt, fp, level, name, val, valsize);
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, err == -1);
   return err;
 }
 
@@ -446,7 +497,7 @@ getsockname (int fdes, struct sockaddr *asa, int *alen)
   u.p_stat = SWAIT;
 
   err = netcall(NET__getsockname, fp, asa, alen);
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, err == -1);
   return err;
 }
 
@@ -470,7 +521,7 @@ getpeername (int fdes, struct sockaddr *asa, int *alen)
   u.p_stat = SWAIT;
 
   err = netcall(NET__getpeername, fp, asa, alen);
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, err == -1);
   return err;
 }
 
@@ -501,7 +552,7 @@ ix_release_socket(int fdes)
       ostat = u.p_stat;
       u.p_stat = SWAIT;
       err = netcall(NET_release_socket, fp);
-      socket_cleanup(ostat);
+      socket_cleanup(ostat, err == -1);
     }
   return err;
 }
@@ -528,8 +579,10 @@ ix_obtain_socket(long id, int inet, int stream, int protocol)
     if (err)
     {
       /* free the allocated fd */
+      ix_lock_base ();
       u.u_ofile[fd2] = 0;
       fp2->f_count = 0;
+      ix_unlock_base ();
       break;
     }
 
@@ -538,7 +591,7 @@ ix_obtain_socket(long id, int inet, int stream, int protocol)
 
   errno = err;
 
-  socket_cleanup(ostat);
+  socket_cleanup(ostat, err != 0);
   return err ? -1 : fd2;
 }
 
@@ -631,6 +684,10 @@ soo_select(struct file *fp, int select_cmd, int io_mode,
 	   fd_set *ignored, u_long *also_ignored)
 {
   usetup;
+
+  /* ixnet does not participate in library-side PREPARE cancellation. */
+  if (select_cmd == SELCMD_CANCEL)
+    return 0;
 
   return netcall(NET__tcp_select, fp, select_cmd, io_mode, ignored, also_ignored);
 }

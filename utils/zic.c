@@ -1,6 +1,6 @@
 #ifndef lint
 #ifndef NOID
-static char	elsieid[] = "@(#)zic.c	7.87";
+static char	elsieid[] = "@(#)zic.c	7.102";
 #endif /* !defined NOID */
 #endif /* !defined lint */
 
@@ -8,9 +8,14 @@ static char	elsieid[] = "@(#)zic.c	7.87";
 #include "locale.h"
 #include "tzfile.h"
 
-#ifdef unix
-#include "sys/stat.h"			/* for umask manifest constants */
-#endif /* defined unix */
+#if HAVE_SYS_STAT_H
+#include "sys/stat.h"
+#endif
+#ifdef S_IRUSR
+#define MKDIR_UMASK (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)
+#else
+#define MKDIR_UMASK 0755
+#endif
 
 /*
 ** On some ancient hosts, predicates like `isspace(C)' are defined
@@ -382,7 +387,7 @@ int	errnum;
 	extern int	sys_nerr;
 
 	return (errnum > 0 && errnum <= sys_nerr) ?
-		sys_errlist[errnum] : "Unknown system error";
+		sys_errlist[errnum] : _("Unknown system error");
 }
 #endif /* !(HAVE_STRERROR - 0) */
 
@@ -431,7 +436,7 @@ const char * const	string;
 {
 	char *	cp;
 
-	cp = ecpyalloc("warning: ");
+	cp = ecpyalloc(_("warning: "));
 	cp = ecatalloc(cp, string);
 	error(cp);
 	ifree(cp);
@@ -441,7 +446,7 @@ const char * const	string;
 static void
 usage P((void))
 {
-	(void) fprintf(stderr, _("%s: usage is %s [ -s ] [ -v ] [ -l localtime ] [ -p posixrules ] [ -d directory ]\n\t[ -L leapseconds ] [ -y yearistype ] [ filename ... ]\n"),
+	(void) fprintf(stderr, _("%s: usage is %s [ -s ] [ -v ] [ -l localtime ] [ -p posixrules ] \\\n\t[ -d directory ] [ -L leapseconds ] [ -y yearistype ] [ filename ... ]\n"),
 		progname, progname);
 	(void) exit(EXIT_FAILURE);
 }
@@ -564,12 +569,18 @@ _("%s: More than one -L option specified\n"),
 	/*
 	** Make links.
 	*/
-	for (i = 0; i < nlinks; ++i)
+	for (i = 0; i < nlinks; ++i) {
+		eat(links[i].l_filename, links[i].l_linenum);
 		dolink(links[i].l_from, links[i].l_to);
-	if (lcltime != NULL)
+	}
+	if (lcltime != NULL) {
+		eat("command line", 1);
 		dolink(lcltime, TZDEFAULT);
-	if (psxrules != NULL)
+	}
+	if (psxrules != NULL) {
+		eat("command line", 1);
 		dolink(psxrules, TZDEFRULES);
+	}
 	return (errors == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
@@ -602,9 +613,27 @@ const char * const	tofile;
 	if (!itsdir(toname))
 		(void) remove(toname);
 	if (link(fromname, toname) != 0) {
+		int	result;
+
 		if (mkdirs(toname) != 0)
 			(void) exit(EXIT_FAILURE);
-		if (link(fromname, toname) != 0) {
+
+		result = link(fromname, toname);
+#if (HAVE_SYMLINK - 0)
+		if (result != 0) {
+		        const char *s = tofile;
+		        register char * symlinkcontents = NULL;
+		        while ((s = strchr(s+1, '/')) != NULL)
+			        symlinkcontents = ecatalloc(symlinkcontents, "../");
+			symlinkcontents = ecatalloc(symlinkcontents, fromfile);
+
+			result = symlink(symlinkcontents, toname);
+			if (result == 0)
+warning(_("hard link failed, symbolic link used"));
+			ifree(symlinkcontents);
+		}
+#endif
+		if (result != 0) {
 			const char *e = strerror(errno);
 
 			(void) fprintf(stderr,
@@ -892,9 +921,10 @@ const int		signable;
 			error(errstring);
 			return 0;
 	}
-	if (hh < 0 || hh >= HOURSPERDAY ||
+	if ((hh < 0 || hh >= HOURSPERDAY ||
 		mm < 0 || mm >= MINSPERHOUR ||
-		ss < 0 || ss > SECSPERMIN) {
+		ss < 0 || ss > SECSPERMIN) &&
+		!(hh == HOURSPERDAY && mm == 0 && ss == 0)) {
 			error(errstring);
 			return 0;
 	}
@@ -1021,7 +1051,7 @@ const int		iscont;
 	}
 	z.z_filename = filename;
 	z.z_linenum = linenum;
-	z.z_gmtoff = gethms(fields[i_gmtoff], _("invalid GMT offset"), TRUE);
+	z.z_gmtoff = gethms(fields[i_gmtoff], _("invalid UTC offset"), TRUE);
 	if ((cp = strchr(fields[i_format], '%')) != 0) {
 		if (*++cp != 's' || strchr(cp, '%') != 0) {
 			error(_("invalid abbreviation format"));
@@ -1255,11 +1285,12 @@ const char * const		timep;
 	} else if (sscanf(cp, scheck(cp, "%d"), &rp->r_loyear) != 1) {
 		error(_("invalid starting year"));
 		return;
-	} else if (noise)
+	} else if (noise) {
 		if (rp->r_loyear < min_year_representable)
 			warning(_("starting year too low to be represented"));
 		else if (rp->r_loyear > max_year_representable)
 			warning(_("starting year too high to be represented"));
+	}
 	cp = hiyearp;
 	if ((lp = byword(cp, end_years)) != NULL) switch ((int) lp->l_value) {
 		case YR_MINIMUM:
@@ -1279,11 +1310,12 @@ const char * const		timep;
 	} else if (sscanf(cp, scheck(cp, "%d"), &rp->r_hiyear) != 1) {
 		error(_("invalid ending year"));
 		return;
-	} else if (noise)
+	} else if (noise) {
 		if (rp->r_loyear < min_year_representable)
 			warning(_("starting year too low to be represented"));
 		else if (rp->r_loyear > max_year_representable)
 			warning(_("starting year too high to be represented"));
+	}
 	if (rp->r_loyear > rp->r_hiyear) {
 		error(_("starting year greater than ending year"));
 		return;
@@ -1465,7 +1497,9 @@ const char * const	name;
 	convert(eitol(timecnt), tzh.tzh_timecnt);
 	convert(eitol(typecnt), tzh.tzh_typecnt);
 	convert(eitol(charcnt), tzh.tzh_charcnt);
+	(void) strncpy(tzh.tzh_magic, TZ_MAGIC, sizeof tzh.tzh_magic);
 #define DO(field)	(void) fwrite((void *) tzh.field, (size_t) sizeof tzh.field, (size_t) 1, fp)
+	DO(tzh_magic);
 	DO(tzh_reserved);
 	DO(tzh_ttisgmtcnt);
 	DO(tzh_ttisstdcnt);
@@ -1629,7 +1663,7 @@ const int			zonecount;
 				INITIALIZE(ktime);
 				if (useuntil) {
 					/*
-					** Turn untiltime into GMT
+					** Turn untiltime into UTC
 					** assuming the current gmtoff and
 					** stdoff values.
 					*/
@@ -1878,10 +1912,12 @@ const char * const	type;
 	buf = erealloc(buf, (int) (132 + strlen(yitcommand) + strlen(type)));
 	(void) sprintf(buf, "%s %d %s", yitcommand, year, type);
 	result = system(buf);
-	if (result == 0)
-		return TRUE;
-	if (result == (1 << 8))
-		return FALSE;
+	if (WIFEXITED(result)) switch (WEXITSTATUS(result)) {
+		case 0:
+			return TRUE;
+		case 1:
+			return FALSE;
+	}
 	error(_("Wild result from command execution"));
 	(void) fprintf(stderr, _("%s: command was '%s', result was %d\n"),
 		progname, buf, result);
@@ -1945,10 +1981,11 @@ register const struct lookup * const	table;
 	*/
 	foundlp = NULL;
 	for (lp = table; lp->l_word != NULL; ++lp)
-		if (itsabbr(word, lp->l_word))
+		if (itsabbr(word, lp->l_word)) {
 			if (foundlp == NULL)
 				foundlp = lp;
 			else	return NULL;	/* multiple inexact matches */
+		}
 	return foundlp;
 }
 
@@ -2156,7 +2193,7 @@ char * const	argname;
 			** created by some other multiprocessor, so we get
 			** to do extra checking.
 			*/
-			if (mkdir(name, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) != 0) {
+			if (mkdir(name, MKDIR_UMASK) != 0) {
 				const char *e = strerror(errno);
 
 				if (errno != EEXIST || !itsdir(name)) {

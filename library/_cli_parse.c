@@ -17,6 +17,19 @@
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
+ * 
+ *
+ * Revision 1.4  2026/06/06  JJ
+ *
+ * Added inline filename handling to CLI file initialization.
+ *
+ *   - Introduced f_name_inline initialization.
+ *   - Use f_name_buf for short NameFromFH() results.
+ *   - Heap-allocate only when filename exceeds inline buffer.
+ *   - Mark default CLI names as external (FEXTNAME).
+ *
+ * No changes to CLI parsing semantics or standard descriptor behavior.
+ *
  *  _cli_parse.c,v 1.1.1.1 1994/04/04 04:29:41 amiga Exp
  *
  *  _cli_parse.c,v
@@ -72,19 +85,38 @@ static void init_file(struct file *f, BPTR fh, char *defname)
   f->f_close = __close;
   f->f_select= __fselect;
 
+  /* initialize filename ownership state */
+  f->f_name = 0; 
+  f->f_name_inline = 0;
+
   if (!IsInteractive(fh))
     {
       char buf[256];
 
       if (NameFromFH(fh, buf, sizeof(buf)))
         {
-          if ((f->f_name = (void *)kmalloc(strlen(buf) + 1)))
-            strcpy(f->f_name, buf);
+          size_t len = strlen(buf) + 1;
+
+          /* Prefer inline buffer when it fits */
+          if (len <= sizeof(f->f_name_buf))
+            {
+              f->f_name = f->f_name_buf;
+              f->f_name_inline = 1;
+              strcpy(f->f_name, buf);
+            }
+          else
+            {
+              f->f_name = kmalloc(len);
+              f->f_name_inline = 0;
+              if (f->f_name)
+                strcpy(f->f_name, buf);
+            }
         }
     }
   if (f->f_name == NULL)
     {
       f->f_name = defname;
+      f->f_name_inline = 0;   /* external name */
       f->f_flags |= FEXTNAME;   // don't free f_name
     }
 }

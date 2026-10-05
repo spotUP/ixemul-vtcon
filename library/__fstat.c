@@ -20,7 +20,15 @@
  *
  *  __fstat.c,v
  * Revision 1.1.1.1  1994/04/04  04:30:08  amiga
+ * 
  * Initial CVS check in.
+ *
+ * Revision 1.3  2026/07/27  ChatGPT modifications (JJ)
+ * - Cache the filesystem id_BytesPerBlock value per open struct file.
+ * - Avoid repeated DupLockFromFH(), Info() and UnLock() calls after the
+ *   first successful block-size query.
+ * - Preserve the original st_blksize policy, st_blocks calculation and
+ *   512-byte fallback behaviour.
  *
  *  Revision 1.2  1993/11/05  21:49:59  mw
  *  "grp/oth-perms,
@@ -54,7 +62,6 @@ __fstat(struct file *f)
   struct InfoData *info;
   BPTR lock;
   int omask;
-  BOOL res;
   int is_interactive = IsInteractive(CTOBPTR(f->f_fh));
   struct stat *st = &f->f_stb;
   usetup;
@@ -167,27 +174,31 @@ __fstat(struct file *f)
   /* try to find out block size of device, hey postman, it's packet-time
    * again:-)) */
 
-  /* clear the info-structure. Since this packet is used by the console
-   * handler to transmit the window pointer, it actually answers the
-   * request, but doesn't set the not used fields to 0.. this gives HUGE
-   * block lengths :-)) */
-  bzero (info, sizeof(*info));
-  res = 0;
   bytesperblock = 0;
   if (S_ISREG(st->st_mode))
-  {
-    lock = DupLockFromFH(CTOBPTR(f->f_fh));
-    if (lock)
-      {
-        res = Info(lock, (void *)info);
-        UnLock(lock);
-      }
-    if (res && info->id_BytesPerBlock)
-      bytesperblock = info->id_BytesPerBlock;
-  }
+    {
+      if (f->f_fs_blocksize == 0)
+        {
+          /* Clear the info-structure only when Info() is needed. Since this
+           * packet is used by the console handler to transmit the window
+           * pointer, some handlers leave unused fields uninitialized. */
+          bzero (info, sizeof(*info));
+
+          lock = DupLockFromFH(CTOBPTR(f->f_fh));
+          if (lock)
+            {
+              if (Info(lock, (void *)info) && info->id_BytesPerBlock)
+                f->f_fs_blocksize = info->id_BytesPerBlock;
+
+              UnLock(lock);
+            }
+        }
+
+      bytesperblock = f->f_fs_blocksize;
+    }
 
   st->st_blksize = 0;
-  if (res && bytesperblock)
+  if (bytesperblock)
     {
       st->st_blksize = bytesperblock;
       if (!is_interactive && S_ISREG(st->st_mode))

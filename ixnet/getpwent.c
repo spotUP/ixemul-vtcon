@@ -22,6 +22,18 @@
  *
  */
 
+/*
+ * getpwent.c,v
+ *
+ * Revision 1.1  2026/08/05  ChatGPT modifications (JJ)
+ *
+ *    Call AmiTCP usergroup functions only when usergroup.library is open.
+ *
+ *    Keep the AS225 passwd API restricted to an actual AS225 socket base;
+ *    Roadshow without usergroup.library returns no passwd entry instead of
+ *    calling either backend through a NULL library base.
+ */
+
 #define _KERNEL
 #include <pwd.h>
 #include "ixnet.h"
@@ -47,24 +59,28 @@ getpwent(void)
 {
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
-    register int network_protocol = p->u_networkprotocol;
 
-    if (network_protocol == IX_NETWORK_AMITCP) {
-	struct TCP_passwd *err = UG_getpwent();
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase)
+      {
+        struct TCP_passwd *err = UG_getpwent();
 
-	if (err == NULL) {
-	    *u.u_errno = ug_GetErr();
-	    return NULL;
-	}
-	else {
-	    return __TCP2InetPwd(err);
-	}
-    }
-    else /*if (network_protocol == IX_NETWORK_AS225)*/ {
-	struct AS225_passwd *pwd = SOCK_getpwent();
+        if (err == NULL)
+          {
+            *u.u_errno = ug_GetErr();
+            return NULL;
+          }
+        return __TCP2InetPwd(err);
+      }
 
-	return (pwd ? __AS225InetPwd(pwd) : NULL);
-    }
+    if (p->u_networkprotocol == IX_NETWORK_AS225 && p->u_SockBase)
+      {
+        struct AS225_passwd *pwd = SOCK_getpwent();
+
+        return pwd ? __AS225InetPwd(pwd) : NULL;
+      }
+
+    return NULL;
 }
 
 struct passwd *
@@ -72,22 +88,28 @@ getpwnam(const char *name)
 {
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
-    register int network_protocol = p->u_networkprotocol;
 
-    if (network_protocol == IX_NETWORK_AMITCP) {
-	struct TCP_passwd *err = UG_getpwnam(name);
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase)
+      {
+        struct TCP_passwd *err = UG_getpwnam(name);
 
-	if (err == NULL) {
-	    *u.u_errno = ug_GetErr();
-	    return NULL;
-	}
-	return __TCP2InetPwd(err);
-    }
-    else /* if (network_protocol == IX_NETWORK_AS225)*/ {
-	struct AS225_passwd *pwd = SOCK_getpwnam((char *)name);
+        if (err == NULL)
+          {
+            *u.u_errno = ug_GetErr();
+            return NULL;
+          }
+        return __TCP2InetPwd(err);
+      }
 
-	return (pwd ? __AS225InetPwd(pwd) : NULL);
-    }
+    if (p->u_networkprotocol == IX_NETWORK_AS225 && p->u_SockBase)
+      {
+        struct AS225_passwd *pwd = SOCK_getpwnam((char *)name);
+
+        return pwd ? __AS225InetPwd(pwd) : NULL;
+      }
+
+    return NULL;
 }
 
 struct passwd *
@@ -95,29 +117,34 @@ getpwuid(uid_t uid)
 {
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
-    register int network_protocol = p->u_networkprotocol;
 
-    /* Don't do this if uid == -2 (nobody2) */
-    /* This happens when someone doesn't use AmiTCP's login */
-    if (network_protocol == IX_NETWORK_AMITCP) {
-	if (uid != (uid_t)-2) {
-	    struct TCP_passwd *err = UG_getpwuid(uid);
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase)
+      {
+        /* Do not query usergroup for the historical nobody2 value. */
+        if (uid != (uid_t)-2)
+          {
+            struct TCP_passwd *err = UG_getpwuid(uid);
 
-	    if (err == NULL) {
-		*u.u_errno = ug_GetErr();
-		return NULL;
-	    }
-	    return __TCP2InetPwd(err);
-	}
-	else {
-	    return getpwnam(getenv("USER"));
-	}
-    }
-    else /*if (network_protocol == IX_NETWORK_AS225)*/  {
+            if (err == NULL)
+              {
+                *u.u_errno = ug_GetErr();
+                return NULL;
+              }
+            return __TCP2InetPwd(err);
+          }
+
+        return getpwnam(getenv("USER"));
+      }
+
+    if (p->u_networkprotocol == IX_NETWORK_AS225 && p->u_SockBase)
+      {
         struct AS225_passwd *pwd = SOCK_getpwuid(uid);
 
-	return (pwd ? __AS225InetPwd(pwd) : NULL);
-    }
+        return pwd ? __AS225InetPwd(pwd) : NULL;
+      }
+
+    return NULL;
 }
 
 int
@@ -125,14 +152,15 @@ setpassent(int stayopen)
 {
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
-    register int network_protocol = p->u_networkprotocol;
 
-    if (network_protocol == IX_NETWORK_AMITCP) {
-	UG_setpwent();
-    }
-    else /* if (network_protocol == IX_NETWORK_AS225) */ {
-	SOCK_setpwent(0);
-    }
+    (void)stayopen;
+
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase)
+      UG_setpwent();
+    else if (p->u_networkprotocol == IX_NETWORK_AS225 && p->u_SockBase)
+      SOCK_setpwent(0);
+
     return 1;
 }
 
@@ -141,14 +169,13 @@ setpwent(void)
 {
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
-    register int network_protocol = p->u_networkprotocol;
 
-    if (network_protocol == IX_NETWORK_AMITCP) {
-	UG_setpwent();
-    }
-    else /* if (network_protocol == IX_NETWORK_AS225) */ {
-	SOCK_setpwent(0);
-    }
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase)
+      UG_setpwent();
+    else if (p->u_networkprotocol == IX_NETWORK_AS225 && p->u_SockBase)
+      SOCK_setpwent(0);
+
     return 1;
 }
 
@@ -157,14 +184,12 @@ endpwent(void)
 {
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
-    register int network_protocol = p->u_networkprotocol;
 
-    if (network_protocol == IX_NETWORK_AMITCP) {
-	UG_endpwent();
-    }
-    else /* if (network_protocol == IX_NETWORK_AS225)*/ {
-	SOCK_endpwent();
-    }
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase)
+      UG_endpwent();
+    else if (p->u_networkprotocol == IX_NETWORK_AS225 && p->u_SockBase)
+      SOCK_endpwent();
 }
 
 /* change the AmiTCP password structure to the global format */

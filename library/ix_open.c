@@ -19,6 +19,16 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+ * ix_open.c,v
+ *
+ * Revision 1.1  2026/08/05  ChatGPT modifications (JJ)
+ *
+ *    Close a successfully opened per-process ixnet.library instance when
+ *    later ix_open() initialization fails, so its private SocketBase,
+ *    signal bits and ixnet state are not leaked.
+ */
+
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
@@ -125,7 +135,8 @@ ix_open (struct ixemul_base *ixbase)
 
       /* ixnet.library is loaded iff ixbase->ix_network_type != IX_NETWORK_NONE */
       if (ixbase->ix_network_type != IX_NETWORK_NONE)
-	ix_u->u_ixnetbase = OpenLibrary("ixnet.library", 44);  // Let ixnet check if the ixnet version matches ours
+	ix_u->u_ixnetbase = OpenLibrary("ixnet.library", 44);
+          /* ixnet validates that its version matches ixemul. */
 
       me->tc_Launch    = launch_glue;
       me->tc_Switch    = switch_glue;
@@ -215,6 +226,12 @@ ix_open (struct ixemul_base *ixbase)
       FreeSignal (ix_u->u_sleep_sig);
       FreeSignal (ix_u->u_pipe_sig);
       FreeSignal (ix_u->p_zombie_sig);
+
+      if (ix_u->u_ixnetbase)
+        {
+          CloseLibrary(ix_u->u_ixnetbase);
+          ix_u->u_ixnetbase = NULL;
+        }
 
       /* all_free() MUST come before we remove the pointer to u */
       all_free ();

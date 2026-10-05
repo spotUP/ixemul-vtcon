@@ -14,7 +14,7 @@ int main(int argc, char **argv)
     exit(2);
   }
   strcpy(tmp, argv[1]);
-  strcat(tmp, "/../version.in");
+  strcat(tmp, "/version.in");
   f = fopen(tmp, "r");
   if (f == NULL)
   {

@@ -36,6 +36,15 @@
  * SUCH DAMAGE.
  */
 
+/*
+ *  Revision 1.6  2026/06/07  Copilot modifications (JJ)
+ *  - Fixed vsnprintf() handling of n == 0.
+ *    Use a zero-sized __SSTR FILE so vfprintf() can count the
+ *    formatted output without writing to the caller's buffer.
+ *    Do not set __SERR here; vfprintf() returns EOF when the
+ *    stream error flag is set.
+ */
+
 #if defined(LIBC_SCCS) && !defined(lint)
 #if 0
 static char sccsid[] = "@(#)vsnprintf.c	8.1 (Berkeley) 6/4/93";
@@ -55,15 +64,37 @@ vsnprintf(str, n, fmt, ap)
 	const char *fmt;
 	_BSD_VA_LIST_ ap;
 {
-	int ret;
-	FILE f;
+    int ret;
+    FILE f;
+    FILE f2;
+    _BSD_VA_LIST_ ap2;
 
-	if ((int)n < 1)
-		return (EOF);
-	f._flags = __SWR | __SSTR;
-	f._bf._base = f._p = (unsigned char *)str;
-	f._bf._size = f._w = n - 1;
-	ret = vfprintf(&f, fmt, ap);
-	*f._p = 0;
-	return (ret);
+    if (n == 0) {
+        unsigned char dummy[1];
+
+        /*
+         * Use a zero-sized string FILE.  In __SSTR mode,
+         * __sfvwrite() copies only the bytes that fit, but
+         * pretends that the whole iovec was consumed.  With
+         * _w == 0 this gives count-only behaviour without
+         * writing to the caller's buffer.
+         *
+         * Do not set __SERR here; vfprintf() returns EOF if
+         * the stream error flag is set.
+         */
+        ap2 = ap;
+        f2._flags = __SWR | __SSTR;
+        f2._bf._base = f2._p = dummy;
+        f2._bf._size = f2._w = 0;
+
+        return vfprintf(&f2, fmt, ap2);
+    }
+
+    ap2 = ap;
+    f._flags = __SWR | __SSTR;
+    f._bf._base = f._p = (unsigned char *)str;
+    f._bf._size = f._w = n - 1;
+    ret = vfprintf(&f, fmt, ap2);
+    *f._p = 0;
+    return (ret);
 }

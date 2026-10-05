@@ -35,6 +35,14 @@
  *	@(#)stdlib.h	5.13 (Berkeley) 6/4/91
  */
 
+/*
+ * stdlib.h,v
+ *
+ * Revision 1.1  2026/09/12  ChatGPT modifications (JJ)
+ *
+ *    Add mkdtemp() declaration for the public ixemul interface.
+ */
+
 #ifndef _STDLIB_H_
 #define _STDLIB_H_
 #include <machine/ansi.h>
@@ -105,11 +113,25 @@ void	 qsort __P((void *, size_t, size_t,
 	    int (*)(const void *, const void *)));
 int	 rand __P((void));
 void	*realloc __P((void *, size_t));
+void	*reallocarray __P((void *, size_t, size_t));
+#if !defined(_ANSI_SOURCE)
+int	 posix_memalign __P((void **, size_t, size_t));
+char	*mkdtemp __P((char *));
+#endif
 void	 srand __P((unsigned));
 double	 strtod __P((const char *, char **));
 long	 strtol __P((const char *, char **, int));
 unsigned long
 	 strtoul __P((const char *, char **, int));
+long long
+		 strtoll __P((const char *, char **, int));
+unsigned long long
+		 strtoull __P((const char *, char **, int));
+long long
+		 strtonum __P((const char *, long long, long long,
+		     const char **));
+long long
+		 atoll __P((const char *));
 int	 system __P((const char *));
 
 /* these are currently just stubs */

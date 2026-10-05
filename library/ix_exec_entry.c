@@ -22,6 +22,15 @@
  *  ix_exec_entry.c,v
  * Revision 1.1.1.1  1994/04/04  04:30:55  amiga
  * Initial CVS check in.
+ * 
+ * Revision 1.4  2026/08/08  ChatGPT modifications (JJ)
+ *
+ *  Removed unconditional __ix_install_sigwinch() call from ix_exec_entry().
+ *  SIGWINCH handler installation is now performed lazily by kern_sig.c
+ *  when a process installs a real SIGWINCH signal handler.
+ *
+ *  Kept __ix_remove_sigwinch() during cleanup. The removal routine is
+ *  idempotent and safely handles the case where no handler was installed.
  *
  *  Revision 1.3  1992/08/09  20:47:19  amiga
  *  call main thru exit, or no atexit handlers will be called!
@@ -89,8 +98,6 @@ ix_exec_entry (int argc, char **argv, char **environ, int *real_errno,
          in the calling program. However, this setting guarantees that 
          the user area entry is valid for getenv() calls. */
       u.u_environ = &environ;
-
-      __ix_install_sigwinch ();
 
       /* If this process is traced (under debugger control)
 	 then cause a sigtrap.  */

@@ -1,6 +1,6 @@
 /*	$NetBSD: unistd.h,v 1.25 1995/03/19 22:51:38 mycroft Exp $	*/
 
-/*-
+/*
  * Copyright (c) 1991 The Regents of the University of California.
  * All rights reserved.
  *
@@ -33,6 +33,21 @@
  * SUCH DAMAGE.
  *
  *	@(#)unistd.h	5.13 (Berkeley) 6/17/91
+ */
+
+/*
+ * Revision 1.4  2026/06/08  Copilot/ChatGPT modification  (JJ)
+ * Align link prototype with POSIX const-correct signature.
+ * link() now takes const char * arguments, matching its implementation
+ * and the internal const-correct path chain through __lock(),
+ * __make_link(), and __plock().
+ * No behavioural change; ABI/calling convention is unchanged on m68k.
+ *
+ * Revision 1.3  2026/04/26  Copilot modification  (JJ)
+ * Align sethostname prototype with POSIX and misc.c implementation.
+ * The second argument is now size_t instead of int, matching modern
+ * BSD/Linux semantics and avoiding conflicting types during build.
+ * No behavioural changes; ABI remains unchanged on m68k.
  */
 
 #ifndef _UNISTD_H_
@@ -80,6 +95,11 @@ pid_t	 getpid __P((void));
 pid_t	 getppid __P((void));
 uid_t	 getuid __P((void));
 int	 isatty __P((int));
+
+/* POSIX timers are declared in <time.h> when enabled */
+#ifdef IXEMUL_POSIX_TIMERS
+#include <time.h>
+#endif
 int	 link __P((const char *, const char *));
 off_t	 lseek __P((int, off_t, int));
 long	 pathconf __P((const char *, int));	/* not yet */
@@ -98,6 +118,8 @@ int	 tcsetpgrp __P((int, pid_t));
 char	*ttyname __P((int));
 int	 unlink __P((const char *));
 ssize_t	 write __P((int, const void *, size_t));
+
+/* off_t	 lseekw __P((int, off_t, int)); */
 
 #ifndef	_POSIX_SOURCE
 
@@ -134,11 +156,6 @@ char	*mktemp __P((char *));
 int	 nfssvc __P((int, void *));
 int	 nice __P((int));
 void	 psignal __P((unsigned int, const char *));
-#ifdef _KERNEL
-extern char *sys_siglist[];
-#else
-extern const char *const sys_siglist[];
-#endif
 int	 profil __P((char *, int, int, int));
 int	 rcmd __P((char **, int, const char *,
 		const char *, const char *, int *));
@@ -156,7 +173,7 @@ int	 setegid __P((gid_t));
 int	 seteuid __P((uid_t));
 int	 setgroups __P((int, const int *));
 void	 sethostid __P((long));
-int	 sethostname __P((const char *, int));
+int sethostname __P((const char *, size_t));
 int	 setkey __P((const char *));
 int	 setlogin __P((const char *));
 void	*setmode __P((const char *));

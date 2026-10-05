@@ -18,6 +18,49 @@
  *
  */
 
+/*
+ * execve.c,v
+ *
+ * Revision 1.3  2026/08/10  ChatGPT modifications (JJ)
+ *
+ *   Clear the child-side p_vfork_msg pointer before ReplyMsg() resumes
+ *   the parent, so the parent cannot free the vfork message while the
+ *   child still retains a dangling pointer to it.
+ *
+ * Revision 1.2  2026/06/21  ChatGPT modifications (JJ)
+ *
+ * Hardened execve() handling of loader-supplied extra_args.
+ * - Count the number of \001-separated extra_args elements before
+ *   building the replacement argv vector.
+ * - Preserve the original size + 4 argv allocation in the normal case,
+ *   but allocate enough pointer slots when extra_args contains more
+ *   elements than the original slack allowed.
+ * - Check argv slot calculations and allocation size for overflow.
+ * - Check SYS_malloc() failure before using the replacement argv vector.
+ * - On allocation failure, release the loaded segment, restore the
+ *   original signal mask, set errno to ENOMEM, and return -1.
+ *
+ * - Use sizeof(char *) instead of a hard-coded pointer size in dupvec().
+ * - Mark intentionally unused getuser() results to silence warnings
+ *   without changing evaluation.
+ * - Add an explicit struct Task * cast in safe_getuser()'s task
+ *   comparison.
+ * - Use size_t for quote()'s strlen() result and guard against overflow
+ *   before allocating the quoted argument buffer.
+ * 
+ * Hardened compatible_startup() command-line buffer growth.
+ *  - Use size_t when calculating the quoted argument length.
+ *  - Check argument-length calculations for overflow before growing the
+ *    BCPL command-line buffer.
+ *  - Grow the command-line buffer repeatedly until the current argument
+ *    fits, instead of assuming that one doubling is always enough.
+ *  - Detect buffer-growth failure before copying the argument.
+ *  - Free a temporary quoted argument if buffer growth fails.
+ * 
+ * No intentional change to normal execve(), vfork(), RunCommand(), or
+ * argument parsing semantics.
+ */
+
 #define _KERNEL
 #include <string.h>
 #include "ixemul.h"
@@ -26,6 +69,8 @@
 #include <ctype.h>
 #include <sys/wait.h>
 #include <stdio.h>
+#include <errno.h>
+#include <limits.h>
 
 #include <sys/exec.h>
 
@@ -62,6 +107,7 @@ execve (const char *path, char * const *argv, char * const *environ)
   char *extra_args = 0;
   struct Process *me = (struct Process *) FindTask (0);
   struct user *u_ptr = getuser(me);
+  (void)u_ptr;
 
   KPRINTF (("execve (%s,...)\n", path));
   KPRINTF_ARGV ("argv", argv);
@@ -87,10 +133,65 @@ execve (const char *path, char * const *argv, char * const *environ)
 	{
 	  char **ap;
           char **nargv;
+          char *xp;
           int size;
+          size_t extra_argc;
+          size_t nslots;
 
           for (size = 0, ap = (char **)argv; *ap; size++, ap++) ;
-          nargv = (char **) syscall(SYS_malloc, (size + 4) * sizeof(char *));
+
+          /*
+           * Keep the original size + 4 allocation as the normal case,
+           * but grow it if extra_args contains more \001-separated
+           * elements than the original slack can hold.
+           */
+          extra_argc = 1;
+          for (xp = extra_args; *xp; xp++)
+            if (*xp == '\001')
+              extra_argc++;
+
+          if ((size_t)size > (size_t)-1 - 4)
+            {
+              __free_seg (segs);
+              err = ENOMEM;
+              syscall (SYS_sigsetmask, omask);
+              errno = err;
+              return -1;
+            }
+
+          nslots = (size_t)size + 4;
+          if (extra_argc > 4)
+            {
+              if ((size_t)size > (size_t)-1 - extra_argc)
+                {
+                  __free_seg (segs);
+                  err = ENOMEM;
+                  syscall (SYS_sigsetmask, omask);
+                  errno = err;
+                  return -1;
+                }
+              nslots = (size_t)size + extra_argc;
+            }
+
+          if (nslots > (size_t)-1 / sizeof(char *))
+            {
+              __free_seg (segs);
+              err = ENOMEM;
+              syscall (SYS_sigsetmask, omask);
+              errno = err;
+              return -1;
+            }
+
+          nargv = (char **) syscall(SYS_malloc, nslots * sizeof(char *));
+          if (! nargv)
+            {
+              __free_seg (segs);
+              err = ENOMEM;
+              syscall (SYS_sigsetmask, omask);
+              errno = err;
+              return -1;
+            }
+
           ap = nargv;
           argv++;				/* discard the program name */
           *ap = extra_args;			/* new program name */
@@ -155,7 +256,7 @@ dupvec (char **vec)
   /* contrary to `real' vfork(), malloc() works in the child on its own
      data, that is it won't clobber anything in the parent  */
   
-  res = (char **) syscall (SYS_malloc, (n + 1) * 4);
+  res = (char **) syscall (SYS_malloc, (n + 1) * sizeof(char *));
   if (res)
     {
       for (vp = res; n-- > 0; vp++, vec++)
@@ -316,9 +417,15 @@ on_real_stack (BPTR *segs, char **argv, char **environ, int omask)
   KPRINTF (("execve() having parent resume\n"));
   if (u.p_vfork_msg)
     {
-      /* make the parent runable again */
-      ReplyMsg ((struct Message *) u.p_vfork_msg);
+      struct vfork_msg *vm = u.p_vfork_msg;
+
+      /*
+       * ReplyMsg() makes the parent runnable immediately. The parent may
+       * then free the vfork message, so clear the child-side pointer before
+       * publishing the reply and never dereference vm afterwards.
+       */
       u.p_vfork_msg = 0;
+      ReplyMsg ((struct Message *) vm);
     }
 
   KPRINTF (("execve() calling entry()\n"));
@@ -390,7 +497,7 @@ struct user *safe_getuser(struct Process *task)
   for (node = ixemulbase->ix_detached_processes.head; node; node = node->next)
     {
       struct user *p = (struct user *)((char *)node - offsetof(struct user, u_detached_node));
-      if (p->u_task == task)
+      if (p->u_task == (struct Task *)task)
 	{
 	  u_ptr = p;
 	  break;
@@ -420,6 +527,7 @@ compatible_startup (void *code, int argc, char **argv)
   u_int oldsigalloc;
   struct Process *me = (struct Process *)FindTask(0);
   struct user *u_ptr = getuser(me);
+  (void)u_ptr;
   
   KPRINTF (("entered compatible_startup()\n"));
   KPRINTF (("argc = %ld\n", argc));
@@ -443,21 +551,62 @@ compatible_startup (void *code, int argc, char **argv)
 
       for (cp = al; *argv; )
         {
-	  char *newel = quote (*argv);
-          int elsize = strlen (newel ? newel : *argv) + 2;
-	  KPRINTF (("arg [%s] quoted as [%s]\n", *argv, newel ? newel : *argv));
+	  char *newel;
+	  char *arg;
+          size_t elsize;
+          size_t used;
+          int grow_failed;
+
+	  newel = quote (*argv);
+	  arg = newel ? newel : *argv;
+          elsize = strlen (arg);
+	  KPRINTF (("arg [%s] quoted as [%s]\n", *argv, arg));
+
+          if (elsize > (size_t)-3)
+            {
+              if (newel)
+                kfree (newel);
+              break;
+            }
+          elsize += 2;
+
+          used = (size_t)(cp - al);
+          if (elsize > (size_t)-1 - used)
+            {
+              if (newel)
+                kfree (newel);
+              break;
+            }
           
-          if (cp + elsize >= al + max)
+          grow_failed = 0;
+          while (used + elsize >= (size_t)max)
             {
 	      char *nal;
+
+              if (max > INT_MAX / 2)
+                {
+                  grow_failed = 1;
+                  break;
+                }
               max <<= 1;
               nal = (char *) krealloc (al, max);
-              if (! nal) break;
-              cp = nal + (cp-al);
+              if (! nal)
+                {
+                  grow_failed = 1;
+                  break;
+                }
+              cp = nal + used;
               al = nal;
 	    }
 
-	  strcpy (cp, newel ? newel : *argv);
+          if (grow_failed)
+            {
+              if (newel)
+                kfree (newel);
+              break;
+            }
+
+	  strcpy (cp, arg);
 	  cp += elsize - 2;
 	  *cp++ = ' ';
 	  *cp = 0;
@@ -683,7 +832,7 @@ readargs_kludge (BPTR bp)
 static char *
 quote (char *orig)
 {
-  int i;
+  size_t i;
   char *new, *cp;
   
   i = strlen (orig);
@@ -691,6 +840,9 @@ quote (char *orig)
   if (strpbrk (orig, "\"\'\\ \t\n"))
     {
       /* worst case, each character needs quoting plus starting and ending " */
+      if (i > ((size_t)-3) / 2)
+        return 0;
+
       new = (char *) kmalloc (i * 2 + 3);
       if (! new) return 0;
 
@@ -710,4 +862,3 @@ quote (char *orig)
   else
     return 0;	/* means `just use the original string' */
 }   
-

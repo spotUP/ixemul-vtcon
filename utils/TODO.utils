@@ -1,0 +1,38 @@
+TODO -- ixemul utils
+====================
+
+Medium priority
+---------------
+
+* ixstack.c
+
+  Include a stack marker beginning exactly 12 bytes before the end of a
+  file by changing the scan boundary from `i < len - 12` to
+  `i <= len - 12`.
+
+  Check the results of lseek() and the four-byte write used to update
+  the requested stack size, and report seek errors, short writes and
+  write errors.
+
+* ixrun.c
+
+  Return zero explicitly when the verbose/debug path prints the generated
+  command without calling Execute().
+
+Verification
+------------
+
+* Build all utilities with GCC 2.95.3 using the normal ixemul m68k build
+  options, while retaining C89-compatible declaration placement.
+
+* Run ixtrace with the last valid syscall number, exactly one past the
+  table, and with trace lines that exactly fill or exceed the output
+  buffer.
+
+* Test localtime(), localtime_r(), gmtime_r(), ctime_r() and mktime()
+  with representative valid TZif files and leap-second values.
+
+* Test ixstack with markers at the beginning, middle and final valid
+  offset of a file, and verify error handling on read-only files.
+
+* Test ixrun with /volume/path input in both execute and verbose modes.

@@ -19,6 +19,18 @@
  *  stat.c,v 1.1.1.1 1994/04/04 04:30:35 amiga Exp
  *
  *  stat.c,v
+ * 
+ * Revision 1.3  2026/06/15  ChatGPT modifications (JJ)
+ *
+ * Small correctness and cleanup fixes in stat.c.
+ *
+ * - Preserve IoErr() when Examine() fails after a successful lock.
+ * - Allocate and clear InfoData only for regular files that may call Info().
+ * - Avoid repeated basename() calls in filenamecmp().
+ *
+ * No change to stat()/lstat() semantics, lock selection, symlink fallback,
+ * UNIX-name handling or reported file metadata on successful calls.
+ *
  * Revision 1.1.1.1  1994/04/04  04:30:35  amiga
  * Initial CVS check in.
  *
@@ -36,6 +48,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "multiuser.h"
+#include "unp.h"
+
 
 /* currently, links are quite buggy.. hope this get cleaned up RSN ;-) */
 
@@ -224,11 +238,9 @@ error:
   fib = LONG_ALIGN (fib);
   fib->fib_OwnerUID = fib->fib_OwnerGID = 0;
 
-  info = alloca (sizeof(*info) + 2);
-  info = LONG_ALIGN (info);
-
   if (!(Examine (lock, fib)))
     {
+      err = IoErr ();
       __unlock (lock);
       goto error;
     }
@@ -255,20 +267,26 @@ error:
    * the fileheader. Note, that this is wrong for large files, where there
    * are some extension-blocks as well */
   stb->st_blocks = fib->fib_NumBlocks + 1;
-  
-  bzero (info, sizeof (*info));
+
   stb->st_blksize = 0;
-  if (S_ISREG(stb->st_mode) && Info(lock, (void *)info))
+  if (S_ISREG(stb->st_mode))
     {
       int bytesperblock = 0;
 
-      /* optimal for fileio is as high as possible ;-) This is a
-       * compromise between "as high as possible" and not too restricitve
-       * for people low on memory */
-      if (info->id_BytesPerBlock)
-        bytesperblock = info->id_BytesPerBlock;
-      stb->st_blksize = bytesperblock * ix.ix_fs_buf_factor;
-      stb->st_blocks = (stb->st_blocks * bytesperblock) / 512;
+      info = alloca (sizeof(*info) + 2);
+      info = LONG_ALIGN (info);
+      bzero (info, sizeof (*info));
+
+      if (Info(lock, (void *)info))
+        {
+          /* optimal for fileio is as high as possible ;-) This is a
+           * compromise between "as high as possible" and not too restricitve
+           * for people low on memory */
+          if (info->id_BytesPerBlock)
+            bytesperblock = info->id_BytesPerBlock;
+          stb->st_blksize = bytesperblock * ix.ix_fs_buf_factor;
+          stb->st_blocks = (stb->st_blocks * bytesperblock) / 512;
+        }
     }
 
   if (! stb->st_blksize) stb->st_blksize = 512;
@@ -307,6 +325,7 @@ filenamecmp(const char *fname)
   BPTR lock;
   struct FileInfoBlock *fib;
   int omask, result = 0;
+  char *base;
 
   omask = syscall (SYS_sigsetmask, ~0);
 
@@ -333,8 +352,12 @@ filenamecmp(const char *fname)
    */
    
   if (Examine (lock, fib))
-    result = strcmp(basename((char *)fname), fib->fib_FileName) &&
-	     !stricmp(basename((char *)fname), fib->fib_FileName);
+    {
+      base = basename((char *)fname);
+      result = strcmp(base, fib->fib_FileName) &&
+	       !stricmp(base, fib->fib_FileName);
+    }
+
   __unlock (lock);
   syscall (SYS_sigsetmask, omask);
   return result;

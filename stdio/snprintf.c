@@ -36,6 +36,14 @@
  * SUCH DAMAGE.
  */
 
+/*
+ *  Revision 1.5  2026/06/07  JJ
+ *  - Let vsnprintf() handle n == 0.  The previous code returned EOF
+ *    before formatting, bypassing the zero-sized __SSTR FILE path
+ *    used to count formatted output without writing.
+ *    snprintf() is now a thin wrapper around vsnprintf().
+ */
+
 #if defined(LIBC_SCCS) && !defined(lint)
 #if 0
 static char sccsid[] = "@(#)snprintf.c	8.1 (Berkeley) 6/4/93";
@@ -66,20 +74,13 @@ snprintf(str, n, fmt, va_alist)
 {
 	int ret;
 	va_list ap;
-	FILE f;
 
-	if ((int)n < 1)
-		return (EOF);
 #if __STDC__
 	va_start(ap, fmt);
 #else
 	va_start(ap);
 #endif
-	f._flags = __SWR | __SSTR;
-	f._bf._base = f._p = (unsigned char *)str;
-	f._bf._size = f._w = n - 1;
-	ret = vfprintf(&f, fmt, ap);
-	*f._p = 0;
+	ret = vsnprintf(str, n, fmt, ap);
 	va_end(ap);
 	return (ret);
 }

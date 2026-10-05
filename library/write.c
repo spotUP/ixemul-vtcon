@@ -16,6 +16,18 @@
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
+ * Revision 1.3  2026/08/05  ChatGPT modifications (JJ)
+ *
+ *  Preserve FSDF_UTIME when the lower-level write operation fails.
+ *  Only a successful write of at least one byte proves that the
+ *  filesystem has performed its normal timestamp update.
+ *
+ * Revision 1.2  2026/06/13  ChatGPT modifications  (JJ)
+ *
+ *  Handle zero-length writes in write() after validating the descriptor
+ *  and write handler, avoiding an unnecessary lower-level write call
+ *  while preserving existing error semantics.
+ *
  *  write.c,v 1.1.1.1 1994/04/04 04:30:38 amiga Exp
  *
  *  write.c,v
@@ -43,10 +55,17 @@ write (int fd, char *buf, int len)
 
   if (f->f_write == NULL)
     errno_return(EIO, -1);
-  
+
+  /*
+   * A zero-length write succeeds, but only after the descriptor
+   * and write operation have been validated.
+   */
+  if (len == 0)
+    return 0;
+
   result = (*f->f_write)(f, buf, len);
 
-  if (result)
+  if (result > 0)
     f->f_stb_dirty &= ~FSDF_UTIME;
 
   return result;

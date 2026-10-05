@@ -31,6 +31,19 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * strtok.c,v
+ *
+ * Revision 1.1  2026/08/11  ChatGPT modifications (JJ)
+ *
+ *    Replace the repeated delimiter rescans with direct fast paths for
+ *    empty and one- through four-character delimiter sets.  For larger
+ *    sets, build one compact 256-bit membership table per strtok() call
+ *    and reuse it for both leading-delimiter skipping and token scanning.
+ *    Preserve ixemul per-process continuation state and standard strtok()
+ *    tokenization semantics.
+ */
+
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)strtok.c	5.8 (Berkeley) 2/24/91";
 #endif /* LIBC_SCCS and not lint */
@@ -49,48 +62,177 @@ strtok(s, delim)
 	register char *s;
 	register const char *delim;
 {
-        usetup;
-	register char *spanp;
-	register int c, sc;
+	usetup;
+	register unsigned char *p;
+	register unsigned char c;
+	unsigned char d0, d1, d2, d3;
+	unsigned char map[32];
+	static const unsigned char bitmask[8] = {
+		0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
+	};
+	register int i;
 	char *tok;
-
 
 	if (s == NULL && (s = last) == NULL)
 		return (NULL);
 
+	p = (unsigned char *)s;
+	d0 = (unsigned char)delim[0];
+
 	/*
-	 * Skip (span) leading delimiters (s += strspn(s, delim), sort of).
+	 * Empty delimiter string: the complete remainder is one token.
 	 */
-cont:
-	c = *s++;
-	for (spanp = (char *)delim; (sc = *spanp++) != 0;) {
-		if (c == sc)
-			goto cont;
+	if (d0 == 0) {
+		if (*p == 0) {
+			last = NULL;
+			return (NULL);
+		}
+		tok = (char *)p;
+		while (*p != 0)
+			p++;
+		last = NULL;
+		return (tok);
 	}
 
-	if (c == 0) {		/* no non-delimiter characters */
+	/*
+	 * One-character delimiter set.
+	 */
+	d1 = (unsigned char)delim[1];
+	if (d1 == 0) {
+		while (*p == d0)
+			p++;
+
+		if (*p == 0) {
+			last = NULL;
+			return (NULL);
+		}
+
+		tok = (char *)p;
+		while ((c = *p) != 0 && c != d0)
+			p++;
+
+		if (c == 0)
+			last = NULL;
+		else {
+			*p++ = 0;
+			last = (char *)p;
+		}
+		return (tok);
+	}
+
+	/*
+	 * Two-character delimiter set.
+	 */
+	d2 = (unsigned char)delim[2];
+	if (d2 == 0) {
+		while ((c = *p) != 0 && (c == d0 || c == d1))
+			p++;
+
+		if (c == 0) {
+			last = NULL;
+			return (NULL);
+		}
+
+		tok = (char *)p;
+		while ((c = *p) != 0 && c != d0 && c != d1)
+			p++;
+
+		if (c == 0)
+			last = NULL;
+		else {
+			*p++ = 0;
+			last = (char *)p;
+		}
+		return (tok);
+	}
+
+	/*
+	 * Three-character delimiter set.
+	 */
+	d3 = (unsigned char)delim[3];
+	if (d3 == 0) {
+		while ((c = *p) != 0 &&
+		    (c == d0 || c == d1 || c == d2))
+			p++;
+
+		if (c == 0) {
+			last = NULL;
+			return (NULL);
+		}
+
+		tok = (char *)p;
+		while ((c = *p) != 0 &&
+		    c != d0 && c != d1 && c != d2)
+			p++;
+
+		if (c == 0)
+			last = NULL;
+		else {
+			*p++ = 0;
+			last = (char *)p;
+		}
+		return (tok);
+	}
+
+	/*
+	 * Four-character delimiter set.
+	 */
+	if ((unsigned char)delim[4] == 0) {
+		while ((c = *p) != 0 &&
+		    (c == d0 || c == d1 || c == d2 || c == d3))
+			p++;
+
+		if (c == 0) {
+			last = NULL;
+			return (NULL);
+		}
+
+		tok = (char *)p;
+		while ((c = *p) != 0 &&
+		    c != d0 && c != d1 && c != d2 && c != d3)
+			p++;
+
+		if (c == 0)
+			last = NULL;
+		else {
+			*p++ = 0;
+			last = (char *)p;
+		}
+		return (tok);
+	}
+
+	/*
+	 * Larger delimiter sets: build one membership table and reuse it
+	 * for both phases of this strtok() call.
+	 */
+	for (i = 0; i < 32; i++)
+		map[i] = 0;
+
+	p = (unsigned char *)delim;
+	while ((c = *p++) != 0)
+		map[c >> 3] |= bitmask[c & 7];
+
+	p = (unsigned char *)s;
+	while ((c = *p) != 0 &&
+	    (map[c >> 3] & bitmask[c & 7]) != 0)
+		p++;
+
+	if (c == 0) {
 		last = NULL;
 		return (NULL);
 	}
-	tok = s - 1;
 
-	/*
-	 * Scan token (scan for delimiters: s += strcspn(s, delim), sort of).
-	 * Note that delim must have one NUL; we stop if we see that, too.
-	 */
-	for (;;) {
-		c = *s++;
-		spanp = (char *)delim;
-		do {
-			if ((sc = *spanp++) == c) {
-				if (c == 0)
-					s = NULL;
-				else
-					s[-1] = 0;
-				last = s;
-				return (tok);
-			}
-		} while (sc != 0);
+	tok = (char *)p;
+	while ((c = *p) != 0 &&
+	    (map[c >> 3] & bitmask[c & 7]) == 0)
+		p++;
+
+	if (c == 0)
+		last = NULL;
+	else {
+		*p++ = 0;
+		last = (char *)p;
 	}
-	/* NOTREACHED */
+
+	return (tok);
 }

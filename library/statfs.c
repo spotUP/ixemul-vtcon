@@ -30,6 +30,20 @@
  *
  */
 
+/*
+ * Revision 1.3  2026/06/22  ChatGPT modifications (JJ)
+ *
+ * Minimal safety fixes for getfsstat() and fstatfs().
+ *
+ * - Treat a negative getfsstat() buffer size as an empty buffer to avoid
+ *   signed/unsigned comparison problems against sizeof().
+ * - Validate the file descriptor range in fstatfs() before indexing
+ *   u.u_ofile[].
+ *
+ * Normal statfs(), fstatfs() and getfsstat() semantics unchanged.
+ */
+
+
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
@@ -158,6 +172,9 @@ getfsstat (struct statfs *buf, long bufsize, int flags)
   struct InfoData *info;
   struct StandardPacket *sp;
 
+  if (bufsize < 0)
+    bufsize = 0;
+
   /* could probably use less drastic measures under 2.0... */
   Forbid ();
   dl = DOSBase;
@@ -213,7 +230,7 @@ int
 fstatfs (int fd, struct statfs *buf)
 {
   usetup;
-  struct file *f = u.u_ofile[fd];
+  struct file *f;
   struct DosLibrary *dl;
   struct RootNode *rn;
   struct DosInfo *di;
@@ -222,6 +239,8 @@ fstatfs (int fd, struct statfs *buf)
   struct InfoData *info;
   struct StandardPacket *sp;
 
+  if ((unsigned)fd < NOFILE)
+    f = u.u_ofile[fd];
   if ((unsigned)fd < NOFILE && f)
     {
       if (! buf)

@@ -1,3 +1,70 @@
+2026-09-25  Jörgen Johansson
+
+	Documented the remaining rare SIGWINCH/input.device teardown freeze
+	in BUGS.
+
+	Added TODO notes for further investigation of
+	__ix_remove_sigwinch(), handler lifetime, process-exit ordering and
+	possible teardown hardening.
+	
+	Added BUGS_SIGWINCH document.
+
+2026-09-24  Jörgen Johansson
+
+	* Corrected missing, truncated, anonymous or incorrectly attributed
+	copyright and licence notices introduced during automated source-header
+	updates, restoring the original upstream provenance where applicable.
+
+	Affected files: __close.c, __fselect.c, __read.c, __tioctl.c,
+	__write.c, close.c, nanosleep.c, sysv_sem.c, fls.c, strlcat.c,
+	memmem.c, memmove.c, mempcpy.c, strnlen.c, strndup.c, getaddrinfo.c,
+	getnameinfo.c, strlcpy.c, stpcpy.c, swab.c, posix_memalign.c,
+	buddy-alloc.c, explicit_bzero.c, clock_getres.c, clock_gettime.c,
+	clock_nanosleep.c, poll.c, bcmp.c, strcmp.c, strncmp.c, basename.c,
+	basename_b.c, dirname.c, realpath.c, strtoull.c, strtoll.c, atoll.c,
+	getdelim.c and getline.c
+
+2026-09-23  Jörgen Johansson
+
+	* explicit_bzero.c: Clarified the documentation explaining why
+	explicit_bzero() must remain an out-of-line function.
+
+	* bcopy.c: Corrected the revision history by adding the missing
+	revision 1.1 entry for the CPU-specific implementations and
+	renumbering the later count-guard update from 1.1.1.2 to 1.2.
+
+	* library/lseekw.c, library/start.S, include/unistd.h: Completed the
+	removal of the obsolete lseekw() compatibility wrapper by removing
+	its implementation, library vector and public declaration.
+
+	* BUGS: Removed the AF_UNIX datagram, connection-timeout and
+	socket-option entries. These describe planned implementation work
+	already covered by TODO, rather than bugs without an obvious
+	solution.
+
+2026-09-21  Jörgen Johansson
+
+	* (library/unvis.c): reject incomplete escape sequences at end of input
+	in strunvis() and strnunvis() instead of silently accepting them.
+	
+	* select.c: Corrected the revision history by removing the incorrect
+	statement that revision 1.15 introduced a 68000/68010 inline-assembly
+	scanner.
+
+2026-09-13  Jörgen Johansson
+
+    ixemul.library development for version 80.
+
+	Major work includes new libc/POSIX/BSD interfaces, AF_UNIX stream
+	sockets, poll(), clock interfaces, allocator improvements, extensive
+	TTY/PTY work, descriptor and close lifetime fixes, select() rework,
+	string/memory optimizations, stdio correctness fixes, filesystem and
+	pathname fixes, socket hardening and numerous m68k-specific
+	correctness and performance improvements.
+
+	Detailed changes, dates and implementation notes are recorded in the
+	revision comments of the individual source files.
+
 2001-04-05  David Zaroski  <dez@gg.geekgadgets.org>
 
 	* (version.in): bumped version from 48.1 to 48.2 and updated

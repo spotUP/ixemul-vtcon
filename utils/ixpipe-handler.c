@@ -1,3 +1,16 @@
+/*
+ * Revision 1.1  2026/07/02  ChatGPT modifications (JJ)
+ * ixpipe-handler cleanup and hardening:
+ *  - Check both ACTION_SEEK lseek() calls and translate failures through
+ *    __errno_to_ioerr(); ESPIPE is mapped to ERROR_SEEK_ERROR.
+ *  - Bound ACTION_EXAMINE_FH fib_FileName generation to the available
+ *    FileInfoBlock name storage.
+ *  - Harden signal recovery so longjmp() paths do not dereference a NULL
+ *    or already-returned DosPacket.
+ *  - Keep handler startup, dn_Task handoff, ACTION_END lifetime,
+ *    SIGPIPE behaviour, and ix_exec_entry() structure unchanged.
+ */
+
 #include <exec/types.h>
 #include <exec/lists.h>
 #include <exec/ports.h>
@@ -180,18 +193,26 @@ handler_mainloop (struct DeviceNode *dev_node, struct Process *me, int *errno)
       if ((i = setjmp (jmpbuf)))
         {
 	  dprintf ("ixp-$%lx: SIGNAL %ld\n", me, i);
+
+	  if (!dp)
+	    continue;
+
 	  if (dp->dp_Type == ACTION_WRITE && i == SIGPIPE)
 	    {
 	      Signal (dp->dp_Port->mp_SigTask, SIGBREAKF_CTRL_C);
 	      returnpkt (dp, me, -1, 0); /* return EOF */
+	      dp = NULL;
 	      continue;
 	    }
 	 
 
 	  /* should look like `SIG' plus number ;-) */
 	  returnpkt (dp, me, DOS_FALSE, 516000 + i);
+	  dp = NULL;
 	  continue;
 	}
+
+      dp = NULL;
 
       dprintf ("ixp-$%lx: Waiting for packet...\n", me);
       while (!(dp = taskwait (me))) ;
@@ -207,7 +228,7 @@ handler_mainloop (struct DeviceNode *dev_node, struct Process *me, int *errno)
 	       ordinary Open() call to fail! The semantics are, that you
                pass a hex string describing the id as name. */
             int fd;
-            char name[255];	/* a BSTR can't address more ;-) */
+            char name[256];	/* a BSTR can't address more ;-) */
 	    u_char *cp;
             unsigned int id;
             struct FileHandle *fh;
@@ -242,6 +263,7 @@ handler_mainloop (struct DeviceNode *dev_node, struct Process *me, int *errno)
 			   handler is inside a read/write wait */
 		        dev_node->dn_Task = 0;
 		        returnpkt (dp, me, DOS_TRUE, 0);
+		        dp = NULL;
 		        break;
 		      }
 		  }
@@ -249,6 +271,7 @@ handler_mainloop (struct DeviceNode *dev_node, struct Process *me, int *errno)
 	    dprintf ("ixp-$%lx: open failed somehow.. \n", me);
 	    /* default is to return object-not-found.. */
 	    returnpkt (dp, me, DOS_FALSE, ERROR_OBJECT_NOT_FOUND);
+	    dp = NULL;
 	    break;
 	  }
 
@@ -264,6 +287,7 @@ handler_mainloop (struct DeviceNode *dev_node, struct Process *me, int *errno)
 	  else
 	    dp->dp_Res2 = 0;
 	  returnpktplain (dp, me);
+	  dp = NULL;
 	  break;
 
 	case ACTION_WRITE:
@@ -274,21 +298,41 @@ handler_mainloop (struct DeviceNode *dev_node, struct Process *me, int *errno)
 	  else
 	    dp->dp_Res2 = 0;
 	  returnpktplain (dp, me);
+	  dp = NULL;
 	  break;
 
 	case ACTION_SEEK:
-	  dprintf ("ixp-$%lx: lseek (%ld, %ld, %ld)\n", me, dp->dp_Arg1, (char *) dp->dp_Arg2, dp->dp_Arg3);
+	  dprintf ("ixp-$%lx: lseek (%ld, %ld, %ld)\n",
+         me, dp->dp_Arg1, dp->dp_Arg2, dp->dp_Arg3);
 	  /* we have to return the previous offset, contrary to Unix which
 	     returns the offset after seek operation */
-	  dp->dp_Res1 = lseek (dp->dp_Arg1, 0, SEEK_CUR);
-	  if (dp->dp_Res1 >= 0)
-	    {
-	      lseek (dp->dp_Arg1, dp->dp_Arg2, dp->dp_Arg3 + 1);
-	      dp->dp_Res2 = 0;
-	    }
-	  else
-	    dp->dp_Res2 = __errno_to_ioerr (*errno);
+	  {
+	    long oldpos;
+	    long newpos;
+
+	    oldpos = lseek (dp->dp_Arg1, 0, SEEK_CUR);
+	    if (oldpos >= 0)
+	      {
+		newpos = lseek (dp->dp_Arg1, dp->dp_Arg2, dp->dp_Arg3 + 1);
+		if (newpos >= 0)
+		  {
+		    dp->dp_Res1 = oldpos;
+		    dp->dp_Res2 = 0;
+		  }
+		else
+		  {
+		    dp->dp_Res1 = -1;
+		    dp->dp_Res2 = __errno_to_ioerr (*errno);
+		  }
+	      }
+	    else
+	      {
+		dp->dp_Res1 = -1;
+		dp->dp_Res2 = __errno_to_ioerr (*errno);
+	      }
+	  }
 	  returnpktplain (dp, me);
+	  dp = NULL;
 	  break;
 
 	/* a little present for the growing number of >1.3 users out there */
@@ -305,8 +349,18 @@ handler_mainloop (struct DeviceNode *dev_node, struct Process *me, int *errno)
 	      {
 		fib->fib_DiskKey = stb.st_ino;
 		/* on the packet level, fib's contain the name as a BSTR */
-		strcpy (fib->fib_FileName + 1, "you won't be able to reopen me anyway");
-		fib->fib_FileName[0] = strlen (fib->fib_FileName + 1);
+		{
+		  const char *msg = "you won't be able to reopen me anyway";
+		  const size_t max_bstr = sizeof(fib->fib_FileName) - 1; /* BSTR: length + data */
+		  size_t len = strlen(msg);
+
+		  if (len > max_bstr)
+		    len = max_bstr;
+
+		  /* BSTR format: [len][data...] - no null terminator */
+		  fib->fib_FileName[0] = (UBYTE)len;
+		  memcpy(fib->fib_FileName + 1, msg, len);
+		}
 	        fib->fib_Protection = stb.st_amode; /* nice we kept it ;-)) */
 		fib->fib_Size = stb.st_size;
 		fib->fib_NumBlocks = stb.st_blocks;
@@ -336,6 +390,7 @@ handler_mainloop (struct DeviceNode *dev_node, struct Process *me, int *errno)
 		fib->fib_EntryType = fib->fib_DirEntryType;
 	      }
 	    returnpktplain (dp, me);
+	    dp = NULL;
 	    break;
 	  }
 
@@ -343,6 +398,7 @@ handler_mainloop (struct DeviceNode *dev_node, struct Process *me, int *errno)
 	  dprintf ("ixp-$%lx: close (%ld)\n", me, dp->dp_Arg1);
 	  close (dp->dp_Arg1);
 	  returnpkt (dp, me, DOS_TRUE, 0);
+	  dp = NULL;
 	  /* terminates the handler */
 	  Forbid ();
 	  return 0;
@@ -350,6 +406,7 @@ handler_mainloop (struct DeviceNode *dev_node, struct Process *me, int *errno)
 	default:
 	  dprintf ("ixp-$%lx: returning unknown packet %ld\n", me, dp->dp_Type);
 	  returnpkt (dp, me, DOS_FALSE, ERROR_ACTION_NOT_KNOWN);
+	  dp = NULL;
 	  break;
 	}
     }

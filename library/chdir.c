@@ -17,6 +17,28 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/* 1.3  2026/06/13  ChatGPT modifications  (JJ)
+ *      Fixed chroot() so the target directory is locked and resolved
+ *      before chdir(dir).  This avoids resolving a relative chroot path
+ *      again after the current directory has already changed.
+ *      Use S_ISDIR() when checking the stat mode in chdir(),
+ *      instead of testing S_IFDIR bits directly.
+ *      Added defensive errno fallbacks in chdir() error paths so
+ *      failures cannot return -1 with errno left as zero.
+ *      Bounded the copy into u.u_root_directory after successful chroot().
+ *
+ *  1.2  2026/06/07  Copilot modifications (JJ)
+ *      Added missing __unlock(newlock) in chdir() chroot-protection
+ *      error paths, and guarded __unlock(rootlock) in chroot() so
+ *      rootlock is only released when __lock(dir,ACCESS_READ) succeeds.
+ *
+ *  1.1  2026/05/31  Copilot modifications (JJ)
+ *      Updated chdir() and helpers with improved path handling and
+ *      directory resolution. Added per-process path buffer usage,
+ *      enhanced dirisparent() validity checks, early NULL/empty path
+ *      rejection, and consistent error/IoErr handling.
+ */
+
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
@@ -25,18 +47,30 @@
 
 void set_dir_name_from_lock(BPTR lock)
 {
-  char *buf = (char *) kmalloc (MAXPATHLEN);
+  char *buf;
+  usetup;
 
-  if (buf)
-    {
-      /* NOTE: This shortcuts any symlinks. But then, Unix does the
-       *       same, and a shell that wants to be smart about symlinks,
-       *       has to track chdir()s itself as well */
-      if (NameFromLock (lock, buf, MAXPATHLEN))
-        SetCurrentDirName (buf);
+  /* Prefer per-process path buffer if free, else fallback to kmalloc(). */
+  if (!u.u_path_buf_in_use) {
+    buf = u.u_path_buf;
+    u.u_path_buf_in_use = 1;
+  } else {
+    buf = (char *) kmalloc(MAXPATHLEN);
+  }
 
-      kfree (buf);
-    }
+  if (buf) {
+    /* NOTE: This shortcuts any symlinks. But then, Unix does the
+     *       same, and a shell that wants to be smart about symlinks
+     *       has to track chdir()s itself as well. */
+    if (NameFromLock(lock, buf, MAXPATHLEN))
+      SetCurrentDirName(buf);
+
+    /* Release buffer */
+    if (buf == u.u_path_buf)
+      u.u_path_buf_in_use = 0;
+    else
+      kfree(buf);
+  }
 }
 
 /*
@@ -55,7 +89,7 @@ dirisparent (char *name1, char *name2)
     if (lock1) {
 	BPTR lock2;
 
-	lock2 = Lock (name2, SHARED_LOCK);
+	lock2 = Lock(name2, SHARED_LOCK);
 	if (lock2) {
 	    switch (SameLock (lock1, lock2)) {
 
@@ -73,8 +107,9 @@ dirisparent (char *name1, char *name2)
 		    while (lock2) {
 			l = lock2;
 			lock2 = ParentDir (l);
-			UnLock (l);
-			if (SameLock (lock1, lock2) == LOCK_SAME) {
+			UnLock(l);
+			/* Avoid SameLock(NULL) */
+			if (lock2 && SameLock(lock1, lock2) == LOCK_SAME) {
 			    ret = 1;
 			    break;
 			}
@@ -82,7 +117,9 @@ dirisparent (char *name1, char *name2)
 		    break;
 		}
 	    }
-	    UnLock (lock2);
+	    /* Only unlock if still valid */
+	    if (lock2)
+	      UnLock(lock2);
 	}
 	UnLock (lock1);
     }
@@ -98,8 +135,16 @@ int chdir (char *path)
   BPTR oldlock, newlock;
   int error = 0;
   int omask;
+  int ioerr;
   struct stat stb;
   usetup;
+
+  /* Reject NULL or empty path */
+  if (!path || !*path) {
+    errno = ENOENT;
+    KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+    return -1;
+  }
 
   /* Sigh... CurrentDir() is a DOS-library function, it would probably be
    * ok to just use pr_CurrentDir, but alas, this way we're conformant to
@@ -110,7 +155,7 @@ int chdir (char *path)
   if (!strcmp("/",path) && *u.u_root_directory)
     path = u.u_root_directory;
 
-  if (syscall (SYS_stat, path, &stb) == 0 && !(stb.st_mode & S_IFDIR))
+  if (syscall (SYS_stat, path, &stb) == 0 && !S_ISDIR(stb.st_mode))
   {
     errno = ENOTDIR;
     KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
@@ -120,8 +165,9 @@ int chdir (char *path)
   omask = syscall (SYS_sigsetmask, ~0);
 
   newlock = __lock (path, ACCESS_READ);
+  ioerr = newlock ? 0 : IoErr();
 
-  if (newlock == NULL && IoErr() == 6262)
+  if (newlock == NULL && ioerr == 6262)
     {
       u.u_is_root = 1;
       SetCurrentDirName("/");
@@ -138,12 +184,16 @@ int chdir (char *path)
 
 	if (NameFromLock (newlock, dir, MAXPATHLEN)) {
 	  if (dirisparent(dir,u.u_root_directory) == 1) {
-	    errno = EACCES;
+	    error = EACCES;   /* set error, chdirerr will assign errno */
+	    __unlock (newlock);
 	    goto chdirerr;
 	  }
 	}
 	else {
-	  errno = __ioerr_to_errno (IoErr ());
+	  error = __ioerr_to_errno (IoErr ());
+	  if (!error)
+	    error = EIO;
+	  __unlock (newlock);
 	  goto chdirerr;
 	}
       }
@@ -161,7 +211,9 @@ int chdir (char *path)
       syscall (SYS_sigsetmask, omask);
       return 0;
     }
-  error = __ioerr_to_errno (IoErr ());
+  error = __ioerr_to_errno (ioerr);
+  if (!error)
+    error = ENOENT;
 
 chdirerr:
   syscall (SYS_sigsetmask, omask);
@@ -173,18 +225,53 @@ chdirerr:
 /* change the "root" directory to dir */
 int chroot(char *dir)
 {
-    int retval;
+    int retval, error;
+    int i;
+    BPTR rootlock;
+    char rootdir[MAXPATHLEN];
     usetup;
+
+    if (!dir || !*dir) {
+	errno = ENOENT;
+	KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+	return -1;
+    }
+
+    /*
+     * Resolve the new root before chdir(dir).  If dir is relative,
+     * resolving it after chdir() would look it up relative to the new
+     * current directory instead of the caller's original one.
+     */
+    rootlock = __lock(dir, ACCESS_READ);
+    if (!rootlock) {
+	error = __ioerr_to_errno(IoErr());
+	if (!error)
+	    error = ENOENT;
+	errno = error;
+	KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+	return -1;
+    }
+
+    if (!NameFromLock(rootlock, rootdir, MAXPATHLEN)) {
+	error = __ioerr_to_errno(IoErr());
+	if (!error)
+	    error = EIO;
+	__unlock(rootlock);
+	errno = error;
+	KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+	return -1;
+    }
+
+    __unlock(rootlock);
 
     retval = chdir(dir);
 
-    if (retval == 0) {
-	BPTR rootlock = __lock(dir,ACCESS_READ);
-	if (rootlock)
-	    NameFromLock(rootlock,u.u_root_directory,MAXPATHLEN);
-	else
-	    retval = -1;
-	__unlock(rootlock);
+    if (retval == 0)
+    {
+	for (i = 0; i < MAXPATHLEN - 1 && rootdir[i]; i++)
+	    u.u_root_directory[i] = rootdir[i];
+	u.u_root_directory[i] = '\0';
     }
+
     return retval;
 }

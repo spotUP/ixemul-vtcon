@@ -17,6 +17,18 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+/*
+ * Revision 1.1.1.1  2026/06/18  ChatGPT modifications (JJ)
+ *
+ * - Hardened calloc() against size_t multiplication overflow before
+ *   allocating and zeroing memory.
+ *
+ * - Added an overflow check for num * size before calling SYS_malloc.
+ * - Set errno to ENOMEM and return NULL when the requested allocation
+ *   size cannot be represented.
+ * - Keep cfree() behavior unchanged.
+ */
+
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)calloc.c	5.5 (Berkeley) 5/17/90";
 #endif /* LIBC_SCCS and not lint */
@@ -24,6 +36,7 @@ static char sccsid[] = "@(#)calloc.c	5.5 (Berkeley) 5/17/90";
 #define _KERNEL
 #include "ixemul.h"
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -31,10 +44,17 @@ void *
 calloc (size_t num, size_t size)
 {
 	register void *p;
+	size_t total;
+	usetup;
 
-	size *= num;
-	if ((p = (void *) syscall (SYS_malloc, size)))
-		bzero(p, size);
+	if (size != 0 && num > (size_t)-1 / size) {
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	total = num * size;
+	if ((p = (void *) syscall (SYS_malloc, total)))
+		bzero(p, total);
 	return(p);
 }
 

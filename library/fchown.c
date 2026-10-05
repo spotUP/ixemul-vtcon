@@ -19,6 +19,11 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+ /*
+ * Revision 1.2  2026/06/13  ChatGPT modifications (JJ)
+ *  Validate the file descriptor before indexing u.u_ofile[] in fchown().
+ */
+
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
@@ -28,10 +33,10 @@ int
 fchown(int fd, uid_t uid, gid_t gid)
 {
   usetup;
-  struct file *f = u.u_ofile[fd];
+  struct file *f;
   struct stat stb;
 
-  if (fd >= 0 && fd < NOFILE && f)
+  if (fd >= 0 && fd < NOFILE && (f = u.u_ofile[fd]))
     {
       if (syscall (SYS_fstat, fd, &stb) == -1) return -1;
       if (stb.st_mode & 0600)

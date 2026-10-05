@@ -17,6 +17,16 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+
+/*
+ * user.h,v
+ *
+ * Revision 1.1  2026/08/29  ChatGPT modifications (JJ)
+ *
+ *	Added per-process state support for asynchronous ACTION_WAIT_CHAR
+ *	requests used by the normal AmigaDOS filehandle select() backend.
+ */
+
 #ifndef _USER_H
 #define _USER_H
 
@@ -105,6 +115,12 @@ struct reg_parms {
   jmp_buf jb;
 };
 
+/* Internal exit notification; the complete definition is private to vfork.c. */
+struct death_msg;
+
+/* Per-process asynchronous file-select state; private to __fselect.c. */
+struct ix_fselect_state;
+
 struct vfork_msg {
   struct Message 	vm_msg;
   struct Process	*vm_self;	/* for validation purposes */
@@ -124,7 +140,7 @@ struct vfork_msg {
  */
 
 /* default size */
-#define A4_POINTERS 100
+#define A4_POINTERS 1000 /*Increased from 100 to 1000 library pointers*/
 
 /* NB: a list of pointers for shared libraries is allocated *before*
    the start of this struct! So the struct is actually larger, but
@@ -233,7 +249,20 @@ struct user {
 	struct session		*u_session;	/* session pointer */
 
 	char			*u_strtok_last;	/* moved with 37.8 */
-	
+
+	/* Per-process filename buffer for open() */
+#define U_OPEN_NAME_BUFSIZE 256
+	char  u_open_name_buf[U_OPEN_NAME_BUFSIZE];
+	char  u_open_name_in_use;
+
+	/*
+	 * Per-process scratch buffer for path/cwd operations.
+	 * Used by chdir()/chroot()/set_dir_name_from_lock() to avoid
+	 * repeated kmalloc()/kfree() and large stack buffers.
+	 */
+	char  u_path_buf[MAXPATHLEN];
+	char  u_path_buf_in_use;
+
 	/* vfork() support */
 	struct ixlist		p_zombies;	/* list of death messages */
 	int			p_zombie_sig;	/* signal to set when a child died */
@@ -261,6 +290,21 @@ struct user {
 	void			*u_save_sp;	/* when vfork'd, this is the `real' sp */
 	jmp_buf			u_vfork_frame;	/* for the parent in vfork () */
 	u_int			u_mini_stack[1000]; /* 4K stack while in vfork () */
+
+	/*
+	 * Per-process static vfork message buffer.
+	 * Used to avoid kmalloc()/kfree() in the hot vfork() path.
+	 * This buffer is private to the process and must never be freed.
+	 */
+	struct vfork_msg u_vfork_msg_buf;
+	int              u_vfork_msg_in_use;
+
+	/*
+	 * Counts how many times vfork() had to fall back
+	 * to heap-allocated vfork_msg instead of the
+	 * per-process static buffer.
+	 */
+	unsigned long    u_vfork_heap_fallbacks;
 
 	/* stack watcher. When usp < u_red_zone && ix.ix_watch_stack -> SIGSEGV */
 	void			*u_red_zone;
@@ -418,6 +462,18 @@ struct user {
         short                   u_segment_no;   /* segment number (0-2) */
         long                    u_segment_ptr;
 	struct ixnode		u_detached_node;
+
+	/*
+	 * p_death_msg is this process's reserved exit notification. The separate
+	 * p_pending_death_msg temporarily holds the notification allocated for a
+	 * child being created by vfork(). Both fields are appended so all existing
+	 * struct user member offsets remain unchanged.
+	 */
+	struct death_msg	*p_death_msg;
+	struct death_msg	*p_pending_death_msg;
+
+	/* Process-private ACTION_WAIT_CHAR state. Appended to preserve offsets. */
+	struct ix_fselect_state	*u_fselect_states;
 };
 
 /* flag codes */

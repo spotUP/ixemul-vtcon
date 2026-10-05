@@ -31,6 +31,14 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * strdup.c,v 1.3
+ *
+ * 2026-06-01  Copilot modification (JJ)
+ *      Use size_t for length and replace bcopy() with memcpy().
+ *      No functional change.
+ */
+
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)strdup.c	5.4 (Berkeley) 2/24/91";
 #endif /* LIBC_SCCS and not lint */
@@ -46,12 +54,13 @@ char *
 strdup(str)
 	const char *str;
 {
-	int len;
-	char *copy;
+       size_t len;
+       char *copy;
 
 	len = strlen(str) + 1;
-	if (!(copy = (char *) syscall (SYS_malloc, (u_int)len)))
+       copy = (char *) syscall(SYS_malloc, (u_int)len);
+       if (copy == NULL)
 		return((char *)NULL);
-	bcopy(str, copy, len);
+       memcpy(copy, str, len);
 	return(copy);
 }

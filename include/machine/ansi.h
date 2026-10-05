@@ -32,7 +32,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ * GCC v3 compatiblity modifications by Pavel Fedin <sonic_amiga@rambler.ru>, 19.05.2004
+ *
  *	@(#)ansi.h	8.2 (Berkeley) 1/4/94
+ */
+
+ /*
+ * 1.1  2026/07/21  ixemul fork
+ *      Corrected GCC version detection for _BSD_VA_LIST_.
+ *      GCC 3 and later use __builtin_va_list; older GCC and
+ *      non-GCC compilers retain the historical char * definition.
  */
 
 #ifndef	_ANSI_H_
@@ -52,7 +61,11 @@
 #define	_BSD_SIZE_T_	unsigned long		/* sizeof() */
 #define	_BSD_SSIZE_T_	int			/* byte count or error */
 #define	_BSD_TIME_T_	long			/* time() */
-#define	_BSD_VA_LIST_	char *			/* va_list */
+#if defined(__GNUC__) && (__GNUC__ >= 3)
+#define _BSD_VA_LIST_ __builtin_va_list /* va_list */
+#else
+#define _BSD_VA_LIST_ char *			/* va_list */
+#endif
 
 /*
  * Runes (wchar_t) is declared to be an ``int'' instead of the more natural

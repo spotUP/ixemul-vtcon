@@ -54,6 +54,7 @@ char *
 gets(buf)
 	char *buf;
 {
+	struct user *u_ptr = ((struct user *)(((struct Process *)(SysBase->ThisTask))->pr_Task.tc_TrapData));
 	register int c;
 	register char *s;
 

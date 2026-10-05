@@ -1,31 +1,57 @@
+/*	$OpenBSD: unvis.c,v 1.17 2015/09/13 11:32:51 guenther Exp $ */
 /*-
- * Copyright (c) 1989 The Regents of the University of California.
- * All rights reserved.
+ * Copyright (c) 1989, 1993
+ *	The Regents of the University of California.  All rights reserved.
  *
- * Redistribution and use in source and binary forms are permitted provided
- * that: (1) source distributions retain this entire copyright notice and
- * comment, and (2) distributions including binaries display the following
- * acknowledgement:  ``This product includes software developed by the
- * University of California, Berkeley and its contributors'' in the
- * documentation or other materials provided with the distribution and in
- * all advertising materials mentioning features or use of this software.
- * Neither the name of the University nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)unvis.c	1.3 (Berkeley) 6/27/90";
-#endif /* LIBC_SCCS and not lint */
+/*
+ * unvis.c,v
+ *
+ * Revision 1.3  2026/09/21  ChatGPT modifications (JJ)
+ *
+ * Treat an incomplete escape sequence at end of input as an error in
+ * strunvis() and strnunvis(), matching the documented -1 error return.
+ *
+ * Revision 1.2  2026/07/20  ChatGPT/JJ
+ * Namespaced the private isoctal macro as UNVIS_ISOCTAL to avoid
+ * collisions with vis.c in ixemul's all.c unity build.
+ *
+ * Revision 1.1  2026/07/14  ChatGPT/JJ
+ * Adapted the OpenBSD unvis implementation for ixemul and GCC 2.95.3.
+ * Removed the OpenBSD weak-symbol declaration and replaced the
+ * BSD-specific octal character cast with an ANSI C type.
+ *
+ * Reworked strnunvis() to support sz == 0 and to calculate the decoded
+ * length without forming or advancing pointers outside the destination
+ * object.
+ */
 
-#define _KERNEL
-#include "ixemul.h"
-
+#include <sys/types.h>
 #include <vis.h>
-#include <ctype.h>
 
 /*
  * decode driven by state machine
@@ -38,7 +64,8 @@ static char sccsid[] = "@(#)unvis.c	1.3 (Berkeley) 6/27/90";
 #define	S_OCTAL2	5	/* octal digit 2 */
 #define	S_OCTAL3	6	/* octal digit 3 */
 
-#define	isoctal(c)	(((u_char)(c)) >= '0' && ((u_char)(c)) <= '7')
+#define	UNVIS_ISOCTAL(c)	(((unsigned char)(c)) >= '0' && \
+				 ((unsigned char)(c)) <= '7')
 
 /*
  * unvis - decode characters previously encoded by vis
@@ -68,7 +95,12 @@ unvis(char *cp, char c, int *astate, int flag)
 
 	case S_START:
 		switch(c) {
+		case '-':
+			*cp = 0;
+			*astate = S_GROUND;
+			return (0);
 		case '\\':
+		case '"':
 			*cp = c;
 			*astate = S_GROUND;
 			return (UNVIS_VALID);
@@ -78,7 +110,7 @@ unvis(char *cp, char c, int *astate, int flag)
 			*astate = S_OCTAL2;
 			return (0);
 		case 'M':
-			*cp = 0200;
+			*cp = (char) 0200;
 			*astate = S_META;
 			return (0);
 		case '^':
@@ -161,7 +193,7 @@ unvis(char *cp, char c, int *astate, int flag)
 		return (UNVIS_VALID);
 
 	case S_OCTAL2:	/* second possible octal digit */
-		if (isoctal(c)) {
+		if (UNVIS_ISOCTAL(c)) {
 			/* 
 			 * yes - and maybe a third 
 			 */
@@ -177,7 +209,7 @@ unvis(char *cp, char c, int *astate, int flag)
 
 	case S_OCTAL3:	/* third possible octal digit */
 		*astate = S_GROUND;
-		if (isoctal(c)) {
+		if (UNVIS_ISOCTAL(c)) {
 			*cp = (*cp << 3) + (c - '0');
 			return (UNVIS_VALID);
 		}
@@ -185,7 +217,7 @@ unvis(char *cp, char c, int *astate, int flag)
 		 * we were done, push back passed char
 		 */
 		return (UNVIS_VALIDPUSH);
-			
+
 	default:	
 		/* 
 		 * decoder in unknown state - (probably uninitialized) 
@@ -202,9 +234,10 @@ unvis(char *cp, char c, int *astate, int flag)
  *	Dst is null terminated.
  */
 
-int strunvis(char *dst, const char *src)
+int
+strunvis(char *dst, const char *src)
 {
-	register char c;
+	char c;
 	char *start = dst;
 	int state = 0;
 
@@ -221,11 +254,81 @@ int strunvis(char *dst, const char *src)
 		case UNVIS_NOCHAR:
 			break;
 		default:
+			*dst = '\0';
 			return (-1);
 		}
 	}
-	if (unvis(dst, c, &state, UNVIS_END) == UNVIS_VALID)
+	switch (unvis(dst, c, &state, UNVIS_END)) {
+	case UNVIS_VALID:
 		dst++;
+		break;
+	case UNVIS_NOCHAR:
+		break;
+	default:
+		*dst = '\0';
+		return (-1);
+	}
 	*dst = '\0';
 	return (dst - start);
+}
+/*
+ * Decode src into dst, writing at most sz - 1 bytes and terminating
+ * dst when sz is non-zero.
+ *
+ * Decoded length and stored length are tracked separately so that
+ * zero-sized and truncated destinations are handled without invalid
+ * pointer arithmetic.
+ */
+ssize_t
+strnunvis(char *dst, const char *src, size_t sz)
+{
+	char c, p;
+	size_t written, total;
+	int state;
+
+	written = 0;
+	total = 0;
+	state = 0;
+
+	while ((c = *src++) != '\0') {
+	again:
+		switch (unvis(&p, c, &state, 0)) {
+		case UNVIS_VALID:
+			if (sz > 0 && written < sz - 1)
+				dst[written++] = p;
+			total++;
+			break;
+		case UNVIS_VALIDPUSH:
+			if (sz > 0 && written < sz - 1)
+				dst[written++] = p;
+			total++;
+			goto again;
+		case 0:
+		case UNVIS_NOCHAR:
+			break;
+		default:
+			if (sz > 0)
+				dst[written] = '\0';
+			return (-1);
+		}
+	}
+
+	switch (unvis(&p, c, &state, UNVIS_END)) {
+	case UNVIS_VALID:
+		if (sz > 0 && written < sz - 1)
+			dst[written++] = p;
+		total++;
+		break;
+	case UNVIS_NOCHAR:
+		break;
+	default:
+		if (sz > 0)
+			dst[written] = '\0';
+		return (-1);
+	}
+
+	if (sz > 0)
+		dst[written] = '\0';
+
+	return ((ssize_t)total);
 }

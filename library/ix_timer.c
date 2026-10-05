@@ -28,6 +28,17 @@
  *
  */
 
+/*
+ * Revision 1.4  2026/07/22  ChatGPT modifications  (JJ)
+ *
+ *  Made the timer interrupt register ABI explicit to GCC.
+ *
+ *  The target task passed in a1 and the GCC-generated a5 frame pointer
+ *  are now marked as values defined at the external interrupt/function
+ *  ABI boundary.  This removes GCC 2.95.3's false uninitialized-variable
+ *  warnings without initializing or overwriting either incoming register.
+ */
+
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
@@ -55,14 +66,21 @@ int
 ix_timer(char *foobar, ...)
 {
   register struct Task	*t_pass	asm ("a1");
+  register u_int	a5 asm ("a5");
   struct Task		*me;
   struct user		*p;
   u_int			current_pc;
-  register u_int	a5 asm ("a5");
   u_int			sp;
   struct itimerval	*tim;
   /* not necessarily "me" */
   struct Task		*current_task;
+
+  /*
+   * The timer interrupt enters with the target task in a1.
+   * GCC generates a5 as the frame pointer for this varargs function.
+   * Mark both fixed registers as defined at this ABI boundary.
+   */
+  __asm__ __volatile__ ("" : "=a" (t_pass), "=a" (a5));
 
   me = t_pass;
   p = getuser(me);
@@ -154,6 +172,12 @@ ix_timer (char *foobar, ...)
   u_int			sp;
   struct Task		*current_task;
   struct ixnode         *node;
+
+  /*
+   * GCC generates a5 as the frame pointer for this varargs function.
+   * Mark the fixed register as defined at this ABI boundary.
+   */
+  __asm__ __volatile__ ("" : "=a" (a5));
 
   current_task = FindTask(0);
 

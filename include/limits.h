@@ -74,7 +74,7 @@
 #define NL_TEXTMAX		255
 #endif 
 
-#include <machine/limits.h>
+#include "machine/limits.h"
 #include <sys/syslimits.h>
 
 #endif /* !_LIMITS_H_ */

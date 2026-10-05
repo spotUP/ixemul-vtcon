@@ -21,6 +21,32 @@
  *  $Log:$
  */
 
+/*
+ * Revision 1.2  2026/08/06  ChatGPT modifications (JJ)
+ *
+ *    Validate the current task and its ixemul user structure before use.
+ *
+ *    Do not retain cli_CommandName as a C-string pointer: it references
+ *    a length-prefixed BCPL string. Use the task's NUL-terminated name,
+ *    with "ixnet" as a fallback, for SocketBase and usergroup context.
+ *
+ * Revision 1.1  2026/08/05  ChatGPT modifications (JJ)
+ *
+ *    Accept an AmiTCP-compatible bsdsocket.library without requiring
+ *    AmiTCP usergroup.library, allowing Roadshow to use the normal
+ *    IX_NETWORK_AMITCP socket path.
+ *
+ *    Validate both allocated signal bits and fully roll back partial
+ *    AmiTCP or AS225 initialization without leaving stale base pointers.
+ *
+ *    Configure the socket errno pointer and event signals through the
+ *    classic AmiTCP API, and use SocketBaseTagList() only with V4 bases
+ *    for the optional log tag and h_errno pointer.
+ *
+ *    Store the program-name pointer used by later usergroup context
+ *    updates and clear u_ixnet when initialization fails.
+ */
+
 #define _KERNEL
 #include "ixnet.h"
 #include "kprintf.h"
@@ -39,112 +65,176 @@ ixnet_open (struct ixnet_base *ixbase)
     struct ixnet *p;
     struct Task *me;
     struct user *ix_u;
-    struct ix_settings *settings; /* don't call this *ix there is a macro called ix!!! */
+    struct ix_settings *settings; /* Do not call this *ix; ix is a macro. */
     int network_type;
 
     me = FindTask(0);
-    ix_u = getuser(me); /* already initialized by ixemul.library */
+    if (!me)
+      return 0;
 
-    /* need this here instead of ixnet_init.c */
+    ix_u = getuser(me); /* already initialized by ixemul.library */
+    if (!ix_u)
+      return 0;
+
+    /* This must be set here because ixnet_init.c runs in ramlib. */
     ixemulbase = ix_u->u_ixbase;
 
     if (ixnetbase->ixnet_lib.lib_Version != ixemulbase->ix_lib.lib_Version ||
         ixnetbase->ixnet_lib.lib_Revision != ixemulbase->ix_lib.lib_Revision)
       {
         ix_panic(
-"ixnet.library has version %ld.%ld while ixemul.library has version %ld.%ld.
-Both libraries should have the same version, therefore ixnet.library
-won't be used.", ixnetbase->ixnet_lib.lib_Version, ixnetbase->ixnet_lib.lib_Revision,
-                 ixemulbase->ix_lib.lib_Version, ixemulbase->ix_lib.lib_Revision);
-	settings = ix_get_settings();
-	settings->network_type = IX_NETWORK_NONE;
-	ix_set_settings(settings);
+"ixnet.library has version %ld.%ld while ixemul.library has version %ld.%ld.\n"
+"Both libraries should have the same version, therefore ixnet.library\n"
+"won't be used.", ixnetbase->ixnet_lib.lib_Version,
+                 ixnetbase->ixnet_lib.lib_Revision,
+                 ixemulbase->ix_lib.lib_Version,
+                 ixemulbase->ix_lib.lib_Revision);
+        settings = ix_get_settings();
+        settings->network_type = IX_NETWORK_NONE;
+        ix_set_settings(settings);
         return 0;
       }
 
-    p = ix_u->u_ixnet = (struct ixnet *)AllocMem(sizeof(struct ixnet),MEMF_PUBLIC|MEMF_CLEAR);
+    p = (struct ixnet *)AllocMem(sizeof(struct ixnet),
+                                 MEMF_PUBLIC | MEMF_CLEAR);
+    if (!p)
+      return 0;
+
+    ix_u->u_ixnet = p;
+    p->u_sigurg = -1;
+    p->u_sigio = -1;
+    p->u_networkprotocol = IX_NETWORK_NONE;
 
     settings = ix_get_settings();
     network_type = settings->network_type;
 
-    if (p) {
-      p->u_networkprotocol = IX_NETWORK_NONE;
-      switch (network_type) {
-	case IX_NETWORK_AUTO:
-	case IX_NETWORK_AMITCP:
-	    /* We could check for the existance of the AMITCP port here
-	       to make sure we're using the AmiTCP bsdsocket.library,
-	       and not the bsdsocket.library emulation for AS225.
-	       But in that case, the Miami package isn't recognized,
-	       because they don't open an AMITCP port. Oh well... */
-	    if ((p->u_TCPBase = OpenLibrary ("bsdsocket.library",3))) {
-		struct Process *thisproc = (struct Process *)me;
-		struct CommandLineInterface *cli = BTOCPTR(thisproc->pr_CLI);
-		char *progname = ((!thisproc->pr_CLI) ? me->tc_Node.ln_Name : BTOCPTR(cli->cli_CommandName));
-		struct TagItem list[] = {
-		    /* { SBTM_SETVAL(SBTC_ERRNOPTR(sizeof(int))), (ULONG)&u.u_errno }, */
-		    /* { SBTM_SETVAL(SBTC_HERRNOLONGPTR), (ULONG)&h_errno }, */
-		    { SBTM_SETVAL(SBTC_LOGTAGPTR), (ULONG)progname },
-		    { SBTM_SETVAL(SBTC_SIGIOMASK), NULL },
-		    { SBTM_SETVAL(SBTC_SIGURGMASK), NULL },
-		    { SBTM_SETVAL(SBTC_BREAKMASK), SIGBREAKF_CTRL_C },
-		    { TAG_END }
-		};
+    switch (network_type)
+      {
+      case IX_NETWORK_AUTO:
+      case IX_NETWORK_AMITCP:
+        /*
+         * Roadshow, AmiTCP and Miami expose the AmiTCP-compatible
+         * bsdsocket.library interface.  usergroup.library is optional and
+         * must not decide whether the socket backend itself is usable.
+         */
+        p->u_TCPBase = OpenLibrary("bsdsocket.library", 3);
+        if (p->u_TCPBase)
+          {
+            /*
+             * tc_Node.ln_Name is a normal NUL-terminated C string.
+             * cli_CommandName is a BCPL string and must not be retained
+             * as a C-string pointer for later SocketBase/usergroup calls.
+             */
+            p->u_progname = me->tc_Node.ln_Name;
+            if (!p->u_progname)
+              p->u_progname = "ixnet";
 
-		p->u_sigurg	 = AllocSignal (-1);
-		p->u_sigio	 = AllocSignal (-1);
+            p->u_sigurg = AllocSignal(-1);
+            if (p->u_sigurg >= 0)
+              p->u_sigio = AllocSignal(-1);
 
-		list[1].ti_Data = (1L << p->u_sigio);
-		list[2].ti_Data = (1L << p->u_sigurg);
+            if (p->u_sigurg >= 0 && p->u_sigio >= 0)
+              {
+                ULONG sigio_mask;
+                ULONG sigurg_mask;
 
-		/* I will assume this always is successful */
-		TCP_SocketBaseTagList(list);
+                sigio_mask = 1UL << p->u_sigio;
+                sigurg_mask = 1UL << p->u_sigurg;
 
-		/* only use usergroup stuff when AmiTCP is started only */
-		/* I call OpenLibrary() with the full path since
-		 * usergroup.library might open yet - some people bypass the
-		 * "login" command which loads usergroup.library
-		 */
-		p->u_UserGroupBase = OpenLibrary("AmiTCP:libs/usergroup.library",1);
+                TCP_SetErrnoPtr(ix_u->u_errno, sizeof(*ix_u->u_errno));
+                TCP_SetSocketSignals(SIGBREAKF_CTRL_C,
+                                     sigio_mask, sigurg_mask);
 
-		if (p->u_UserGroupBase) {
-		    struct TagItem ug_list[] = {
-			{ UGT_INTRMASK, SIGBREAKB_CTRL_C } ,
-			{ UGT_ERRNOPTR(sizeof(int)), (ULONG)ix_u->u_errno },
-			{ TAG_END }
-		    };
-		    ug_SetupContextTagList(progname, ug_list);
-		    p->u_networkprotocol = IX_NETWORK_AMITCP;
-		    break;
-		}
-		FreeSignal(p->u_sigurg);
-		FreeSignal(p->u_sigio);
-		CloseLibrary(p->u_TCPBase);
-	    }
-	    /* don't fall through if not auto-detect */
-	    if (network_type != IX_NETWORK_AUTO)
-		break;
+                /*
+                 * SocketBaseTagList() is an AmiTCP V4 API.  Keep V3
+                 * compatibility by using it only for optional V4 settings.
+                 */
+                if (((struct Library *)p->u_TCPBase)->lib_Version >= 4)
+                  {
+                    struct TagItem list[] = {
+                      { SBTM_SETVAL(SBTC_LOGTAGPTR),
+                        (ULONG)p->u_progname },
+                      { SBTM_SETVAL(SBTC_HERRNOLONGPTR),
+                        (ULONG)ix_u->u_h_errno },
+                      { TAG_END }
+                    };
 
-	/* falls through if something failed above */
-	case IX_NETWORK_AS225:
-	    p->u_SockBase = OpenLibrary("socket.library",3);
+                    (void)TCP_SocketBaseTagList(list);
+                  }
 
-	    if (p->u_SockBase) {
-		p->u_sigurg	 = AllocSignal (-1);
-		p->u_sigio	 = AllocSignal (-1);
-		p->u_networkprotocol = IX_NETWORK_AS225;
-	     }
-	    break;
-	}
+                p->u_UserGroupBase =
+                    OpenLibrary("AmiTCP:libs/usergroup.library", 1);
 
-	if (p->u_networkprotocol == IX_NETWORK_NONE) {
-	    extern struct ixnet_base *ixnetbase;
-	    FreeMem(ix_u->u_ixnet,sizeof(struct ixnet));
-	    return 0;
-	}
-	return ixbase;
-    }
-    return 0;
+                if (p->u_UserGroupBase)
+                  {
+                    struct TagItem ug_list[] = {
+                      { UGT_INTRMASK, SIGBREAKB_CTRL_C },
+                      { UGT_ERRNOPTR(sizeof(int)), (ULONG)ix_u->u_errno },
+                      { TAG_END }
+                    };
+
+                    (void)ug_SetupContextTagList(p->u_progname, ug_list);
+                  }
+
+                p->u_networkprotocol = IX_NETWORK_AMITCP;
+                break;
+              }
+
+            if (p->u_sigio >= 0)
+              {
+                FreeSignal(p->u_sigio);
+                p->u_sigio = -1;
+              }
+            if (p->u_sigurg >= 0)
+              {
+                FreeSignal(p->u_sigurg);
+                p->u_sigurg = -1;
+              }
+            CloseLibrary(p->u_TCPBase);
+            p->u_TCPBase = NULL;
+          }
+
+        if (network_type != IX_NETWORK_AUTO)
+          break;
+
+        /* Fall through to AS225 auto-detection. */
+
+      case IX_NETWORK_AS225:
+        p->u_SockBase = OpenLibrary("socket.library", 3);
+        if (p->u_SockBase)
+          {
+            p->u_sigurg = AllocSignal(-1);
+            if (p->u_sigurg >= 0)
+              p->u_sigio = AllocSignal(-1);
+
+            if (p->u_sigurg >= 0 && p->u_sigio >= 0)
+              {
+                p->u_networkprotocol = IX_NETWORK_AS225;
+                break;
+              }
+
+            if (p->u_sigio >= 0)
+              {
+                FreeSignal(p->u_sigio);
+                p->u_sigio = -1;
+              }
+            if (p->u_sigurg >= 0)
+              {
+                FreeSignal(p->u_sigurg);
+                p->u_sigurg = -1;
+              }
+            CloseLibrary(p->u_SockBase);
+            p->u_SockBase = NULL;
+          }
+        break;
+      }
+
+    if (p->u_networkprotocol == IX_NETWORK_NONE)
+      {
+        ix_u->u_ixnet = NULL;
+        FreeMem(p, sizeof(struct ixnet));
+        return 0;
+      }
+
+    return ixbase;
 }
-
-

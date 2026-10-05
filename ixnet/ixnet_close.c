@@ -22,6 +22,20 @@
  *
  */
 
+/*
+ * ixnet_close.c,v
+ *
+ * Revision 1.1  2026/08/05  ChatGPT modifications (JJ)
+ *
+ *    Make per-process network teardown safe for partial initialization.
+ *
+ *    Disable AmiTCP-compatible socket signals before closing the private
+ *    SocketBase, close each library at most once, and free signal bits only
+ *    after the network libraries can no longer deliver them.
+ *
+ *    Clear u_ixnet before releasing the per-process ixnet structure.
+ */
+
 #define _KERNEL
 #include "ixnet.h"
 #include "kprintf.h"
@@ -32,24 +46,46 @@ void
 ixnet_close (struct ixnet_base *ixbase)
 {
     usetup;
-    struct ixnet *p = (struct ixnet *)u.u_ixnet;
+    struct ixnet *p;
 
-    if (p->u_SockBase) {
+    (void)ixbase;
+    p = (struct ixnet *)u.u_ixnet;
+    if (!p)
+      return;
+
+    if (p->u_SockBase)
+      {
         SOCK_cleanup_sockets();
-	FreeSignal(p->u_sigurg);
-	FreeSignal(p->u_sigio);
-	CloseLibrary(p->u_SockBase);
-    }
+        CloseLibrary(p->u_SockBase);
+        p->u_SockBase = NULL;
+      }
 
-    if (p->u_UserGroupBase) {
-	CloseLibrary(p->u_UserGroupBase);
-    }
+    if (p->u_UserGroupBase)
+      {
+        CloseLibrary(p->u_UserGroupBase);
+        p->u_UserGroupBase = NULL;
+      }
 
-    if (p->u_TCPBase) {
-	FreeSignal(p->u_sigurg);
-	FreeSignal(p->u_sigio);
-	CloseLibrary(p->u_TCPBase);
-    }
+    if (p->u_TCPBase)
+      {
+        /* Prevent delivery to signal bits after they are released. */
+        TCP_SetSocketSignals(0, 0, 0);
+        CloseLibrary(p->u_TCPBase);
+        p->u_TCPBase = NULL;
+      }
 
+    if (p->u_sigurg >= 0)
+      {
+        FreeSignal(p->u_sigurg);
+        p->u_sigurg = -1;
+      }
+
+    if (p->u_sigio >= 0)
+      {
+        FreeSignal(p->u_sigio);
+        p->u_sigio = -1;
+      }
+
+    u.u_ixnet = NULL;
     FreeMem(p, sizeof(struct ixnet));
 }

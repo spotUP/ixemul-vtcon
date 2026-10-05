@@ -17,6 +17,16 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+/*
+ * strtoul.c,v
+ *
+ * Revision 1.1  2026/08/16  ChatGPT  (JJ)
+ *
+ *    Validate base before conversion and return EINVAL for invalid bases.
+ *    Accept a 0x/0X prefix only when followed by a hexadecimal digit.
+ *    Pass unsigned-char values to ctype macros.
+ */
+
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)strtoul.c	5.2 (Berkeley) 5/17/90";
 #endif /* LIBC_SCCS and not lint */
@@ -45,19 +55,29 @@ strtoul(const char *nptr, char **endptr, int base)
 	register int neg = 0, any, cutlim;
         usetup;
 
+	if (base && (base < 2 || base > 36)) {
+		if (endptr != 0)
+			*endptr = (char *)nptr;
+		errno = EINVAL;
+		return 0;
+	}
+
 	/*
 	 * See strtol for comments as to the logic used.
 	 */
 	do {
 		c = *s++;
-	} while (isspace(c));
+	} while (isspace((unsigned char)c));
 	if (c == '-') {
 		neg = 1;
 		c = *s++;
 	} else if (c == '+')
 		c = *s++;
 	if ((base == 0 || base == 16) &&
-	    c == '0' && (*s == 'x' || *s == 'X')) {
+	    c == '0' && (*s == 'x' || *s == 'X') &&
+	    ((s[1] >= '0' && s[1] <= '9') ||
+	     (s[1] >= 'a' && s[1] <= 'f') ||
+	     (s[1] >= 'A' && s[1] <= 'F'))) {
 		c = s[1];
 		s += 2;
 		base = 16;
@@ -67,10 +87,10 @@ strtoul(const char *nptr, char **endptr, int base)
 	cutoff = (unsigned long)ULONG_MAX / (unsigned long)base;
 	cutlim = (unsigned long)ULONG_MAX % (unsigned long)base;
 	for (acc = 0, any = 0;; c = *s++) {
-		if (isdigit(c))
+		if (isdigit((unsigned char)c))
 			c -= '0';
-		else if (isalpha(c))
-			c -= isupper(c) ? 'A' - 10 : 'a' - 10;
+		else if (isalpha((unsigned char)c))
+			c -= isupper((unsigned char)c) ? 'A' - 10 : 'a' - 10;
 		else
 			break;
 		if (c >= base)

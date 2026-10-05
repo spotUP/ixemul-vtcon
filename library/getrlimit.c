@@ -25,6 +25,18 @@
  *  Revision 1.1  1992/05/14  19:55:40  mwild
  *  Initial revision
  *
+ * Revision 1.1.1.2  2026/06/16  JJ/ChatGPT
+ *
+ * Updated getrlimit() resource validation to match the RLIMIT_* values
+ * exported by sys/resource.h.
+ *
+ * Replaced the RLIMIT_RSS upper-bound check with RLIM_NLIMITS-based
+ * validation.
+ * Added handling for RLIMIT_MEMLOCK, RLIMIT_NPROC and RLIMIT_OFILE,
+ * returning RLIM_INFINITY like the other non-enforced limits.
+ * Kept RLIMIT_STACK reporting based on the current task stack bounds,
+ * using explicit address arithmetic for the stack-size calculation.
+ * Preserved the existing no-enforcement semantics and ABI.
  */
 
 #define _KERNEL
@@ -39,7 +51,7 @@ getrlimit(int resource, struct rlimit *rlp)
   struct Task *me = FindTask(0);
   struct user *u_ptr = getuser(me);
 
-  if (resource < RLIMIT_CPU || resource > RLIMIT_RSS || !rlp)
+  if (!rlp || resource < 0 || resource >= RLIM_NLIMITS)
     {
       errno = EINVAL;
       KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
@@ -53,11 +65,19 @@ getrlimit(int resource, struct rlimit *rlp)
       case RLIMIT_CORE:
       case RLIMIT_RSS:
       case RLIMIT_DATA:
+      case RLIMIT_MEMLOCK:
+      case RLIMIT_NPROC:
+      case RLIMIT_OFILE:
 	rlp->rlim_cur = rlp->rlim_max = RLIM_INFINITY;
 	break;
       case RLIMIT_STACK:
-        rlp->rlim_cur = rlp->rlim_max = me->tc_SPUpper - me->tc_SPLower;
+        rlp->rlim_cur = rlp->rlim_max =
+	  (long)((ULONG)me->tc_SPUpper - (ULONG)me->tc_SPLower);
 	break;
+      default:
+	errno = EINVAL;
+	KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+	return -1;
     }
 
   return 0;

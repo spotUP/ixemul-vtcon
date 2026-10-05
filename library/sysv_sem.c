@@ -1,11 +1,36 @@
-/*	$NetBSD: sysv_sem.c,v 1.26 1996/02/09 19:00:25 christos Exp $	*/
+/*	$NetBSD: sysv_msg.c,v 1.19 1996/02/09 19:00:18 christos Exp $	*/
 
 /*
- * Implementation of SVID semaphores
+ * Implementation of SVID messages
  *
  * Author:  Daniel Boulet
  *
+ * Copyright 1993 Daniel Boulet and RTMX Inc.
+ *
+ * This system call was implemented by Daniel Boulet under contract from RTMX.
+ *
+ * Redistribution and use in source forms, with and without modification,
+ * are permitted provided that this entire comment appears intact.
+ *
+ * Redistribution in binary form may occur without any restrictions.
+ * Obviously, it would be nice if you gave credit where credit is due
+ * but requiring it would be too onerous.
+ *
  * This software is provided ``AS IS'' without any warranties of any kind.
+ */
+
+/*
+ *  Revision 1.27  2026/07/07  ChatGPT modifications (JJ)
+ *  Fixed errno_return() argument order throughout SysV semaphore
+ *  handling to use ixemul's errno/value convention.
+ *  Fixed semid bounds checks in semctl() and semop() to validate
+ *  against SEMMNI/seminfo.semmni instead of SEMMSL/seminfo.semmsl,
+ *  avoiding possible out-of-bounds access to the semaphore id table.
+ *  Stored the Unix process id from getpid() in sempid after semop(),
+ *  rather than a cast Amiga Task pointer, matching SysV GETPID
+ *  semaphore semantics.
+ *  Fixed interrupted semop() waits to remove the process from
+ *  semncnt/semzcnt before returning EINTR.
  */
 
 #define _KERNEL
@@ -247,13 +272,13 @@ ix_semctl(int semid, int semnum, int cmd, union semun arg)
 	semlock(p);
 
 	semid = IPCID_TO_IX(semid);
-	if (semid < 0 || semid >= seminfo.semmsl)
-		errno_return(-1, EINVAL);
+	if (semid < 0 || semid >= seminfo.semmni)
+		errno_return(EINVAL, -1);
 
 	semaptr = &sema[semid];
 	if ((semaptr->sem_perm.mode & SEM_ALLOC) == 0 ||
 	    semaptr->sem_perm.seq != IPCID_TO_SEQ(semid))
-		errno_return(-1, EINVAL);
+		errno_return(EINVAL, -1);
 
 	eval = 0;
 	rval = 0;
@@ -261,7 +286,7 @@ ix_semctl(int semid, int semnum, int cmd, union semun arg)
 	switch (cmd) {
 	case IPC_RMID:
 		if ((eval = ipcperm(&cred, &semaptr->sem_perm, IPC_M)) != 0)
-			errno_return(-1, eval);
+			errno_return(eval, -1);
 		semaptr->sem_perm.cuid = cred.cr_uid;
 		semaptr->sem_perm.uid = cred.cr_uid;
 		semtot -= semaptr->sem_nsems;
@@ -279,7 +304,7 @@ ix_semctl(int semid, int semnum, int cmd, union semun arg)
 
 	case IPC_SET:
 		if ((eval = ipcperm(&cred, &semaptr->sem_perm, IPC_M)))
-			errno_return(-1, eval);
+			errno_return(eval, -1);
 		semaptr->sem_perm.uid = arg.buf->sem_perm.uid;
 		semaptr->sem_perm.gid = arg.buf->sem_perm.gid;
 		semaptr->sem_perm.mode = (semaptr->sem_perm.mode & ~0777) |
@@ -289,37 +314,37 @@ ix_semctl(int semid, int semnum, int cmd, union semun arg)
 
 	case IPC_STAT:
 		if ((eval = ipcperm(&cred, &semaptr->sem_perm, IPC_R)))
-			errno_return(-1, eval);
+			errno_return(eval, -1);
 		memcpy(arg.buf, semaptr, sizeof(struct semid_ds));
 		break;
 
 	case GETNCNT:
 		if ((eval = ipcperm(&cred, &semaptr->sem_perm, IPC_R)))
-			errno_return(-1, eval);
+			errno_return(eval, -1);
 		if (semnum < 0 || semnum >= semaptr->sem_nsems)
-			errno_return(-1, EINVAL);
+			errno_return(EINVAL, -1);
 		rval = semaptr->sem_base[semnum].semncnt;
 		break;
 
 	case GETPID:
 		if ((eval = ipcperm(&cred, &semaptr->sem_perm, IPC_R)))
-			errno_return(-1, eval);
+			errno_return(eval, -1);
 		if (semnum < 0 || semnum >= semaptr->sem_nsems)
-			errno_return(-1, EINVAL);
+			errno_return(EINVAL, -1);
 		rval = semaptr->sem_base[semnum].sempid;
 		break;
 
 	case GETVAL:
 		if ((eval = ipcperm(&cred, &semaptr->sem_perm, IPC_R)))
-			errno_return(-1, eval);
+			errno_return(eval, -1);
 		if (semnum < 0 || semnum >= semaptr->sem_nsems)
-			errno_return(-1, EINVAL);
+			errno_return(EINVAL, -1);
 		rval = semaptr->sem_base[semnum].semval;
 		break;
 
 	case GETALL:
 		if ((eval = ipcperm(&cred, &semaptr->sem_perm, IPC_R)))
-			errno_return(-1, eval);
+			errno_return(eval, -1);
 		for (i = 0; i < semaptr->sem_nsems; i++) {
 			memcpy(&arg.array[i], (caddr_t)&semaptr->sem_base[i].semval,
 			    sizeof(arg.array[0]));
@@ -328,17 +353,17 @@ ix_semctl(int semid, int semnum, int cmd, union semun arg)
 
 	case GETZCNT:
 		if ((eval = ipcperm(&cred, &semaptr->sem_perm, IPC_R)))
-			errno_return(-1, eval);
+			errno_return(eval, -1);
 		if (semnum < 0 || semnum >= semaptr->sem_nsems)
-			errno_return(-1, EINVAL);
+			errno_return(EINVAL, -1);
 		rval = semaptr->sem_base[semnum].semzcnt;
 		break;
 
 	case SETVAL:
 		if ((eval = ipcperm(&cred, &semaptr->sem_perm, IPC_W)))
-			errno_return(-1, eval);
+			errno_return(eval, -1);
 		if (semnum < 0 || semnum >= semaptr->sem_nsems)
-			errno_return(-1, EINVAL);
+			errno_return(EINVAL, -1);
 		semaptr->sem_base[semnum].semval = arg.val;
 		semundo_clear(semid, semnum);
 		ix_wakeup((u_int)semaptr);
@@ -346,7 +371,7 @@ ix_semctl(int semid, int semnum, int cmd, union semun arg)
 
 	case SETALL:
 		if ((eval = ipcperm(&cred, &semaptr->sem_perm, IPC_W)))
-			errno_return(-1, eval);
+			errno_return(eval, -1);
 		for (i = 0; i < semaptr->sem_nsems; i++) {
 			memcpy((caddr_t)&semaptr->sem_base[i].semval, &arg.array[i],
 			    sizeof(arg.array[0]));
@@ -356,7 +381,7 @@ ix_semctl(int semid, int semnum, int cmd, union semun arg)
 		break;
 
 	default:
-		errno_return(-1, EINVAL);
+		errno_return(EINVAL, -1);
 	}
 
 	if (eval == 0)
@@ -386,12 +411,12 @@ ix_semget(key_t key, int nsems, int semflg)
 		if (semid < seminfo.semmni) {
 			if ((eval = ipcperm(&cred, &sema[semid].sem_perm,
 			    semflg & 0700)))
-				errno_return(-1, eval);
+				errno_return(eval, -1);
 			if (nsems > 0 && sema[semid].sem_nsems < nsems) {
-				errno_return(-1, EINVAL);
+				errno_return(EINVAL, -1);
 			}
 			if ((semflg & IPC_CREAT) && (semflg & IPC_EXCL)) {
-				errno_return(-1, EEXIST);
+				errno_return(EEXIST, -1);
 			}
 			goto found;
 		}
@@ -399,17 +424,17 @@ ix_semget(key_t key, int nsems, int semflg)
 
 	if (key == IPC_PRIVATE || (semflg & IPC_CREAT)) {
 		if (nsems <= 0 || nsems > seminfo.semmsl) {
-			errno_return(-1, EINVAL);
+			errno_return(EINVAL, -1);
 		}
 		if (nsems > seminfo.semmns - semtot) {
-			errno_return(-1, ENOSPC);
+			errno_return(ENOSPC, -1);
 		}
 		for (semid = 0; semid < seminfo.semmni; semid++) {
 			if ((sema[semid].sem_perm.mode & SEM_ALLOC) == 0)
 				break;
 		}
 		if (semid == seminfo.semmni) {
-			errno_return(-1, ENOSPC);
+			errno_return(ENOSPC, -1);
 		}
 		sema[semid].sem_perm.key = key;
 		sema[semid].sem_perm.cuid = cred.cr_uid;
@@ -427,7 +452,7 @@ ix_semget(key_t key, int nsems, int semflg)
 		bzero(sema[semid].sem_base,
 		    sizeof(sema[semid].sem_base[0])*nsems);
 	} else {
-		errno_return(-1, ENOENT);
+		errno_return(ENOENT, -1);
 	}
 
 found:
@@ -454,20 +479,20 @@ ix_semop(int semid, struct sembuf *sops, int nsops)
 
 	semid = IPCID_TO_IX(semid);	/* Convert back to zero origin */
 
-	if (semid < 0 || semid >= seminfo.semmsl)
-		errno_return(-1, EINVAL);
+	if (semid < 0 || semid >= seminfo.semmni)
+		errno_return(EINVAL, -1);
 
 	semaptr = &sema[semid];
 	if ((semaptr->sem_perm.mode & SEM_ALLOC) == 0 ||
 	    semaptr->sem_perm.seq != IPCID_TO_SEQ(semid))
-		errno_return(-1, EINVAL);
+		errno_return(EINVAL, -1);
 
 	if ((eval = ipcperm(&cred, &semaptr->sem_perm, IPC_W))) {
-		errno_return(-1, eval);
+		errno_return(eval, -1);
 	}
 
 	if (nsops > MAX_SOPS) {
-		errno_return(-1, E2BIG);
+		errno_return(E2BIG, -1);
 	}
 
 	/* 
@@ -488,7 +513,7 @@ ix_semop(int semid, struct sembuf *sops, int nsops)
 			sopptr = &sops[i];
 
 			if (sopptr->sem_num >= semaptr->sem_nsems)
-				errno_return(-1, EFBIG);
+				errno_return(EFBIG, -1);
 
 			semptr = &semaptr->sem_base[sopptr->sem_num];
 
@@ -535,7 +560,7 @@ ix_semop(int semid, struct sembuf *sops, int nsops)
 		 * NOWAIT flag set then return with EAGAIN.
 		 */
 		if (sopptr->sem_flg & IPC_NOWAIT)
-			errno_return(-1, EAGAIN);
+			errno_return(EAGAIN, -1);
 
 		if (sopptr->sem_op == 0)
 			semptr->semzcnt++;
@@ -546,9 +571,16 @@ ix_semop(int semid, struct sembuf *sops, int nsops)
 
 		suptr = NULL;	/* sem_undo may have been reallocated */
 
-		if (eval != 0)
-			errno_return(-1, EINTR);
-
+		if (eval != 0) {
+			if ((semaptr->sem_perm.mode & SEM_ALLOC) != 0 &&
+				semaptr->sem_perm.seq == IPCID_TO_SEQ(semid)) {
+				if (sopptr->sem_op == 0)
+					semptr->semzcnt--;
+				else
+					semptr->semncnt--;
+			}
+			errno_return(EINTR, -1);
+		}
 		/*
 		 * Make sure that the semaphore still exists
 		 */
@@ -557,9 +589,9 @@ ix_semop(int semid, struct sembuf *sops, int nsops)
 			/* The man page says to return EIDRM. */
 			/* Unfortunately, BSD doesn't define that code! */
 #ifdef EIDRM
-			errno_return(-1, EIDRM);
+			errno_return(EIDRM, -1);
 #else
-			errno_return(-1, EINVAL);
+			errno_return(EINVAL, -1);
 #endif
 		}
 
@@ -618,7 +650,7 @@ done:
 			for (j = 0; j < nsops; j++)
 				semaptr->sem_base[sops[j].sem_num].semval -=
 				    sops[j].sem_op;
-			errno_return(-1, eval);
+			errno_return(eval, -1);
 		} /* loop through the sops */
 	} /* if (do_undos) */
 
@@ -626,7 +658,7 @@ done:
 	for (i = 0; i < nsops; i++) {
 		sopptr = &sops[i];
 		semptr = &semaptr->sem_base[sopptr->sem_num];
-		semptr->sempid = (pid_t)p;
+		semptr->sempid = getpid();
 	}
 
 	/* Do a wakeup if any semaphore was up'd. */

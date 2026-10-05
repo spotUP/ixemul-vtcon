@@ -89,6 +89,10 @@
 #include <inline/stubs.h>
 #include <sys/types.h>
 
+#ifndef __builtin_expect
+#define __builtin_expect(x, y) (x)
+#endif
+
 #define _SIZE_T
 
 #include <exec/types.h>
@@ -113,6 +117,11 @@
 
 #include <user.h>
 #include <errno.h>
+
+/* Global TTY CR/LF mapping flags (used by __read.c, __write.c, __tioctl.c) */
+#define IXTTY_MAP_NL_TO_CR     0x0100
+#define IXTTY_MAP_CR_TO_NL     0x0200
+#define IXTTY_MAP_NL_TO_CRLF   0x0400
 
 extern struct ixlist timer_wait_queue;
 extern struct ixlist timer_ready_queue;

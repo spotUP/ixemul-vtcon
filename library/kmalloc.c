@@ -16,6 +16,13 @@
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
+ * Revision 1.4  2026/08/09  ChatGPT modifications (JJ)
+ *
+ * - Added size-overflow guards in kmalloc() and krealloc() before
+ *   rounding and allocation-size calculations.
+ * - Ensured krealloc() validates the requested size before deciding
+ *   that the existing block is already large enough.
+ *
  *  kmalloc.c,v 1.1.1.1 1994/04/04 04:30:54 amiga Exp
  *
  *  kmalloc.c,v
@@ -52,7 +59,16 @@ kmalloc (size_t size)
   u_int *res;
 
   /* always allocate a quantity of long words so we can CopyMemQuick() later */
+  if ((signed long)size < 0)
+    return 0;
+
+  if (size > (size_t)-1 - 3)
+    return 0;
+
   size = (size + 3) & ~3;
+
+  if (size > (size_t)-1 - 4)
+    return 0;
 
   res = (u_int *) b_alloc(size + 4, MEMF_PUBLIC);
   if (res) *res++ = size;
@@ -68,7 +84,16 @@ krealloc (void *mem, size_t size)
   if (! mem) return kmalloc (size);
 
   /* always allocate a quantity of long words */
+  if ((signed long)size < 0)
+    return 0;
+
+  if (size > (size_t)-1 - 3)
+    return 0;
+
   size = (size + 3) & ~3;
+
+  if (size > (size_t)-1 - 4)
+    return 0;
 
   /* in that case the block is already large enough */
   if (((u_int *)mem)[-1] >= size)

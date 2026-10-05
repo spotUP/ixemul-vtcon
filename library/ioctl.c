@@ -19,6 +19,10 @@
  *  ioctl.c,v 1.1.1.1 1994/04/04 04:30:26 amiga Exp
  *
  *  ioctl.c,v
+ * 
+ * Revision 1.2  2026/06/13  ChatGPT modifications (JJ)
+ *  Validate the file descriptor before indexing u.u_ofile[] in ioctl().
+ *
  * Revision 1.1.1.1  1994/04/04  04:30:26  amiga
  * Initial CVS check in.
  *
@@ -38,12 +42,12 @@ int
 ioctl (int fd, unsigned long cmd, ...)
 {
   usetup;
-  struct file *f = u.u_ofile[fd];
+  struct file *f;
   va_list ap;
   void *arg;
 
   /* if this is an open fd */
-  if (fd >= 0 && fd < NOFILE && f)
+  if (fd >= 0 && fd < NOFILE && (f = u.u_ofile[fd]))
       if (f->f_ioctl)
         {
 	  /* split the ioctl-cmd into its subparts */

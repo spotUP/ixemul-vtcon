@@ -20,6 +20,36 @@
 \******************************************************************/
 
 /* Dec 1991  - mw - added support for -traditional mode */
+/* Jul 2026  - JJ - added exp2, exp2f, log2, log2f, log10f, roundf and truncf support */
+
+/*
+ * ixemul note:
+ *
+ * <math.h> includes this file only for GCC/C++ builds where
+ * __HAVE_68881__ is defined.  The functions in this file are
+ * deliberately defined as static inline helpers for the 68881/68882
+ * FPU path, following the original ixemul design.
+ *
+ * These definitions do not provide exported library symbols.  They are
+ * compiled into each translation unit that includes <math.h> in the FPU
+ * configuration.  This is why the matching C99/POSIX names added here
+ * are not also declared as ordinary extern functions in <math.h> unless
+ * a real external implementation exists in the selected math library.
+ *
+ * Keeping the additions as static inline definitions avoids linker-level
+ * conflicts with an external libm that may also provide exp2(), log2(),
+ * roundf(), truncf(), etc.  The only case to avoid is declaring the same
+ * names as extern prototypes in the same preprocessor path, which would
+ * conflict with these static definitions at compile time.
+ *
+ * The newer exp2/log2/log10f helpers below are conservative wrappers
+ * around functions already implemented in this header.  In particular,
+ * exp2() and log2() are expressed through exp() and log() rather than
+ * using additional FPU instructions such as ftwotox/flog2, so no new
+ * assembler mnemonics are required beyond those already used by the
+ * original header.  roundf() and truncf() use fintrz directly, matching
+ * the existing truncation primitive already used by modf().
+ */
 
 #include <errno.h>
 
@@ -239,6 +269,20 @@ _DEFUN(exp, (x),
   return value;
 }
 
+__inline static _CONST double
+_DEFUN(exp2, (x),
+    double x)
+{
+  return exp (x * 0.69314718055994530942);
+}
+
+__inline static _CONST float
+_DEFUN(exp2f, (x),
+    float x)
+{
+  return (float)exp2 ((double)x);
+}
+
 __inline static _CONST double 
 _DEFUN(expm1, (x),
     double x)
@@ -263,6 +307,20 @@ _DEFUN(log, (x),
   return value;
 }
 
+__inline static _CONST double
+_DEFUN(log2, (x),
+    double x)
+{
+  return log (x) * 1.4426950408889634074;
+}
+
+__inline static _CONST float
+_DEFUN(log2f, (x),
+    float x)
+{
+  return (float)log2 ((double)x);
+}
+
 __inline static _CONST double 
 _DEFUN(log1p, (x),
     double x)
@@ -285,6 +343,13 @@ _DEFUN(log10, (x),
 	 : "=f" (value)
 	 : "f" (x));
   return value;
+}
+
+__inline static _CONST float
+_DEFUN(log10f, (x),
+    float x)
+{
+  return (float)log10 ((double)x);
 }
 
 __inline static _CONST double 
@@ -421,6 +486,28 @@ _DEFUN(floor, (x),
   return value;
 }
 
+
+__inline static _CONST float
+_DEFUN(roundf, (x),
+    float x)
+{
+  double temp, value;
+
+  if (x == (float)0.0)
+    return x;
+
+  if (x > (float)0.0)
+    temp = (double)x + 0.5;
+  else
+    temp = (double)x - 0.5;
+
+  __asm ("fintrz%.x %1,%0"
+	 : "=f" (value)
+	 : "f" (temp));
+
+  return (float)value;
+}
+
 __inline static _CONST double 
 _DEFUN(rint, (x),
     double x)
@@ -551,6 +638,20 @@ _DEFUN(modf, (x, ip),
 	 : "f" (x));
   *ip = temp;
   return x - temp;
+}
+
+__inline static _CONST float
+_DEFUN(truncf, (x),
+    float x)
+{
+  double temp, value;
+
+  temp = (double)x;
+  __asm ("fintrz%.x %1,%0"
+	 : "=f" (value)
+	 : "f" (temp));
+
+  return (float)value;
 }
 
 #undef _DEFUN

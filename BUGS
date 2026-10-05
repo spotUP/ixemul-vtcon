@@ -1,6 +1,40 @@
 This file documents bugs which have no obvious solution at the moment.
 If they did have an obvious solution, they would be in TODO instead.
+Rare system freeze during process exit / window switching
 
+
+***	The original ixemul 48.2 SIGWINCH/input.device handling could cause
+	GUI trashing / artefacts when multiple shell windows were open and
+	actively used.
+
+	Changes to the SIGWINCH/input.device handler lifetime and cleanup
+	fixed that original multi-shell GUI problem.
+
+	A much rarer timing-related problem remains. A total system freeze
+	has occasionally been observed when an ixemul-based process is
+	exiting while a new Intuition/input event occurs almost
+	simultaneously.
+
+	One observed sequence was:
+
+    	- build ixemul.library and run "make dist"
+    	- use nano and exit after saving
+    	- type "exit" in the shell
+    	- immediately click the top border/title area of a
+      	  Directory Opus 4 window
+    	- system freezes completely
+
+	A similar freeze has occurred previously. Several related cleanup and
+	robustness issues were fixed since then, and the problem became much
+	harder to reproduce.
+
+	The remaining failure may involve a race during process teardown. One
+	area of particular interest is __ix_remove_sigwinch() and the removal
+	of the SIGWINCH/input.device handler, but the exact cause has not
+	been confirmed.
+
+	Status: rare, unresolved.
+		
 ***	The date of a softlink is always Jan 1, 1970 and this is unlikely
 	to be fixed until a future version of AmigaOS includes a efficient
 	function to obtain the date of the softlink. The only way to

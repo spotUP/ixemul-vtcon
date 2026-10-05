@@ -1,0 +1,452 @@
+README.math
+===========
+
+ixemul.library v80 - selecting and using mathematical functions
+Revision 1.3  2026/09/08
+
+
+1. PURPOSE AND SCOPE
+--------------------
+
+ixemul's current <math.h> has two header paths for mathematical functions:
+
+  1. External function declarations, normally resolved through libm.
+  2. Static inline FPU functions from <math-68881.h>.
+
+The compiler options used for the application determine which header path
+is selected.  The CPU option and the FPU option are separate.  In
+particular, -m68060 by itself does not select <math-68881.h>.
+
+This document describes the behaviour verified in the current ixemul
+headers and how an application selects between the two paths.
+
+The original ixemul <math.h> uses the same basic either/or design: when
+__HAVE_68881__ is defined it includes <math-68881.h>; otherwise it exposes
+the normal external math prototypes.  The current v80 header has retained
+that historical structure.
+
+It does NOT assume that any particular separately supplied libm source
+tree, Makefile or archive layout is the standard ADE/GG libm build unless
+that has been verified independently.
+
+
+2. NORMAL USE
+-------------
+
+Programs should include:
+
+    #include <math.h>
+
+and link with libm when external mathematical functions may be needed:
+
+    gcc -O2 -m68060 program.c -lm -o program
+
+With a traditional static linker, place -lm after the object files or
+source file that references the mathematical functions.
+
+
+3. CPU OPTION VERSUS FPU OPTION
+-------------------------------
+
+Example:
+
+    -m68060
+
+selects code generation for the 68060 CPU, but does not by itself enable
+the 68881-compatible FPU header path in ixemul's <math.h>.
+
+Example:
+
+    -m68060 -m68881
+
+selects 68060 CPU code generation and enables GCC's 68881-compatible FPU
+support.  In the GCC 2.95.3 environment tested for ixemul, -m68881 defines
+__HAVE_68881__.  ixemul's <math.h> then includes <math-68881.h>.
+
+The same header-selection principle applies to combinations such as:
+
+    -m68020 -m68881
+    -m68040 -m68881
+    -m68060 -m68881
+
+For ixemul's current <math.h>, __HAVE_68881__ is the relevant condition
+for selecting <math-68881.h>.  CPU selection alone is not the same thing
+as FPU selection.
+
+
+4. EXTERNAL LIBM HEADER PATH
+----------------------------
+
+Without __HAVE_68881__, the current ixemul <math.h> declares normal
+external functions including:
+
+    acos      asin      atan      atan2
+    ceil      cos       cosh      exp
+    fabs      floor     fmod      frexp
+    ldexp     log       log10     modf
+    pow       sin       sinh      sqrt
+    tan       tanh
+
+When neither _ANSI_SOURCE nor _POSIX_SOURCE restricts the interface,
+additional declarations include:
+
+    acosh     asinh     atanh     cabs
+    cbrt      copysign  drem      erf
+    erfc      expm1     finite    hypot
+    j0        j1        jn        lgamma
+    log1p     logb      rint      scalb
+    y0        y1        yn
+
+These are declarations.  A declaration in <math.h> does not by itself
+prove which external library provides the symbol, which implementation is
+used, or how that library was compiled.
+
+External availability must be verified against the actual libm installed
+or selected for the build.
+
+
+5. INLINE 68881/FPU HEADER PATH
+-------------------------------
+
+When GCC or C++ is used and __HAVE_68881__ is defined, the current ixemul
+<math.h> includes <math-68881.h> instead of the normal external prototype
+block.
+
+This is not a v80 invention.  The original ixemul <math.h> already used
+this same selection model, and the original 1989/1991 <math-68881.h>
+contained its own static inline FPU implementations.
+
+The current <math-68881.h> contains static inline implementations of:
+
+    sin       cos       tan       asin
+    acos      atan      atan2     sinh
+    cosh      tanh      atanh     exp
+    expf      exp2      exp2f     expm1
+    log       log2      log2f     log1p
+    log10     log10f    sqrt      hypot
+    pow       fabs      ceil      floor
+    roundf    rint      fmod      drem
+    scalb     logb      ldexp     frexp
+    modf      truncf
+
+These definitions are compiled into each translation unit that uses this
+header path.  They do NOT by themselves create exported symbols in an
+external libm archive.
+
+Some functions use FPU instructions directly.  Others are wrappers around
+existing inline functions.  For example, the current implementation uses:
+
+    log2(x) = log(x) * 1.4426950408889634074
+
+and:
+
+    exp2(x) = exp(x * 0.69314718055994530942)
+
+Thus the current inline log2() and exp2() reuse inline log() and exp()
+instead of directly adding flog2 or ftwotox assembler operations.
+
+
+6. IMPORTANT DIFFERENCE BETWEEN THE TWO PATHS
+---------------------------------------------
+
+The original and current <math.h> effectively select:
+
+    if __HAVE_68881__
+        include <math-68881.h>
+    else
+        declare the external math interface
+
+This is the historical ixemul design.  It is a strict header-level
+either/or choice; the two sets are not automatically merged.
+
+A function added only to <math-68881.h> may be available when compiling
+with -m68881 but still have no external symbol for a build that uses the
+normal external path.
+
+Conversely, an external function can exist in a libm archive while its
+prototype is hidden by the -m68881 header path if that function is not
+also exposed by <math-68881.h>.
+
+Adding -lm does not override or merge this header choice.  -m68881 affects
+preprocessing and compilation; -lm affects the later link stage.  -lm can
+resolve an external symbol only if the compiled code contains an external
+reference to it.  It does not make the prototypes from the skipped
+<math.h> branch visible.
+
+The original design therefore intentionally favours the inline FPU header
+as a self-contained interface when __HAVE_68881__ is selected.
+
+This distinction is especially important when adding C99 functions.
+
+
+7. CURRENT C99-STYLE ADDITIONS IN MATH-68881.H
+----------------------------------------------
+
+The current <math-68881.h> contains these newer additions:
+
+    expf
+    exp2
+    exp2f
+    log2
+    log2f
+    log10f
+    roundf
+    truncf
+
+Their presence in <math-68881.h> proves only that they exist as static
+inline implementations on the selected FPU header path.
+
+It must NOT be assumed from that fact alone that matching external symbols
+exist in the libm used by ADE/GG or by any particular ixemul installation.
+
+log2() demonstrated this distinction during the Lua 5.4 work: compiling
+through the external path produced an unresolved reference to log2(),
+while the current <math-68881.h> does contain an inline log2().
+
+For a function that is intentionally supported on both historical paths,
+the following pieces may be needed:
+
+    FPU header path:
+        static inline implementation in <math-68881.h>
+
+    external path:
+        prototype in the non-68881 branch of <math.h>
+        real external implementation in the selected libm
+
+This follows the existing either/or header design.  A different design in
+which <math-68881.h> supplies inline functions and <math.h> simultaneously
+supplies external prototypes for everything else would be a deliberate
+modernisation, not restoration of original ixemul behaviour.
+
+
+8. DO NOT INFER LIBM CONTENT FROM AN UNRELATED MAKEFILE
+-------------------------------------------------------
+
+A Makefile from a libm source tree describes only that source tree unless
+it has been established that it is the libm actually used by the target
+ADE/GG installation.
+
+In particular, do not infer from such a Makefile:
+
+    - which libm is the ADE/GG default
+    - which object files are present in the installed libm
+    - which CPU or FPU flags were used to build the installed libm
+    - whether libm881 is a separate build or a link to another archive
+
+Those properties must be checked against the actual installed or selected
+library and its actual build system.
+
+
+9. VERIFYING THE EXTERNAL LIBM
+------------------------------
+
+To determine whether a function exists externally, inspect the actual
+library used for the link.
+
+Typical checks are:
+
+    nm /path/to/libm.a | grep log2
+
+or, where supported:
+
+    ar t /path/to/libm.a
+
+The exact tools available depend on the object/archive format and the ADE
+toolchain.
+
+A successful header compile is not enough.  The final link is the decisive
+test for an external function.
+
+For example:
+
+    #include <math.h>
+
+    int main(void)
+    {
+        volatile double x = 8.0;
+        volatile double y = log2(x);
+        return (y == 3.0) ? 0 : 1;
+    }
+
+Compile through the external path:
+
+    gcc -O2 -m68060 testlog2.c -lm -o testlog2
+
+If the linker reports an undefined reference to log2, the selected
+external libraries do not provide the required symbol, regardless of
+whether an inline log2() exists in <math-68881.h>.
+
+
+10. 68040 AND 68060 NOTE
+------------------------
+
+-m68881 tells GCC and the inline header to use the 68881-compatible FPU
+instruction model.
+
+The 68040 and 68060 have internal FPUs, but they do not implement every
+68881/68882 transcendental instruction directly in hardware.  Code using
+68881-style transcendental instructions may therefore depend on the
+appropriate 68040/68060 floating-point support when an unsupported
+instruction requires software emulation.
+
+Do not interpret -m68881 as meaning that every FPU operation is necessarily
+a native single-instruction operation on a 68040 or 68060.
+
+
+
+11. BUILDING LIBM WITH -m68881
+-----------------------------
+
+When compiling libm itself, -m68881 has two separate effects that must not
+be confused:
+
+    1. GCC may generate 68881-compatible floating-point instructions.
+    2. GCC defines __HAVE_68881__, which makes ixemul's <math.h> select
+       <math-68881.h>.
+
+-fno-inline does NOT disable the second effect.  It controls compiler
+inlining, but it does not change the preprocessor selection made by
+<math.h>.  Static inline definitions from <math-68881.h> are still visible
+to the translation unit.
+
+Therefore:
+
+    -fno-inline
+        does NOT mean "do not use <math-68881.h>"
+
+If libm should be compiled with FPU code generation while avoiding the
+<math-68881.h> header path, one possible GCC 2.95.3 configuration is:
+
+    -m68881 -U__HAVE_68881__
+
+This keeps -m68881 code generation enabled while removing the macro that
+ixemul's <math.h> uses to select <math-68881.h>.
+
+This combination must be verified with the actual GCC 2.95.3 build and the
+actual libm sources before it is made part of the normal build procedure.
+
+12. ADDING A NEW MATH FUNCTION
+--------------------------------
+
+The original ixemul design should be treated as the compatibility baseline:
+the -m68881 path is supplied by <math-68881.h>, while the non-68881 path
+uses external prototypes and libm.
+
+When adding a new function such as log2(), exp2(), round() or a float
+variant, decide explicitly which path or paths are intended to support it.
+
+For support on both paths, keep the following parts synchronized where
+applicable:
+
+    A. External implementation
+       Add a real implementation to the libm source tree that is actually
+       used when the function must work without the inline FPU header.
+
+    B. External library build
+       Add that implementation to the real libm build system.
+
+    C. <math.h>
+       Add the external prototype in the non-68881 path.
+
+    D. <math-68881.h>
+       Add or retain a static inline implementation for the FPU path.
+
+    E. Test both paths
+       Compile and link once without -m68881 and once with -m68881.
+
+Do not add an unconditional extern declaration for a name that is also
+defined as static inline in <math-68881.h> if that would place conflicting
+linkage declarations in the same translation unit.
+
+Changing <math.h> so that the -m68881 path also receives external
+prototypes for functions absent from <math-68881.h> is possible, but it is
+an API/header redesign and should be evaluated separately rather than
+treated as an original ixemul behaviour.
+
+
+13. RECOMMENDED TEST MATRIX
+---------------------------
+
+External header/libm path:
+
+    gcc -O2 -m68060 testmath.c -lm -o testmath
+
+68060 inline FPU header path:
+
+    gcc -O2 -m68060 -m68881 testmath.c -lm -o testmath-060fpu
+
+68040 inline FPU header path:
+
+    gcc -O2 -m68040 -m68881 testmath.c -lm -o testmath-040fpu
+
+68020 plus 68881/68882:
+
+    gcc -O2 -m68020 -m68881 testmath.c -lm -o testmath-020fpu
+
+For each new function, test normal values, zero, negative-domain cases
+where applicable, infinities/NaNs if supported by the implementation, and
+boundary values relevant to the function.
+
+
+14. DIAGNOSTICS
+---------------
+
+To verify the header path, inspect the compiler macros.
+
+With the tested GCC 2.95.3 setup:
+
+    gcc -m68060 -m68881 -dM -E test.c
+
+defines:
+
+    __HAVE_68881__
+
+and therefore selects <math-68881.h> through ixemul's <math.h>.
+
+Without -m68881, do not assume that header path is active.
+
+To verify an external function, inspect and/or link against the actual libm
+that the application will use.
+
+Do not infer external availability from <math-68881.h>.  Its static inline
+functions are header implementations, not proof of external archive
+symbols.
+
+
+15. SUMMARY
+-----------
+
+Use:
+
+    -m68060
+
+when you want 68060 CPU code and the normal external math header path.
+
+Use:
+
+    -m68060 -m68881
+
+when you want the 68060 CPU target and ixemul's inline
+68881-compatible FPU math header path.
+
+Always remember:
+
+    CPU selection != FPU selection
+
+    -m68881 selects the historical inline FPU header path
+
+    -lm does not override or merge that header selection
+
+and:
+
+    function present in <math-68881.h>
+        !=
+    function exported by the selected libm
+
+The original ixemul design is an either/or header model.  A hybrid model
+that keeps inline FPU functions while also exposing external prototypes for
+missing functions would be a deliberate modernisation.
+
+The build details of an arbitrary libm source tree must not be presented as
+properties of the standard ADE/GG libm unless that relationship has been
+verified.

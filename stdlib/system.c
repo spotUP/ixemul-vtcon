@@ -31,8 +31,14 @@
  * SUCH DAMAGE.
  */
 
+/* 
+ *  Revision 1.11  2026/04/12   Copilot modification  (JJ)
+ *  - Made waitpid() EINTR-safe with a retry loop.
+ *  - Kept historical ixemul shell invocation semantics unchanged.
+ */
+
 #if defined(LIBC_SCCS) && !defined(lint)
-/*static char *sccsid = "from: @(#)system.c	5.10 (Berkeley) 2/23/91";*/
+/*static char *sccsid = "from: @(#)system.c 5.10 (Berkeley) 2/23/91";*/
 static char *rcsid = "$Id: system.c,v 1.10 1995/06/14 05:20:01 jtc Exp $";
 #endif /* LIBC_SCCS and not lint */
 
@@ -45,26 +51,29 @@ static char *rcsid = "$Id: system.c,v 1.10 1995/06/14 05:20:01 jtc Exp $";
 #include <stdlib.h>
 #include <unistd.h>
 #include <paths.h>
+#include <errno.h>
 
 int
 system(command)
 	const char *command;
 {
-	pid_t pid;
+	pid_t pid, wp;
 	sig_t intsave, quitsave;
 	int omask;
 	int pstat;
 	char *argp[] = {"sh", "-c", (char *) command, NULL};
-        usetup;
+	usetup;
 
 	if (!command)		/* just checking... */
 		return(1);
 
 	omask = sigblock(sigmask(SIGCHLD));
+
 	switch(pid = vfork()) {
 	case -1:			/* error */
 		(void)sigsetmask(omask);
 		return(-1);
+
 	case 0:				/* child */
 		(void)sigsetmask(omask);
 		execve("sh", argp, *u.u_environ);
@@ -73,9 +82,14 @@ system(command)
 
 	intsave = (sig_t)signal(SIGINT, SIG_IGN);
 	quitsave = (sig_t)signal(SIGQUIT, SIG_IGN);
-	pid = waitpid(pid, (int *)&pstat, 0);
+
+	while ((wp = waitpid(pid, &pstat, 0)) == -1 && errno == EINTR)
+		;
+
 	(void)sigsetmask(omask);
 	(void)signal(SIGINT, intsave);
 	(void)signal(SIGQUIT, quitsave);
-	return(pid == -1 ? -1 : pstat);
+
+	return(wp == -1 ? -1 : pstat);
 }
+

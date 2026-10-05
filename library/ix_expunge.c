@@ -18,6 +18,20 @@
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  *  $Id: ix_expunge.c,v 1.9 1994/07/07 15:08:35 rluebbert Exp $
+ * 
+ * Revision 1.10  2026/06/22  ChatGPT modifications (JJ)
+ *
+ *  Added global allocator cleanup during library expunge.
+ *
+ *  ix_expunge() now calls cleanup_buddy() after all remaining global
+ *  ixemul allocations that use kfree() have been released, and before
+ *  closing the supporting libraries.
+ *
+ *  This completes the global lifecycle pairing with init_buddy() in
+ *  ix_init(), and ensures the PoolMem/buddy allocator backend is torn
+ *  down when the library is expunged.
+ *
+ * Per-process ix_close() teardown is unchanged.
  *
  *  $Log: ix_expunge.c,v $
  *  Revision 1.9  1994/07/07  15:08:35  rluebbert
@@ -69,6 +83,8 @@ void ix_expunge (struct ixemul_base *ixbase)
         kfree(*tmp++);
       kfree(ixbase->ix_global_environment);
     }
+
+  cleanup_buddy();
 
   close_libraries();
 

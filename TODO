@@ -1,98 +1,42 @@
-2000-08-31  David Zaroski  <dez@cronus.ninemoons.com>
+2026-09-25  Jörgen Johansson
 
-	* remove pOS support.
+***	Investigate the remaining rare SIGWINCH/input.device teardown race.
 
-1999-09-03  David Zaroski  <zaroski@cronus.ninemoons.com>
+***	Review __ix_remove_sigwinch() and process-exit ordering to ensure that
+   	handler-related data cannot be freed or invalidated before
+   	IND_REMHANDLER has fully completed.
 
-	* The following are in prioritized order
-	* Add seamless cross-compiling capabilities to the build process
-	* Fix lseek() bug reported by Rask
-	* Add? nanosleep()
+   	Consider separating the input handler state from process data and
+   	adding an explicit inactive/dying state during teardown.
 
-It appears that some of the following have already been taken care of,
-but was not removed from the list. :( Something else TODO. :-)
+2026-09-14  Jörgen Johansson
+
+	* Updated for the current ixemul.library source tree.
+	* Removed completed, obsolete and currently excluded items.
 
 
+***	Modernize and reorganize the Makefile/build system.
 
-***	Add support for serial line I/O, allowing a port of GNU (Taylor's)
-	UUCP.
 
-***	Add job control support. Partial support for stopping/resuming processes
-	is already in place but it needs to be generalized so that it can be
-	user for job control.
+***	Add support for AF_UNIX/AF_LOCAL datagram sockets.
 
-***	The stat() function (and/or opendir() ) is slow. Is it possible to
-	speed this up?
 
-***	Improve the (currently only partially implemented) ix.h header.
+***	Add connection timeout handling to AF_UNIX connect().
 
-***     Document how to implement a fork() emulation
 
-***	Amiga<->Unix pathname handling scheme:
+***	Make AF_UNIX SO_RCVBUF, SO_SNDBUF, SO_RCVTIMEO and SO_SNDTIMEO
+	settings affect the actual stream buffering and waiting behaviour,
+	if this can be done without breaking existing semantics.
 
-	The following scheme might be feasible:
-	
-	Either through a function call or through a global variable, a program
-	tells ixemul that it can use Amiga pathnames. In that case ixemul will
-	translate all filenames to Unix pathnames internally. E.g., the open()
-	function will start with this code:
-	
-	  if (process_can_use_amiga_pathnames)
-	    pathname = a2u(pathname);
-	
-	Similar code is needed for fopen(), etc.
-	
-	With ixprefs you can state whether you want to accept these hints from
-	programs or not.
-	
-	This means that a program must be prepared to handle both kinds of
-	pathnames. This is only a problem if your program tries to parse the
-	pathname.
-	
-	I think a function 'int ix_can_use_amiga_pathnames(void)' that returns TRUE
-	if the user (through ixprefs) also accepts amiga pathnames would be the
-	best way to do this.
-	
-	Functions a2u() and u2a() for pathname conversion would also be exported
-	from ixemul (they are already available internally).
-
-***	#include <unistd.h>
-
-	main()
-	{
-	  char foo[1000];
-	  read(0,foo,999);
-	}
-
-	Run this program, press Ctrl-C and it looks as if nothing has
-	happened. You will have to actually press enter to see the
-	shell prompt.
-
-***	Open the math libraries on a per-task basis.
-
-***	The initial value of the frame pointer is not set to NULL (as
-	it should be). This makes backtracking the stack a bit more
-	complicated as the current frame pointer has to be checked for
-	being inside the current maximum stack frame (and it's almost
-	impossible to do that with stackextension enabled...).
-
-***	Implement socketpair().
-
-***	ixstack should be able to modify stack even if the file is write protected
-	(just like gzip).
 
 ***	Add proper locale support.
 
-***	Improve math handling (especially math.h, ask Kriton for more info)
+***	Complete and restore manual-page documentation.
+	Many of the functions added after ixemul 48.2 do not yet have man
+	pages.  Add documentation for the new interfaces and keep existing
+	manual pages in sync with the current implementation.
 
-***	At every ixemul open ixnet tries to open bsdsocket.library or
-	socket.library. If these are not present, it will do a disk access
-	in LIBS, which is a performance penalty. Can we find something more
-	elegant?
+	Manual-page generation is currently disabled in the Makefile because
+	groff/nroff hangs during the build process.  Find a reliable way to
+	generate the documentation without blocking the ixemul build.
 
-***	Make it possible for a program to turn off the Unix path
-	translation of ixemul, so that it can use standard Amiga names.
-
-
-
-	

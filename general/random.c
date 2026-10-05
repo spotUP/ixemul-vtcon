@@ -17,6 +17,16 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+/*
+ * random.c,v
+ *
+ * Revision 1.1  2026/08/16  ChatGPT  (JJ)
+ *
+ *    Use unsigned 32-bit long state arithmetic so wraparound is defined.
+ *    Use local front/rear pointers in random() and write them back once.
+ *    Preserve the existing seed algorithm, initial state table and sequence.
+ */
+
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)random.c	5.7 (Berkeley) 6/1/90";
 #endif /* LIBC_SCCS and not lint */
@@ -42,7 +52,7 @@ static char sccsid[] = "@(#)random.c	5.7 (Berkeley) 6/1/90";
  * generates far better random numbers than a linear congruential generator.
  * If the amount of state information is less than 32 bytes, a simple linear
  * congruential R.N.G. is used.
- * Internally, the state information is treated as an array of longs; the
+ * Internally, the state information is treated as an array of unsigned longs;
  * zeroeth element of the array is the type of R.N.G. being used (small
  * integer); the remainder of the array is the state information for the
  * R.N.G.  Thus, 32 bytes of state information will give 7 longs worth of
@@ -127,7 +137,7 @@ static  int		seps[ MAX_TYPES ]	= { SEP_0, SEP_1, SEP_2,
  *	MAX_TYPES*(rptr - state) + TYPE_3 == TYPE_3.
  */
 
-static  long		randtbl[ DEG_3 + 1 ]	= { TYPE_3,
+static  unsigned long	randtbl[ DEG_3 + 1 ]	= { TYPE_3,
 			    0x9a319039, 0x32d9c024, 0x9b663182, 0x5da1f342, 
 			    0xde3b81e0, 0xdf0a6fb5, 0xf103bc02, 0x48f340fb, 
 			    0x7449e56b, 0xbeb1dbb0, 0xab5c5918, 0x946554fd, 
@@ -149,8 +159,8 @@ static  long		randtbl[ DEG_3 + 1 ]	= { TYPE_3,
  * to point to randtbl[1] (as explained below).
  */
 
-static  long		*fptr			= &randtbl[ SEP_3 + 1 ];
-static  long		*rptr			= &randtbl[ 1 ];
+static  unsigned long	*fptr			= &randtbl[ SEP_3 + 1 ];
+static  unsigned long	*rptr			= &randtbl[ 1 ];
 
 
 
@@ -166,13 +176,13 @@ static  long		*rptr			= &randtbl[ 1 ];
  * the front and rear pointers have wrapped.
  */
 
-static  long		*state			= &randtbl[ 1 ];
+static  unsigned long	*state			= &randtbl[ 1 ];
 
 static  int		rand_type		= TYPE_3;
 static  int		rand_deg		= DEG_3;
 static  int		rand_sep		= SEP_3;
 
-static  long		*end_ptr		= &randtbl[ DEG_3 + 1 ];
+static  unsigned long	*end_ptr		= &randtbl[ DEG_3 + 1 ];
 
 
 
@@ -273,7 +283,7 @@ initstate( seed, arg_state, n )
 		}
 	    }
 	}
-	state = &(  ( (long *)arg_state )[1]  );	/* first location */
+	state = &(  ( (unsigned long *)arg_state )[1]  );	/* first location */
 	end_ptr = &state[ rand_deg ];	/* must set end_ptr before srandom */
 	srandom( seed );
 	if(  rand_type  ==  TYPE_0  )  state[ -1 ] = rand_type;
@@ -300,7 +310,7 @@ setstate( arg_state )
 
     char		*arg_state;
 {
-	register  long		*new_state	= (long *)arg_state;
+	register  unsigned long	*new_state	= (unsigned long *)arg_state;
 	register  int		type		= new_state[0]%MAX_TYPES;
 	register  int		rear		= new_state[0]/MAX_TYPES;
 	char			*ostate		= (char *)( &state[ -1 ] );
@@ -350,22 +360,27 @@ setstate( arg_state )
 long
 random()
 {
-	long		i;
+	unsigned long	i;
+	unsigned long	*f, *r;
 	
 	if(  rand_type  ==  TYPE_0  )  {
-	    i = state[0] = ( state[0]*1103515245 + 12345 )&0x7fffffff;
+	    i = state[0] = ( state[0]*1103515245UL + 12345UL )&0x7fffffffUL;
 	}
 	else  {
-	    *fptr += *rptr;
-	    i = (*fptr >> 1)&0x7fffffff;	/* chucking least random bit */
-	    if(  ++fptr  >=  end_ptr  )  {
-		fptr = state;
-		++rptr;
+	    f = fptr;
+	    r = rptr;
+	    *f += *r;
+	    i = (*f >> 1)&0x7fffffffUL;	/* chucking least random bit */
+	    if(  ++f  >=  end_ptr  )  {
+		f = state;
+		++r;
 	    }
 	    else  {
-		if(  ++rptr  >=  end_ptr  )  rptr = state;
+		if(  ++r  >=  end_ptr  )  r = state;
 	    }
+	    fptr = f;
+	    rptr = r;
 	}
-	return( i );
+	return( (long)i );
 }
 

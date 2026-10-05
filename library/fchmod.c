@@ -19,6 +19,10 @@
  *  fchmod.c,v 1.1.1.1 1994/04/04 04:30:17 amiga Exp
  *
  *  fchmod.c,v
+ * 
+ * Revision 1.2  2026/06/13  ChatGPT modifications (JJ)
+ *  Validate the file descriptor before indexing u.u_ofile[] in fchmod().
+ *
  * Revision 1.1.1.1  1994/04/04  04:30:17  amiga
  * Initial CVS check in.
  *
@@ -35,9 +39,9 @@ int
 fchmod(int fd, mode_t mode)
 {
   usetup;
-  struct file *f = u.u_ofile[fd];
+  struct file *f;
 
-  if (fd >= 0 && fd < NOFILE && f)
+  if (fd >= 0 && fd < NOFILE && (f = u.u_ofile[fd]))
     {
       f->f_stb.st_mode = mode;
       f->f_stb_dirty |= FSDF_MODE;

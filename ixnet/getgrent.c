@@ -35,6 +35,16 @@
 static char sccsid[] = "@(#)getgrent.c  5.9 (Berkeley) 4/1/91";
 #endif /* LIBC_SCCS and not lint */
 
+/*
+ * getgrent.c,v
+ *
+ * Revision 1.1  2026/08/05  ChatGPT modifications (JJ)
+ *
+ *    Call AmiTCP usergroup functions only when usergroup.library is open.
+ *    Roadshow without usergroup.library now uses the existing local group
+ *    database path instead of invoking an inline function through NULL.
+ */
+
 #define _KERNEL
 #include "ixnet.h"
 #include <sys/types.h>
@@ -57,7 +67,8 @@ getgrent(void)
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
 
-    if (p->u_networkprotocol == IX_NETWORK_AMITCP) {
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase) {
 	return UG_getgrent();
     }
     if ((!u.u_grp_fp && !start_gr()) || !grscan(0, 0, NULL))
@@ -71,7 +82,8 @@ getgrnam(const char *name)
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
 
-    if (p->u_networkprotocol == IX_NETWORK_AMITCP) {
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase) {
 	struct group *err = UG_getgrnam(name);
 
 	if (!err) {
@@ -99,7 +111,8 @@ getgrgid(gid_t gid)
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
 
-    if (p->u_networkprotocol == IX_NETWORK_AMITCP) {
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase) {
 	struct group *err;
 	err = UG_getgrgid(gid);
 
@@ -140,7 +153,8 @@ setgrent(void)
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
 
-    if (p->u_networkprotocol == IX_NETWORK_AMITCP) {
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase) {
 	UG_setgrent();
 	return 1;
     }
@@ -153,7 +167,8 @@ setgroupent(int stayopen)
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
 
-    if (p->u_networkprotocol == IX_NETWORK_AMITCP) {
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase) {
 	UG_setgrent();
 	return 1;
     }
@@ -170,7 +185,8 @@ endgrent(void)
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
 
-    if (p->u_networkprotocol == IX_NETWORK_AMITCP) {
+    if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase) {
 	UG_endgrent();
     }
     if (u.u_grp_fp) {
@@ -242,7 +258,8 @@ setgroups (int ngroups, const int *gidset)
   usetup;
   struct ixnet *p = u.u_ixnet;
 
-  if (p->u_networkprotocol == IX_NETWORK_AMITCP)
+  if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
+        p->u_UserGroupBase)
     return UG_setgroups(ngroups,gidset);
   return (ngroups >= 1) ? 0 : -1;
 }

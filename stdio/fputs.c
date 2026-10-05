@@ -36,7 +36,15 @@
  * SUCH DAMAGE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
+/*
+ * Revision 1.4.1  2026/06/11  ChatGPT modifications  (JJ)
+ *
+ *   Normalize CRLF sequences to LF while preserving standalone CR.
+ *   Added fast path for CR?free strings to avoid unnecessary copying.
+ */
+
+
+ #if defined(LIBC_SCCS) && !defined(lint)
 #if 0
 static char sccsid[] = "@(#)fputs.c	8.1 (Berkeley) 6/4/93";
 #endif
@@ -52,6 +60,7 @@ static char rcsid[] = "$NetBSD: fputs.c,v 1.4 1995/02/02 02:09:32 jtc Exp $";
 
 /*
  * Write the given string to the given file.
+ * CR is removed only when immediately followed by LF.
  */
 int
 fputs(s, fp)
@@ -60,10 +69,45 @@ fputs(s, fp)
 {
 	struct __suio uio;
 	struct __siov iov;
+	char buf[256];
+	const char *p;
+	size_t n, i, j;
 
-	iov.iov_base = (void *)s;
-	iov.iov_len = uio.uio_resid = strlen(s);
-	uio.uio_iov = &iov;
-	uio.uio_iovcnt = 1;
-	return (__sfvwrite(fp, &uio));
+	p = s;
+	n = strlen(s);
+
+	/*
+	 * Fast path for the normal case: pass CR-free strings directly to
+	 * stdio without copying them through the temporary buffer.
+	 */
+	if (memchr(p, '\r', n) == NULL) {
+		iov.iov_base = (void *)p;
+		iov.iov_len = uio.uio_resid = n;
+		uio.uio_iov = &iov;
+		uio.uio_iovcnt = 1;
+		return (__sfvwrite(fp, &uio) != 0 ? EOF : 0);
+	}
+
+	while (n != 0) {
+		j = 0;
+
+		for (i = 0; i < n && j < sizeof(buf); i++) {
+			if (p[i] == '\r' && i + 1 < n && p[i + 1] == '\n')
+				continue;
+			buf[j++] = p[i];
+		}
+
+		if (j != 0) {
+			iov.iov_base = (void *)buf;
+			iov.iov_len = uio.uio_resid = j;
+			uio.uio_iov = &iov;
+			uio.uio_iovcnt = 1;
+			if (__sfvwrite(fp, &uio) != 0)
+				return (EOF);
+		}
+
+		p += i;
+		n -= i;
+	}
+	return (0);
 }

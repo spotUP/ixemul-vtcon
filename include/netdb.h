@@ -35,6 +35,12 @@
  *	@(#)netdb.h	5.15 (Berkeley) 4/3/91
  */
 
+/*
+ * Revision 1.1  2026/08/01  ChatGPT modification (JJ)
+ *
+ *  Add EAI_OVERFLOW for getnameinfo() result-buffer overflow.
+ */
+
 #ifndef _NETDB_H_
 #define _NETDB_H_
 
@@ -86,6 +92,30 @@ struct	protoent {
 };
 
 /*
+ * RFC2553 / POSIX getaddrinfo() and getnameinfo() support.
+ *
+ * This is a minimal ixemul-compatible addition to the original NetBSD
+ * 1995 header.  It intentionally keeps the existing hostent/servent/
+ * protoent ABI and only adds the addrinfo interface needed by the
+ * getaddrinfo.c/getnameinfo.c compatibility sources.
+ */
+#ifndef _IXEMUL_SOCKLEN_T_DEFINED
+typedef int socklen_t;
+#define _IXEMUL_SOCKLEN_T_DEFINED
+#endif
+
+struct addrinfo {
+	int	ai_flags;	/* AI_PASSIVE, AI_CANONNAME, AI_NUMERICHOST */
+	int	ai_family;	/* PF_xxx */
+	int	ai_socktype;	/* SOCK_xxx */
+	int	ai_protocol;	/* 0 or IPPROTO_xxx */
+	socklen_t ai_addrlen;	/* length of ai_addr */
+	char	*ai_canonname;	/* canonical name for hostname */
+	struct sockaddr *ai_addr;	/* binary address */
+	struct addrinfo *ai_next;	/* next structure in linked list */
+};
+
+/*
  * Error return codes from gethostbyname() and gethostbyaddr()
  * (left in extern int h_errno).
  */
@@ -97,6 +127,50 @@ extern int h_errno;
 #define	NO_RECOVERY	3 /* Non recoverable errors, FORMERR, REFUSED, NOTIMP */
 #define	NO_DATA		4 /* Valid name, no data record of requested type */
 #define	NO_ADDRESS	NO_DATA		/* no address, look for MX record */
+
+/*
+ * Error return codes from getaddrinfo().
+ */
+#define	EAI_ADDRFAMILY	 1	/* address family for hostname not supported */
+#define	EAI_AGAIN	 2	/* temporary failure in name resolution */
+#define	EAI_BADFLAGS	 3	/* invalid value for ai_flags */
+#define	EAI_FAIL	 4	/* non-recoverable failure in name resolution */
+#define	EAI_FAMILY	 5	/* ai_family not supported */
+#define	EAI_MEMORY	 6	/* memory allocation failure */
+#define	EAI_NODATA	 7	/* no address associated with hostname */
+#define	EAI_NONAME	 8	/* hostname nor servname provided, or not known */
+#define	EAI_SERVICE	 9	/* servname not supported for ai_socktype */
+#define	EAI_SOCKTYPE	10	/* ai_socktype not supported */
+#define	EAI_SYSTEM	11	/* system error returned in errno */
+#define	EAI_BADHINTS	12	/* invalid value for hints */
+#define	EAI_PROTOCOL	13	/* resolved protocol is unknown */
+#define	EAI_OVERFLOW	14	/* argument buffer overflow */
+#define	EAI_MAX		14
+
+/*
+ * Flag values for getaddrinfo().
+ */
+#define	AI_PASSIVE	0x00000001	/* get address to use bind() */
+#define	AI_CANONNAME	0x00000002	/* fill ai_canonname */
+#define	AI_NUMERICHOST	0x00000004	/* prevent name resolution */
+#define	AI_NUMERICSERV	0x00000008	/* prevent service name resolution */
+#define	AI_MASK		(AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | \
+				 AI_NUMERICSERV)
+
+/*
+ * Constants and flag values for getnameinfo().
+ */
+#define	NI_MAXHOST	1025
+#define	NI_MAXSERV	32
+
+#define	NI_NOFQDN	0x00000001
+#define	NI_NUMERICHOST	0x00000002
+#define	NI_NAMEREQD	0x00000004
+#define	NI_NUMERICSERV	0x00000008
+#define	NI_DGRAM	0x00000010
+#define	NI_WITHSCOPEID	0x00000020
+
+#define	SCOPE_DELIMITER '%'
 
 #include <sys/cdefs.h>
 
@@ -123,6 +197,12 @@ void		sethostent __P((int));
 /* void		sethostfile __P((const char *)); */
 void		setnetent __P((int));
 void		setprotoent __P((int));
+int		getaddrinfo __P((const char *, const char *,
+				 const struct addrinfo *, struct addrinfo **));
+int		getnameinfo __P((const struct sockaddr *, socklen_t, char *,
+				 socklen_t, char *, socklen_t, int));
+void		freeaddrinfo __P((struct addrinfo *));
+char		*gai_strerror __P((int));
 void		setservent __P((int));
 __END_DECLS
 

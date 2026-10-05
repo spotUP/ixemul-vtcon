@@ -15,6 +15,12 @@
  *  You should have received a copy of the GNU Library General Public
  *  License along with this library; if not, write to the Free
  *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * 
+ * 
+ *  Revision 1.2  2026/06/08  Copilot/ChatGPT modification  (JJ)
+ *  Changed __make_link() to take const char * instead of char *.
+ *  No functional change; __plock() copies the string internally.
+ *
  *
  *  __make_link.c,v 1.1.1.1 1994/04/04 04:30:10 amiga Exp
  *
@@ -61,7 +67,7 @@ __link_func (struct lockinfo *info, struct link_vec *lv, int *error)
 }
 
 int 
-__make_link (char *path, BPTR targ, int mode)
+__make_link (const char *path, BPTR targ, int mode)
 {
   struct link_vec lv;
   
