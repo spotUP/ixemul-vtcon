@@ -54,8 +54,10 @@ $(LIB) :	all.o
 		$(AR) rv $@ $^
 		$(RANLIB) $@
 
-all.c:		$(SRC)
+# libc_impl.h first: no loop may become a call to the function it implements
+all.c:		$(SRC) libc_impl.h
 		@$(catenate)
+		@{ echo '#include "libc_impl.h"'; cat $@; } > $@.tmp && mv $@.tmp $@
 
 clean:
 		rm -rf 680?0 notrap
