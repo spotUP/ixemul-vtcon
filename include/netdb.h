@@ -99,10 +99,11 @@ struct	protoent {
  * protoent ABI and only adds the addrinfo interface needed by the
  * getaddrinfo.c/getnameinfo.c compatibility sources.
  */
-#ifndef _IXEMUL_SOCKLEN_T_DEFINED
+#if !defined(_IXEMUL_SOCKLEN_T_DEFINED) && !defined(_SOCKLEN_T_DECLARED)
 typedef int socklen_t;
-#define _IXEMUL_SOCKLEN_T_DEFINED
 #endif
+#define _IXEMUL_SOCKLEN_T_DEFINED
+#define _SOCKLEN_T_DECLARED	/* the BSD guard, <sys/socket.h> tests it too */
 
 struct addrinfo {
 	int	ai_flags;	/* AI_PASSIVE, AI_CANONNAME, AI_NUMERICHOST */

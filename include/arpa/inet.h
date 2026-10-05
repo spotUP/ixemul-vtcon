@@ -51,10 +51,11 @@
 #include <netinet/in.h>
 #include <sys/cdefs.h>
 
-#ifndef _IXEMUL_SOCKLEN_T_DEFINED
+#if !defined(_IXEMUL_SOCKLEN_T_DEFINED) && !defined(_SOCKLEN_T_DECLARED)
 typedef int socklen_t;
-#define _IXEMUL_SOCKLEN_T_DEFINED
 #endif
+#define _IXEMUL_SOCKLEN_T_DEFINED
+#define _SOCKLEN_T_DECLARED	/* the BSD guard, <sys/socket.h> tests it too */
 
 #ifndef INET_ADDRSTRLEN
 #define INET_ADDRSTRLEN 16

@@ -131,10 +131,12 @@ struct	linger {
 /* POSIX names for the types ixemul's calls use: lengths are int here
  * (accept(int, struct sockaddr *, int *)), families a byte (UP-Term:
  * libevent and tmux declare with them) */
-#ifndef _SOCKLEN_T_DECLARED
-#define _SOCKLEN_T_DECLARED
+#if !defined(_IXEMUL_SOCKLEN_T_DEFINED) && !defined(_SOCKLEN_T_DECLARED)
 typedef int socklen_t;
 #endif
+/* 80.1's guard (<netdb.h>, <arpa/inet.h>) and the BSD one ports test */
+#define _IXEMUL_SOCKLEN_T_DEFINED
+#define _SOCKLEN_T_DECLARED
 #ifndef _SA_FAMILY_T_DECLARED
 #define _SA_FAMILY_T_DECLARED
 typedef u_char sa_family_t;
