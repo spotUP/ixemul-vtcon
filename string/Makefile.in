@@ -39,7 +39,13 @@ endef
 
 FLAVOR_CFLAGS =	-m$(CPU) -m$(FPU)
 INCS =		-I$(srcdir) -I$(srcdir)/../library -I$(srcdir)/../include
-ALL_CFLAGS =	$(CFLAGS) $(FLAVOR_CFLAGS) $(INCS) $(OTHER_CFLAGS) -g
+# -fno-builtin: these files implement the builtins. gcc 4+ fold a call to
+# one into another (bcopy(s, d, n) is memmove(d, s, n)), and memmove.c's
+# bcopy() call built with gcc 16 became a jump back to memmove's own entry:
+# an endless loop on the first memmove (every program hung). gcc 2.95's
+# code is the same with or without it. The loops gcc turns into calls are
+# a separate switch: libc_impl.h.
+ALL_CFLAGS =	$(CFLAGS) $(FLAVOR_CFLAGS) $(INCS) $(OTHER_CFLAGS) -fno-builtin -g
 
 LIB =		libstring.a
 

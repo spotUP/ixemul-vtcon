@@ -170,6 +170,13 @@ Status note 2026-10-06: M1-M9 landed; R7, M10.1 and M10.2 stay open. The M10 wor
   .orig and restored). ixemul-vtcon's main checkout is on feature/ixemul-80
   (build295 = 80.1, the default path of vtcon's kit and rig); the 48.2 line
   is branch stable-48.2 (fa0156c). Worktree ~/Code/ixemul-80 removed.
+  2026-10-06: the remaining hang is fixed. string/memmove.c calls bcopy(),
+  which gcc 16 folds into memmove(): a jump to memmove's own entry, so the
+  first memmove never returned (also at -O0). string/Makefile.in now builds
+  with -fno-builtin. Rig: ls and ixc99 17 of 17 on the full gcc 16 library
+  (before: ls hung). tools/selfcall_check.py reports any function that
+  branches to its own entry; clean on string, general, stdlib, stdio.
+  The R1-R11 matrix on the gcc 16 build is still open.
 - M10 (gcc 16) open, separate track. Found and fixed so far: gcc 16 left
   d2 unsaved (m68k_save_reg shortcut on stale df chains) and has no
   AmigaOS float return (new -mfloat-return-d0) -- compiler branch
