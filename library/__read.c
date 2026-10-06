@@ -52,6 +52,7 @@
 #define _KERNEL
 #include "ixemul.h"
 #include "__vtcon.h"
+#include <dos/dosasl.h>  /* ERROR_BREAK */
 #include "kprintf.h"
 
 /*
@@ -159,6 +160,61 @@ tty_apply_crlf_translation(int ttyflags, char *buf, int len)
       buf[i] = subst;
 }
 
+/*
+ * A blocking read of a vtcon console that a caught signal interrupts, as a
+ * Unix tty read is (vtcon W47: less 321's SIGWINCH handler longjmps out of
+ * its read to redraw; with a plain Read() it ran only after the next key).
+ * The read waits in SSLEEP with the caller's signal mask, as select() does:
+ * setrun() wakes it, and the launch code delivers nothing while it waits,
+ * so no handler runs with the packet out. A caught signal asks the handler
+ * for the read back (ACTION_VTCON_INTR): it comes back -1/ERROR_BREAK and
+ * the read fails with EINTR. A read the handler already answered keeps its
+ * bytes; a handler that does not know the packet lets the read complete.
+ * The handler owns VMIN/VTIME, so the read itself is unchanged.
+ */
+static int
+vtcon_read(struct file *f, char *buf, int len, int omask, int *errp)
+{
+  usetup;
+  struct StandardPacket *isp = NULL, *prw;
+  char ispbuf[sizeof(struct StandardPacket) + 3];
+  int ostat = u.p_stat;
+  int res;
+
+  LastResult (f) = 0;
+  LastError (f) = 0;
+  SendPacket3 (f, __srwport, ACTION_READ, f->f_fh->fh_Arg1, (long)buf, len);
+  u.p_stat = SSLEEP;
+  u.p_sigmask = omask;
+  for (;;)
+    {
+      if (!isp && CURSIG (&u))
+        {
+          isp = (struct StandardPacket *) LONG_ALIGN (ispbuf);
+          __init_std_packet (isp);
+          isp->sp_Pkt.dp_Port = __srwport;
+          isp->sp_Pkt.dp_Type = ACTION_VTCON_INTR;
+          isp->sp_Pkt.dp_Arg1 = f->f_fh->fh_Arg1;
+          isp->sp_Pkt.dp_Arg2 = (long) &f->f_sp.sp_Pkt;
+          PutPacket (f->f_fh->fh_Type, isp);
+        }
+      /* a reply clears dp_Port: the packet is ours again */
+      while ((prw = GetPacket (__srwport)))
+        prw->sp_Pkt.dp_Port = 0;
+      if (!f->f_sp.sp_Pkt.dp_Port && (!isp || !isp->sp_Pkt.dp_Port))
+        break;
+      Wait ((1 << __srwport->mp_SigBit) | (1 << u.u_sleep_sig));
+    }
+  u.p_sigmask = ~0;
+  u.p_stat = ostat;
+  SetSignal (0, 1 << u.u_sleep_sig);
+
+  res = LastResult (f);
+  if (res == -1)
+    *errp = (isp && LastError (f) == ERROR_BREAK) ? EINTR : __ioerr_to_errno (LastError (f));
+  return res;
+}
+
 int __read(struct file *f, char *buf, int len)
 {
   usetup;
@@ -248,7 +304,9 @@ int __read(struct file *f, char *buf, int len)
 	      buf++;
 	      res++;
 	    }
-	}	  
+	}
+      else if (__vtcon (f))
+        res = vtcon_read (f, buf, len, omask, &err);
       else
         {
           /* Normal blocking read (fast path) */

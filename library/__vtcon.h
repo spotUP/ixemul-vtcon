@@ -9,6 +9,7 @@
 #define ACTION_VTCON_GWINSZ 0x7657  /* Arg2 struct winsize * to fill */
 #define ACTION_VTCON_SWINSZ 0x7658  /* Arg2 struct winsize * (a pty master's) */
 #define ACTION_VTCON_NREAD  0x765A  /* Res1: bytes a Read would get now */
+#define ACTION_VTCON_INTR   0x765C  /* Arg2 a waiting ACTION_READ: answer it now, -1/ERROR_BREAK */
 
 int __vtcon_packet(struct file *f, long action, void *arg, long arg3);
 int __vtcon(struct file *f);
