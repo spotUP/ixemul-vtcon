@@ -117,16 +117,13 @@ same build, and the UP-Term kit installs both libraries.
 - [x] M9.1 Kit built with the 80.x pair; install_rig passes
 - [x] M9.2 vtcon ledger and this plan updated; worktree removed after merge
 
-### M10 Library with bebbo's gcc 6 (owner question 2026-10-05)
-Status note 2026-10-06: M1-M9 landed; R7, M10.1 and M10.2 stay open. The M10 work moved to the gcc 16 track (see the notes at the end); the gcc 6 wording below is stale.
-- [ ] M10.1 Build the M9 tree with bebbo's gcc 6 (the 32efe2b C fixes are carried);
-      the 48.2 gcc 6 build crashed at run time, cause never found: bisect it against
-      the 2.95.3 build object by object if it recurs
-- [x] M10.2 Rig matrix R1-R11 on the gcc 6 build; mallocbench and conbench against
-      the 2.95.3 build; keep gcc 6 only if it passes everything and is faster
+### M10 Library with gcc 16 (owner question 2026-10-05; the gcc 6 plan was dropped 2026-10-06)
+Status note 2026-10-06: M1-M9 landed. The bebbo gcc 6 build item (M10.1) is removed: the work moved to gcc 16, whose library now builds, boots and passes the rig matrix (see below and the notes at the end). R7 stays open (see its row).
+- [x] M10.1 gcc 16 library builds and runs: the compiler branch, the string/ -fno-builtin fix (45f8bd3), the stackextend.c dead-store fixes (3ebef54, 8fb9acb)
+- [x] M10.2 Rig matrix R1-R11 on the gcc 16 build; malloc about 40 percent slower than 2.95 (ixmalloc), the rest as 2.95; known failures R4 colour cube and R7 reflow also fail on 2.95 or 48.2
 
 Rig results gcc 16 (2026-10-06, 060 rig, buildgcc16 ixemul + ixnet 80.1 in VTC:ixp6,
-prebuilt vtcon/build/amiga binaries; M10.2 stays OPEN):
+prebuilt vtcon/build/amiga binaries; the R2 getty_rig failure was a stale test, fixed in vtcon ec12272):
 - R1 pass (versions 80.1/80.1, ls, wc -c 6, tcsh, less and nano draw/edit/quit).
 - R2 FAIL only in getty_rig: ixpty 26/26, ptytest 34/34, ttyprobe no FAIL; getty 2 of 7 on
   gcc 16 AND 2 of 7 on 2.95 (same rig, same binaries; first check "vsh's prompt arrives":
