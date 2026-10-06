@@ -11,7 +11,8 @@
 AGCC ?= $(HOME)/opt/amiga/bin/m68k-amigaos-gcc
 XAR  ?= $(HOME)/opt/amiga/bin/m68k-amigaos-ar
 SDK  ?= $(HOME)/opt/amiga/m68k-amigaos/ixemul
-VTCON ?= $(HOME)/Code/vtcon
+UPTERM_ROOT ?= $(abspath $(CURDIR)/../..)
+VTCON ?= $(UPTERM_ROOT)/vtcon
 CPPFLAGS ?=
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o c99.o selfpath.o langinfo.o \

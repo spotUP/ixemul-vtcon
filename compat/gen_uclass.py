@@ -6,7 +6,7 @@ The Unicode version is the one vtcon's engine/vtwidth.h was generated from
 (read from its header), so wcwidth and the classes come from one database.
 UnicodeData.txt is fetched once into build/ucd/<version>/.
     python3 compat/gen_uclass.py [path/to/vtwidth.h]
-        (default $VTCON/engine/vtwidth.h, VTCON default ~/Code/vtcon)
+        (default $VTCON/engine/vtwidth.h, VTCON default $UPTERM_ROOT/vtcon, UPTERM_ROOT default the parent of ixemul-vtcon)
 
 Layout (see uclass.c):
   ixc_class_run[]  sorted run starts, (first code point << 4) | class: a
@@ -23,7 +23,7 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 VTWIDTH = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    os.environ.get("VTCON", os.path.expanduser("~/Code/vtcon")), "engine", "vtwidth.h")
+    os.environ.get("VTCON", os.path.join(os.environ.get("UPTERM_ROOT") or os.path.dirname(os.path.dirname(HERE)), "vtcon")), "engine", "vtwidth.h")
 
 CLASSES = ["CN", "LU", "LL", "LO", "M", "ND", "NO", "P", "S", "ZS", "ZL", "CC", "CF", "CS"]
 GC = {"Lu": "LU", "Ll": "LL", "Lt": "LO", "Lm": "LO", "Lo": "LO",
