@@ -125,6 +125,26 @@ Status note 2026-10-06: M1-M9 landed; R7, M10.1 and M10.2 stay open. The M10 wor
 - [ ] M10.2 Rig matrix R1-R11 on the gcc 6 build; mallocbench and conbench against
       the 2.95.3 build; keep gcc 6 only if it passes everything and is faster
 
+Rig results gcc 16 (2026-10-06, 060 rig, buildgcc16 ixemul + ixnet 80.1 in VTC:ixp6,
+prebuilt vtcon/build/amiga binaries; M10.2 stays OPEN):
+- R1 pass (versions 80.1/80.1, ls, wc -c 6, tcsh, less and nano draw/edit/quit).
+- R2 FAIL only in getty_rig: ixpty 26/26, ptytest 34/34, ttyprobe no FAIL; getty 2 of 7 on
+  gcc 16 AND 2 of 7 on 2.95 (same rig, same binaries; first check "vsh's prompt arrives":
+  the prompt carries OSC 7/133 sequences). Not library-specific; test/vsh drift, not run down.
+- R3 pass (ixc99 17/17, ixsock names/pairpingpong/pairwake/rights/accept, tcsh ^Z, bg, fg,
+  SIGTTOU and SIGTTIN suspend; ixsig not built in vtcon/build/amiga, not run).
+- R4 same as recorded: tmux 6/7, screen 4 children ok; both fail only the colour cube (36 of 240).
+- R5 3/3 (part 1, no requester, skipped: IXPIPE: is mounted at boot on this rig, as before).
+- R6 pass (vshpath 5/5, slash 9/9, dotdot identical to build295).
+- R7 known open: after resize less does not reflow (W47, same on 48.2 and 2.95);
+  20 less exits while dragging another window's title bar: no freeze, 20/20, agent alive.
+- R8 sentinel 27 OK, no FAIL; vector-audit 258/258 (source table, build-independent).
+- R9 nvim 0.4.4 8/8, 0.12.5 9/9.
+- R10 grep 17/17, ncurses 5/5; spawnprobe 13/14 (the known spawnp PATH case).
+- R11 ixmalloc (mallocbench is a vbcc program and not built): ms per 10000 calls, gcc 16
+  vs 2.95: malloc 24-33 vs 18-19, malloc+free 10-13 vs 7-8, realloc 7-8 vs 5-6
+  (gcc 16 about 40 percent slower; no conbench row in R1-R11).
+
 ## Rig results so far (2026-10-05, 060 rig)
 
 - Pristine 80.1 from build.sh: loads, ixnet version matches, GG ls runs.
