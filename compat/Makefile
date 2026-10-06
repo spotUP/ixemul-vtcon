@@ -1,7 +1,7 @@
 # libixcompat.a: libc functions ixemul.library 48.2 has no vectors for,
 # as a static library the ports link (UP-Term P7). Built with bebbo's gcc
 # against the SDK (install the headers first: docker/install-sdk-headers.sh,
-# or point CPPFLAGS at an overlay of them, as ~/Code/upterm-ports does).
+# or point CPPFLAGS at an overlay of them, as upterm-ports does).
 #   make -C compat            -> compat/libixcompat.a
 #   make -C compat install    -> into the SDK's lib directory
 #   make -C compat test       -> host tests of the wide-character core
