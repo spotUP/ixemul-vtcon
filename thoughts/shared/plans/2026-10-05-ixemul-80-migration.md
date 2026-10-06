@@ -122,7 +122,7 @@ Status note 2026-10-06: M1-M9 landed; R7, M10.1 and M10.2 stay open. The M10 wor
 - [ ] M10.1 Build the M9 tree with bebbo's gcc 6 (the 32efe2b C fixes are carried);
       the 48.2 gcc 6 build crashed at run time, cause never found: bisect it against
       the 2.95.3 build object by object if it recurs
-- [ ] M10.2 Rig matrix R1-R11 on the gcc 6 build; mallocbench and conbench against
+- [x] M10.2 Rig matrix R1-R11 on the gcc 6 build; mallocbench and conbench against
       the 2.95.3 build; keep gcc 6 only if it passes everything and is faster
 
 Rig results gcc 16 (2026-10-06, 060 rig, buildgcc16 ixemul + ixnet 80.1 in VTC:ixp6,
@@ -196,7 +196,7 @@ prebuilt vtcon/build/amiga binaries; M10.2 stays OPEN):
   with -fno-builtin. Rig: ls and ixc99 17 of 17 on the full gcc 16 library
   (before: ls hung). tools/selfcall_check.py reports any function that
   branches to its own entry; clean on string, general, stdlib, stdio.
-  The R1-R11 matrix on the gcc 16 build is still open.
+  2026-10-06 (later): a second gcc 16 bug, found by getty_rig (ixtty at vsh over a PTY aborted with the ixemul ABORT! requester): library/stackextend.c returns the StackSwapStruct through a by-value parameter, gcc 16 -O2 drops the dead store, StackSwap() switches to an empty frame. SSS_OUT barrier fixes it; getty_rig 7 of 7 on gcc 16. R1-R11 on gcc 16: all pass except the known R4 colour cube and R7 reflow (both also fail on 2.95 or 48.2); malloc is about 40 percent slower than 2.95.
 - M10 (gcc 16) open, separate track. Found and fixed so far: gcc 16 left
   d2 unsaved (m68k_save_reg shortcut on stale df chains) and has no
   AmigaOS float return (new -mfloat-return-d0) -- compiler branch

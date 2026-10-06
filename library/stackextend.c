@@ -6,6 +6,20 @@
 #include <unistd.h>
 
 /*
+ * The asm glue below passes the StackSwapStruct on the stack and hands
+ * that same memory to StackSwap() once the C function returns: stkext*()
+ * and stkrst*() give the struct back through their by-value parameter.
+ * C does not promise that: a store to a parameter that is not read again
+ * before the return is dead to gcc 3+, which drops it (gcc 16 -O2 dropped
+ * `sss.stk_Pointer -= cpsize` in stkext_startup: StackSwap() switched to
+ * the empty top of the new frame, the glue's moveml/rts popped zeros, and
+ * ixtty under vsh, whose job stack is smaller than __stack, ran into
+ * address 0 and aborted; 2026-10-06). SSS_OUT makes the stores to sss
+ * happen, in place, before the function returns.
+ */
+#define SSS_OUT(sss) asm volatile ("" : : "m" (sss) : "memory")
+
+/*
  * Glue asm to C.
  */
 asm("\n\
@@ -308,6 +322,7 @@ int stkext(struct StackSwapStruct sss, sigset_t old,
   pushframe(d0, &sss, &old, 0);
   *(char **)&sss.stk_Pointer -= cpsize;
   CopyMem(&old, sss.stk_Pointer, cpsize);
+  SSS_OUT (sss);
   return 1;
 }
 
@@ -337,6 +352,7 @@ int stkext_f(struct StackSwapStruct sss, sigset_t old,
   u.u_stk_used->savesp = (char *)callsp + d1; /* store sp */
   *(void **)((char *)sss.stk_Upper - ((char *)argtop - (char *)callsp) + d1)
 	= &__stkrst_f; /* set returnaddress */
+  SSS_OUT (sss);
   return 1;
 }
 
@@ -384,6 +400,7 @@ int stkext_startup(struct StackSwapStruct sss, sigset_t old,
   u.u_stk_used->savesp = (char *)callsp; /* store sp */
   *(void **)((char *)sss.stk_Upper - ((char *)argtop - (char *)callsp))
 	= &__stkrst_f; /* set returnaddress */
+  SSS_OUT (sss);
   return 1;
 }
 
@@ -452,6 +469,7 @@ void *stkrst(struct StackSwapStruct sss, sigset_t old,
   popframes(sf1, &sss);
   sss.stk_Pointer = (char *)d0 - cpsize;
   CopyMem(&old, sss.stk_Pointer,cpsize);
+  SSS_OUT (sss);
   return NULL;
 }
 
@@ -468,4 +486,5 @@ void stkrst_f(struct StackSwapStruct sss, sigset_t old,
   sss.stk_Pointer = (char *)u.u_stk_used->savesp - cpsize;
   popframes(u.u_stk_used, &sss);
   CopyMem(&old, sss.stk_Pointer, cpsize);
+  SSS_OUT (sss);
 }
