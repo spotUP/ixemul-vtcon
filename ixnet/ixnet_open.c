@@ -83,9 +83,9 @@ ixnet_open (struct ixnet_base *ixbase)
         ixnetbase->ixnet_lib.lib_Revision != ixemulbase->ix_lib.lib_Revision)
       {
         ix_panic(
-"ixnet.library has version %ld.%ld while ixemul.library has version %ld.%ld.\n"
-"Both libraries should have the same version, therefore ixnet.library\n"
-"won't be used.", ixnetbase->ixnet_lib.lib_Version,
+"Needs ixemul %ld.%ld, found %ld.%ld: run the UP-Term Install.\n"
+"ixnet.library and ixemul.library must have the same version,\n"
+"so ixnet.library won't be used.", ixnetbase->ixnet_lib.lib_Version,
                  ixnetbase->ixnet_lib.lib_Revision,
                  ixemulbase->ix_lib.lib_Version,
                  ixemulbase->ix_lib.lib_Revision);
