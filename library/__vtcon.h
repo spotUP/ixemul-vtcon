@@ -13,6 +13,8 @@
 
 int __vtcon_packet(struct file *f, long action, void *arg, long arg3);
 int __vtcon(struct file *f);
+int __vtcon_refused(struct file *f, long action);
+void __vtcon_note_reply(struct file *f, long action, long res1, long res2);
 long __vtcon_nread(struct file *f);
 unsigned long __vtcon_breaks(unsigned long breaks);
 void __vtcon_winch(struct Task *t);

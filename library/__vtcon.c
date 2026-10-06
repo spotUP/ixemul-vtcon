@@ -13,13 +13,58 @@
 #include <sys/termios.h>
 #include "__vtcon.h"
 
+/*
+ * A handler that answers a vtcon packet with ERROR_ACTION_NOT_KNOWN (an
+ * older vtcon, or a console type that has no use for it: XCON: for the
+ * window-size packet) is asked once. The refusal is remembered per handler
+ * and packet, and the packet is not sent again: ACTION_VTCON_SWINSZ on every
+ * TIOCSWINSZ and ACTION_VTCON_INTR on every interrupted read cost a packet
+ * round trip each. Only the optional packets are remembered: the TCGETA
+ * probe that finds out whether a console is vtcon's is itself such a refusal
+ * and is kept in f_ttyflags.
+ */
+#define NREFUSED 8
+static struct { struct MsgPort *port; long action; } refused[NREFUSED];
+
+int __vtcon_refused(struct file *f, long action)
+{
+  int i;
+
+  for (i = 0; i < NREFUSED; i++)
+    if (refused[i].port == f->f_fh->fh_Type && refused[i].action == action)
+      return 1;
+  return 0;
+}
+
+void __vtcon_note_reply(struct file *f, long action, long res1, long res2)
+{
+  int i;
+
+  if (res1 || res2 != ERROR_ACTION_NOT_KNOWN || __vtcon_refused (f, action))
+    return;
+  Forbid ();
+  for (i = 0; i < NREFUSED; i++)
+    if (!refused[i].port)
+      {
+        refused[i].action = action;
+        refused[i].port = f->f_fh->fh_Type;
+        break;
+      }
+  Permit ();
+}
+
 int __vtcon_packet(struct file *f, long action, void *arg, long arg3)
 {
   usetup;
+  int optional = action == ACTION_VTCON_SWINSZ;
 
+  if (optional && __vtcon_refused (f, action))
+    return 0;
   LastResult (f) = 0; LastError (f) = 0;
   SendPacket3 (f, __srwport, action, f->f_fh->fh_Arg1, (long)arg, arg3);
   __wait_sync_packet (&f->f_sp);
+  if (optional)
+    __vtcon_note_reply (f, action, LastResult (f), LastError (f));
   return LastResult (f) != 0;
 }
 

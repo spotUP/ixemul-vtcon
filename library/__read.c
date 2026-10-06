@@ -188,7 +188,7 @@ vtcon_read(struct file *f, char *buf, int len, int omask, int *errp)
   u.p_sigmask = omask;
   for (;;)
     {
-      if (!isp && CURSIG (&u))
+      if (!isp && CURSIG (&u) && !__vtcon_refused (f, ACTION_VTCON_INTR))
         {
           isp = (struct StandardPacket *) LONG_ALIGN (ispbuf);
           __init_std_packet (isp);
@@ -208,6 +208,10 @@ vtcon_read(struct file *f, char *buf, int len, int omask, int *errp)
   u.p_sigmask = ~0;
   u.p_stat = ostat;
   SetSignal (0, 1 << u.u_sleep_sig);
+
+  /* a handler that does not know the packet: do not ask it again */
+  if (isp)
+    __vtcon_note_reply (f, ACTION_VTCON_INTR, isp->sp_Pkt.dp_Res1, isp->sp_Pkt.dp_Res2);
 
   res = LastResult (f);
   if (res == -1)
