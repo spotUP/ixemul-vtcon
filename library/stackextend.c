@@ -230,6 +230,10 @@ void atomic_on(int old)
   usetup;
 
   old = u.p_sigmask;
+  /* the glue reserved the slot `old` names and atomic_off() pops it: the
+     store must happen (see SSS_OUT; gcc 16 -O2 dropped it, and the signal
+     mask came back as stack garbage after every stack extension) */
+  SSS_OUT (old);
   u.p_sigmask = ~0;
 /*  sigset_t fill;
   sigfillset(&fill);
