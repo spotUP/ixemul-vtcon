@@ -2,7 +2,7 @@
 date: 2026-10-05
 topic: Move ixemul-vtcon from 48.2 to ixemul 80.1, carrying the UP-Term patches
 tags: [ixemul, 80.1, rebase, af_unix, scm_rights, pty, termios, sigwinch, ixnet]
-status: implemented
+status: final
 ---
 
 # ixemul 80.1 migration
@@ -118,6 +118,7 @@ same build, and the UP-Term kit installs both libraries.
 - [x] M9.2 vtcon ledger and this plan updated; worktree removed after merge
 
 ### M10 Library with bebbo's gcc 6 (owner question 2026-10-05)
+Status note 2026-10-06: M1-M9 landed; R7, M10.1 and M10.2 stay open. The M10 work moved to the gcc 16 track (see the notes at the end); the gcc 6 wording below is stale.
 - [ ] M10.1 Build the M9 tree with bebbo's gcc 6 (the 32efe2b C fixes are carried);
       the 48.2 gcc 6 build crashed at run time, cause never found: bisect it against
       the 2.95.3 build object by object if it recurs
