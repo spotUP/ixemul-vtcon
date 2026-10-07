@@ -788,17 +788,17 @@ issig(struct user *p)	/* called in SUPERVISOR */
 
   asm volatile (" \n\
     movel a5,a0\n\
-    lea	  Lget_sr,a5\n\
+    lea	  L_get_sr%=,a5\n\
     movel 4:w,a6\n\
     jsr	  a6@(-0x1e)\n\
     movel a1,%0\n\
-    bra	  Lskip\n\
-Lget_sr:\n\
+    bra	  L_skip%=\n\
+L_get_sr%=:\n\
     movew sp@,a1	| get sr register from the calling function\n\
     rte\n\
-Lskip:\n\
+L_skip%=:\n\
     movel a0,a5\n\
-	" : "=g" (sr) : : "a0", "a1", "a6");
+	" : "=d" (sr) : : "d0", "d1", "a0", "a1", "a6", "cc", "memory");
 
   if (p->u_mask_state)
     {
