@@ -34,6 +34,7 @@
 #include "kprintf.h"
 
 #include <hardware/intbits.h>
+#include <dos/var.h>
 #include <exec/memory.h>
 #include <string.h>
 
@@ -180,6 +181,22 @@ ix_open (struct ixemul_base *ixbase)
       ix_u->u_a4_pointers_size = A4_POINTERS;
 
       ix_u->u_cmask = 0022; /* default, see manpage for umask() */
+      {
+        /* A parent that is not an ixemul program (a native shell such as
+         * vsh) cannot call umask() for the commands it starts: it hands the
+         * mask over as the local variable UMASK, an octal number, which a
+         * Shell's SetVar / a CreateNewProc copy passes on. */
+        char mbuf[16];
+        long n = GetVar ("UMASK", mbuf, sizeof (mbuf), GVF_LOCAL_ONLY);
+        if (n > 0 && n <= 4)
+          {
+            int m = 0, i;
+            for (i = 0; i < n && mbuf[i] >= '0' && mbuf[i] <= '7'; i++)
+              m = m * 8 + (mbuf[i] - '0');
+            if (i == n && m <= 0777)
+              ix_u->u_cmask = m;
+          }
+      }
 
       if (ix_u->u_sync_mp && ix_u->u_select_mp)
         {

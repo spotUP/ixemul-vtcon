@@ -118,24 +118,24 @@ umask (mode_t mode)
 {
     usetup;
     register struct ixnet *p = (struct ixnet *)u.u_ixnet;
+    int md = (int)mode;
+    mode_t res;
 
+    if (md < 0 || (int)md > 0777) {
+        errno = EINVAL;
+        KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
+        return -1;
+    }
+
+    /* u_cmask is the mask open(), mkdir() and fstat() apply, and the one a
+     * program starts with (UMASK, ix_open.c): it is the process's mask
+     * whichever network stack is there. usergroup.library keeps a mask of
+     * its own (0 at start); asking it alone left umask() reporting 0 and
+     * open() applying 022. It is told as well. */
+    res = u.u_cmask;
+    u.u_cmask = mode;
     if (p->u_networkprotocol == IX_NETWORK_AMITCP &&
-        p->u_UserGroupBase) {
-        return UG_umask(mode);
-    }
-    else {
-        int md = (int)mode;
-        mode_t res;
-        if (md < 0 || (int)md > 0777) {
-	    errno = EINVAL;
-	    KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
-	    return -1;
-	}
-
-	/* one day I'll use this field ;-)) */
-	mode &= ((1<<9)-1);
-	res = u.u_cmask;
-	u.u_cmask = mode;
-	return res;
-    }
+        p->u_UserGroupBase)
+        UG_umask(mode);
+    return res;
 }
