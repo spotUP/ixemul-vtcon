@@ -17,6 +17,7 @@ int __vtcon_refused(struct file *f, long action);
 void __vtcon_note_reply(struct file *f, long action, long res1, long res2);
 long __vtcon_nread(struct file *f);
 unsigned long __vtcon_breaks(unsigned long breaks);
+void __sleep_breaks(unsigned long res);
 void __vtcon_winch(struct Task *t);
 int __vtcon_bg(struct file *f, int sig);
 void __vtcon_init(void);

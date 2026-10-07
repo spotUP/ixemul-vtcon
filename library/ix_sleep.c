@@ -54,6 +54,26 @@ ix_hash (u_int waitchan)
   return res; 
 }
 
+/* The breaks a sleeper woke with, as Unix signals. The Launch handler
+   inhibits the CTRL_C conversion as long as we're in SSLEEP, and the
+   SetSignal() the sleeper does afterwards removes all traces of a perhaps
+   present SIGBREAKF_CTRL_C, so the sleeper converts it itself: SIGINT
+   unless the program catches SIGMSG; a vtcon console's CTRL_E and CTRL_F
+   too (__vtcon_breaks). Used by tsleep() and by vtcon_read(). */
+void
+__sleep_breaks (unsigned long res)
+{
+  usetup;
+
+  if (((u.p_sigignore & sigmask(SIGMSG)) || !(u.p_sigcatch & sigmask(SIGMSG)))
+      && (res & SIGBREAKF_CTRL_C))
+    {
+      struct Process *proc = (struct Process *)(u.u_session ? u.u_session->pgrp : getpid());
+      _psignalgrp(proc, SIGINT);
+    }
+  __vtcon_breaks(res);
+}
+
 int
 tsleep(caddr_t waitchan, char *wmesg, int timo)
 {
@@ -102,17 +122,7 @@ tsleep(caddr_t waitchan, char *wmesg, int timo)
 
   /* this will break the Disable () and reestablish it afterwards */
   res = Wait (wait_sigs);
-  /* this conversion is inhibited in the Launch handler as long as we're
-     in SSLEEP state. Since the SetSignal() below will remove all traces
-     of a perhaps present SIGBREAKF_CTRL_C, we'll have to do the conversion
-     here ourselves */
-  if (((u.p_sigignore & sigmask(SIGMSG)) || !(u.p_sigcatch & sigmask(SIGMSG)))
-      && (res & SIGBREAKF_CTRL_C))
-    {
-      struct Process *proc = (struct Process *)(u.u_session ? u.u_session->pgrp : getpid());
-      _psignalgrp(proc, SIGINT);
-    }
-  __vtcon_breaks(res);
+  __sleep_breaks (res);
   SetSignal (0, res);
   res = CURSIG (&u) ? -1 : 0;
 

@@ -203,7 +203,16 @@ vtcon_read(struct file *f, char *buf, int len, int omask, int *errp)
         prw->sp_Pkt.dp_Port = 0;
       if (!f->f_sp.sp_Pkt.dp_Port && (!isp || !isp->sp_Pkt.dp_Port))
         break;
-      Wait ((1 << __srwport->mp_SigBit) | (1 << u.u_sleep_sig));
+      {
+        /* ^C, and ^\ and ^Z of a vtcon console, end the wait as in tsleep() */
+        ULONG got = Wait ((1 << __srwport->mp_SigBit) | (1 << u.u_sleep_sig) |
+                          SIGBREAKF_CTRL_C | SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F);
+        if (got & (SIGBREAKF_CTRL_C | SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F))
+          {
+            __sleep_breaks (got);
+            SetSignal (0, got & (SIGBREAKF_CTRL_C | SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F));
+          }
+      }
     }
   u.p_sigmask = ~0;
   u.p_stat = ostat;
