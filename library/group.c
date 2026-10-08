@@ -501,6 +501,23 @@ int getgroups(int gidsetlen, int *gidset)
 {
   usetup;
 
+  /* POSIX: a size of 0 asks for the number of groups and stores none
+     (gnulib's configure tests getgroups (0, 0); its failure made findutils
+     4.11 take a stub of another signature, which did not compile) */
+  if (gidsetlen == 0)
+    {
+      if (muBase)
+        {
+          struct muExtOwner *me = muGetTaskExtOwner (NULL);
+          int n = me ? me->NumSecGroups + 1 : 1;
+
+          if (me)
+            muFreeExtOwner (me);
+          return n;
+        }
+      return u.u_ngroups;
+    }
+
   /* parameter check */
   if (gidset == NULL || gidsetlen < 0)
     {
