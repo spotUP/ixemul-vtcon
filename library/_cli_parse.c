@@ -69,6 +69,34 @@
 extern int __read(), __write(), __ioctl(), __fselect(), __close();
 
 // Initialize file structure
+/* RunCommand (and the Shell, which runs every command through it) puts a
+ * copy of the command's argument line into its Input() handle's buffer,
+ * for ReadArgs to read. A program that takes its arguments from the
+ * registers, as ixemul's startup does, leaves that copy unread, and
+ * dos.library counts unread buffered bytes as read ahead from the file:
+ * the first Seek() of standard input (fstat, lseek) or the Flush() at
+ * exit moved a file input BACK by the argument line's length. In a shell
+ * reading its script from that same file (vsh -s <script), `head -n 1`
+ * printed the end of its own command line ("-n 1") instead of the next
+ * line. Read the copy out of the buffer, as ReadArgs would, when the
+ * buffer holds exactly the argument line: a program started any other
+ * way (vfork, Workbench, a handle with real read-ahead) is left alone. */
+static void consume_runcommand_args(BPTR fh, long alen, const char *aptr)
+{
+  struct FileHandle *fhp = (struct FileHandle *)BTOCPTR(fh);
+  const char *buf;
+  long i;
+
+  if (alen <= 0 || !aptr || !fhp->fh_Buf || fhp->fh_Pos < 0
+      || fhp->fh_End - fhp->fh_Pos != alen)
+    return;
+  buf = (const char *)BTOCPTR(fhp->fh_Buf) + fhp->fh_Pos;
+  if (memcmp(buf, aptr, alen))
+    return;
+  for (i = 0; i < alen; i++)
+    FGetC(fh);
+}
+
 static void init_file(struct file *f, BPTR fh, char *defname)
 {
   f->f_fh = (struct FileHandle *)BTOCPTR(fh);
@@ -225,6 +253,7 @@ __ix_cli_parse(struct Process *this_proc, long alen, char *_aptr,
 
 	  if ((fh = Input ()))
 	    {
+	      consume_runcommand_args(fh, alen, _aptr);
 	      init_file(fin, fh, "<Standard Input>");
 	      /* a console is a terminal: on Unix its fd 0, 1 and 2 are one
 	         read/write open. tmux draws on a dup of stdin, and select()
