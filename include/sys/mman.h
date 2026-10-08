@@ -67,6 +67,10 @@
 #define	MAP_FILE	0x0000	/* map from file (default) */
 #define	MAP_ANON	0x1000	/* allocated from memory, swap space */
 
+/* what mmap() returns on failure (library/mmap.c: (caddr_t)-1), POSIX's
+ * name for it (mandoc 1.14.6's dbm_map.c tests it) */
+#define	MAP_FAILED	((void *)-1)
+
 /*
  * Advice to madvise
  */
