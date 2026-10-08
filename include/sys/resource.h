@@ -94,6 +94,10 @@ struct	rusage {
 #define	RLIM_NLIMITS	9		/* number of resource limits */
 
 #define	RLIM_INFINITY	0x7fffffff
+/* POSIX: the limits that do not fit rlim_t; every limit fits here, so they
+ * are RLIM_INFINITY, as POSIX allows (xz 5.8.4 compares with them) */
+#define	RLIM_SAVED_MAX	RLIM_INFINITY
+#define	RLIM_SAVED_CUR	RLIM_INFINITY
 
 struct rlimit {
 	long	rlim_cur;		/* current (soft) limit */
