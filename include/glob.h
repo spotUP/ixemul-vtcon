@@ -89,7 +89,7 @@ typedef struct {
 
 #define	GLOB_NOSPACE	(-1)	/* Malloc call failed. */
 #define	GLOB_ABEND	(-2)	/* Unignored error. */
-#define	GLOB_NOMATCH	(-3)	/* POSIX (UP-Term); this glob returns 0 with gl_pathc 0 instead */
+#define	GLOB_NOMATCH	(-3)	/* POSIX (UP-Term): no match without GLOB_NOCHECK */
 
 __BEGIN_DECLS
 int	glob __P((const char *, int, int (*)(const char *, int), glob_t *));

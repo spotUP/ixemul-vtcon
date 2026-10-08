@@ -587,6 +587,11 @@ glob0(pattern, pglob)
 	      ((pglob->gl_flags & GLOB_NOMAGIC) &&
 	       !(pglob->gl_flags & GLOB_MAGCHAR))))
 		return(globextend(pattern, pglob));
+	/* POSIX: no match and no GLOB_NOCHECK is GLOB_NOMATCH. It returned 0
+	 * with nothing added, and mandoc 1.14.6's man took that as a found
+	 * page: "Cannot allocate memory", then a hang (rig 3, 2026-10-08) */
+	else if (pglob->gl_pathc == oldpathc)
+		return(GLOB_NOMATCH);
 	else if (!(pglob->gl_flags & GLOB_NOSORT)) 
 		qsort(pglob->gl_pathv + pglob->gl_offs + oldpathc,
 		    pglob->gl_pathc - oldpathc, sizeof(char *), 
