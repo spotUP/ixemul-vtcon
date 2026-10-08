@@ -35,7 +35,10 @@ static void usleephandler(void)
 	u.u_ringring = 1;
 }
 
-void usleep(u_int useconds)
+/* int, as POSIX has it (it was void: gnulib's rpl_usleep returns its value,
+ * and findutils 4.11 failed to compile); 0 when it slept, -1 when the
+ * interval timer could not be read */
+int usleep(u_int useconds)
 {
         usetup;
 	register struct itimerval *itp;
@@ -45,11 +48,11 @@ void usleep(u_int useconds)
 
 	itp = &itv;
 	if (!useconds)
-		return;
+		return 0;
 	timerclear(&itp->it_interval);
 	timerclear(&itp->it_value);
 	if (syscall (SYS_setitimer, ITIMER_REAL, itp, &oitv) < 0)
-		return;
+		return -1;
 	itp->it_value.tv_sec = useconds / USPS;
 	itp->it_value.tv_usec = useconds % USPS;
 	if (timerisset(&oitv.it_value)) {
@@ -77,4 +80,5 @@ void usleep(u_int useconds)
 	syscall (SYS_sigvec, SIGALRM, &ovec, (struct sigvec *)0);
 	syscall (SYS_sigsetmask, omask);
 	syscall (SYS_setitimer, ITIMER_REAL, &oitv, (struct itimerval *)0);
+	return 0;
 }
