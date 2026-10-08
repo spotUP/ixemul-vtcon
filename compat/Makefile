@@ -16,7 +16,7 @@ VTCON ?= $(UPTERM_ROOT)/vtcon
 CPPFLAGS ?=
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o c99.o selfpath.o langinfo.o \
-       eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o
+       eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o
 
 # C95's wide string functions, which gnulib takes for granted (GNU grep
 # 3.12 failed to link on wcscat, wmemcpy): the self-contained members of the
@@ -48,13 +48,17 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test
+test: test/wide_test test/wcwidth_test test/math_test
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
 	./test/wcwidth_test
+	./test/math_test
 test/wide_test: test/wide_test.c utf8.c uclass.c uclass_tab.h ixc_wide.h
 	$(HOSTCC) -Wall -O2 -o $@ test/wide_test.c utf8.c uclass.c
+test/math_test: test/math_test.c math.c
+	$(HOSTCC) -Wall -O2 -Datan2=ixc_atan2 -c -o test/math_ixc.o math.c
+	$(HOSTCC) -Wall -O2 -o $@ test/math_test.c test/math_ixc.o
 test/wcwidth_test: test/wcwidth_test.c wcwidth.c $(VTCON)/engine/vtwidth.h
 	$(HOSTCC) -Wall -O2 -I$(VTCON)/engine -o $@ test/wcwidth_test.c wcwidth.c
 

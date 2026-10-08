@@ -5,5 +5,7 @@ compat/test/wide_test
 compat/test/spawnprobe
 compat/newlibwcs/
 compat/test/wcwidth_test
+compat/test/math_test
+compat/test/*.o
 thoughts/spot/
 thoughts/searchable/
