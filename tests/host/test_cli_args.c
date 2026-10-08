@@ -43,7 +43,22 @@ int main(void)
     check("star_star", "\"c**d\"\n", "Q:c*d");
     check("star_newline", "\"x*Ny\" \"x*ny\"\n", "Q:x\ny|Q:x\ny");
     check("star_escape", "\"e*Ef\" \"e*ef\"\n", "Q:e\033f|Q:e\033f");
-    check("star_other", "\"*q*z*1\"\n", "Q:qz1");
+    /* on purpose unlike ReadItem: * before any other character is a literal
+     * star (ReadItem drops it), so a Unix user's quoted glob or expression
+     * typed in the AmigaShell reaches the program whole */
+    check("star_other_literal", "\"*q*z*1\"\n", "Q:*q*z*1");
+    check("python_expr", "-c \"print(6*7)\"\n", "-c|Q:print(6*7)");
+    check("find_glob", ". -name \"*.c\"\n", ".|-name|Q:*.c");
+    check("grep_star", "\"a*b\" \"x* y\" \"[*]\"\n", "Q:a*b|Q:x* y|Q:[*]");
+    /* the four escapes stay escapes before any letter: "*exe" is ESC xe and
+     * "*n" a newline, as ReadItem reads them. vsh never writes *E, *e or *n
+     * (it writes * as **, " as *" and a newline as *N), so its lines are
+     * unaffected; a person typing "*exe" in the AmigaShell writes "**exe" */
+    check("star_exe_is_escape", "\"*exe\"\n", "Q:\033xe");
+    check("star_n_is_newline", "\"*n\"\n", "Q:\n");
+    check("vsh_star_exe", "\"**exe\" \"**n\"\n", "Q:*exe|Q:*n");
+    /* "*" is *" (a quote) and no closing quote: kept to the end of the line */
+    check("lone_star_quoted", "\"*\"\n", "Q:\"");
     check("empty_quoted", "\"\" plain \"\"\n", "Q:|plain|Q:");
     check("plain_word", "plain\n", "plain");
     check("no_args", "\n", "");
