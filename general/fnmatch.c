@@ -65,6 +65,7 @@ static char rcsid[] = "$NetBSD: fnmatch.c,v 1.11 1995/02/27 03:43:06 cgd Exp $";
 #define _KERNEL
 #include "ixemul.h"
 
+#include <ctype.h>
 #include <fnmatch.h>
 #include <string.h>
 
@@ -145,8 +146,11 @@ fnmatch(const char *pattern, const char *string, int flags)
 			}
 			/* FALLTHROUGH */
 		default:
-			if (c != *string++)
+			if (c != *string &&
+			    !((flags & FNM_CASEFOLD) &&
+			      tolower((unsigned char)c) == tolower((unsigned char)*string)))
 				return (FNM_NOMATCH);
+			string++;
 			break;
 		}
 	/* NOTREACHED */
@@ -166,6 +170,8 @@ static const char *rangematch(const char *pattern, int test, int flags)
 	 */
 	if ((negate = (*pattern == '!' || *pattern == '^')))
 		++pattern;
+	if (flags & FNM_CASEFOLD)
+		test = tolower((unsigned char)test);
 	
 	for (ok = 0; (c = *pattern++) != ']';) {
 		if (c == '\\' && !(flags & FNM_NOESCAPE))
@@ -179,9 +185,14 @@ static const char *rangematch(const char *pattern, int test, int flags)
 				c2 = *pattern++;
 			if (c2 == EOS)
 				return (NULL);
+			if (flags & FNM_CASEFOLD) {
+				c = tolower((unsigned char)c);
+				c2 = tolower((unsigned char)c2);
+			}
 			if (c <= test && test <= c2)
 				ok = 1;
-		} else if (c == test)
+		} else if (c == test || ((flags & FNM_CASEFOLD) &&
+		    tolower((unsigned char)c) == test))
 			ok = 1;
 	}
 	return (ok == negate ? NULL : pattern);
