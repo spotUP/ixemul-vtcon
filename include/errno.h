@@ -102,6 +102,7 @@ extern int *ixemul_errno;
 #define	EPROTONOSUPPORT	43		/* Protocol not supported */
 #define	ESOCKTNOSUPPORT	44		/* Socket type not supported */
 #define	EOPNOTSUPP	45		/* Operation not supported on socket */
+#define	ENOTSUP		EOPNOTSUPP	/* POSIX; may equal EOPNOTSUPP (libarchive 3.8.9) */
 #define	EPFNOSUPPORT	46		/* Protocol family not supported */
 #define	EAFNOSUPPORT	47		/* Address family not supported by protocol family */
 #define	EADDRINUSE	48		/* Address already in use */
