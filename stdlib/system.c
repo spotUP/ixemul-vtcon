@@ -76,7 +76,9 @@ system(command)
 
 	case 0:				/* child */
 		(void)sigsetmask(omask);
-		execve("sh", argp, *u.u_environ);
+		/* the shell by its path, as popen does: execve searches no path,
+		 * so "sh" alone exited 127 (awk system(), upterm-ports 1.3) */
+		execve(_PATH_BSHELL, argp, *u.u_environ);
 		_exit(127);
 	}
 
