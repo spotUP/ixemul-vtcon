@@ -36,6 +36,9 @@
 #ifndef	_UTIME_H_
 #define	_UTIME_H_
 
+#include <sys/types.h>	/* time_t, which POSIX has <utime.h> define (gnulib's
+			   utime.c in nano 9.2 included it alone) */
+
 struct utimbuf {
 	time_t actime;		/* Access time */
 	time_t modtime;		/* Modification time */

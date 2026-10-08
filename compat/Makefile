@@ -29,7 +29,10 @@ WCS_FUNCS  = wcscat wcschr wcscmp wcscoll wcscpy wcscspn wcslcpy wcslen wcsncat 
 # POSIX tsearch/tfind/tdelete/twalk the same way (ncurses 6.6's colour pairs
 # failed to link on them under less 710; references: malloc, free)
 SEARCH_FUNCS = tsearch tfind tdelete twalk
-WCS_OBJS   = $(addprefix newlibwcs/lib_a-,$(addsuffix .o,$(WCS_FUNCS) $(SEARCH_FUNCS)))
+# POSIX.1-2008 strnlen: the SDK's string.h declares it, so gnulib (nano 9.2's
+# fnmatch) took it as present and the link failed (no references)
+STR_FUNCS  = strnlen
+WCS_OBJS   = $(addprefix newlibwcs/lib_a-,$(addsuffix .o,$(WCS_FUNCS) $(SEARCH_FUNCS) $(STR_FUNCS)))
 
 libixcompat.a: $(OBJS) $(WCS_OBJS)
 	rm -f $@
