@@ -250,6 +250,13 @@ fstatfs (int fd, struct statfs *buf)
           return -1;
         }
 
+      /* a directory: open() read it into memory (convert_dir) and kept its
+         full AmigaDOS path in f_name, so statfs of that path is its file
+         system (libarchive 3.8.9's tar c asked for it: "statfs failed:
+         Operation not supported" on every directory) */
+      if (f->f_type == DTYPE_MEM && f->f_name)
+        return statfs (f->f_name, buf);
+
       if (HANDLER_NIL (f) || f->f_type != DTYPE_FILE)
         {
           errno = EOPNOTSUPP;
