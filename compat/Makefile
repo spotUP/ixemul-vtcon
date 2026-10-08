@@ -26,7 +26,10 @@ NEWLIBC   ?= $(dir $(AGCC))../m68k-amigaos/lib/libc.a
 WCS_FUNCS  = wcscat wcschr wcscmp wcscoll wcscpy wcscspn wcslcpy wcslen wcsncat \
              wcsncmp wcsncpy wcsnlen wcspbrk wcsrchr wcsspn wcsstr wcstok wcsxfrm \
              wmemchr wmemcmp wmemcpy wmemmove wmemset
-WCS_OBJS   = $(addprefix newlibwcs/lib_a-,$(addsuffix .o,$(WCS_FUNCS)))
+# POSIX tsearch/tfind/tdelete/twalk the same way (ncurses 6.6's colour pairs
+# failed to link on them under less 710; references: malloc, free)
+SEARCH_FUNCS = tsearch tfind tdelete twalk
+WCS_OBJS   = $(addprefix newlibwcs/lib_a-,$(addsuffix .o,$(WCS_FUNCS) $(SEARCH_FUNCS)))
 
 libixcompat.a: $(OBJS) $(WCS_OBJS)
 	rm -f $@
