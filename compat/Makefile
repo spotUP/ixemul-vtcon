@@ -16,7 +16,7 @@ VTCON ?= $(UPTERM_ROOT)/vtcon
 CPPFLAGS ?=
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o c99.o selfpath.o langinfo.o \
-       eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o
+       eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o
 
 # C95's wide string functions, which gnulib takes for granted (GNU grep
 # 3.12 failed to link on wcscat, wmemcpy): the self-contained members of the

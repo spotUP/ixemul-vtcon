@@ -12,6 +12,7 @@
 #include <sys/cdefs.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>	/* FILE, for the wide output functions */
 
 #ifndef _WINT_T_DECLARED
 #define _WINT_T_DECLARED
@@ -51,6 +52,12 @@ size_t	wcsrtombs __P((char *, const wchar_t **, size_t, mbstate_t *));
 size_t	wcsnrtombs __P((char *, const wchar_t **, size_t, size_t, mbstate_t *));
 int	wcwidth __P((wchar_t));
 int	wcswidth __P((const wchar_t *, size_t));
+
+/* wide output (compat/wstdio.c): the character in the locale's encoding,
+ * written with putc; no stream orientation is kept */
+wint_t	fputwc __P((wchar_t, FILE *));
+wint_t	putwc __P((wchar_t, FILE *));
+wint_t	putwchar __P((wchar_t));
 
 /* C95's wide string functions (newlib's, in libixcompat.a) */
 wchar_t	*wcscat __P((wchar_t *, const wchar_t *));
