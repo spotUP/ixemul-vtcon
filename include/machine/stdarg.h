@@ -48,9 +48,12 @@ typedef _BSD_VA_LIST_	va_list;
 #if defined(__GNUC__) && __GNUC__ >= 3
 /* the first unnamed argument from the compiler: &last is not the argument
    slot once gcc optimises (gcc 6 -O2: vsnprintf got garbage; UP-Term).
-   The same pointer, so va_list stays the char * the library takes. */
-#define	va_start(ap, last) \
-	((ap) = (char *)__builtin_next_arg(last))
+   __builtin_va_start, not an assignment of __builtin_next_arg: it is the
+   same pointer (va_list is __builtin_va_list, a pointer on m68k: machine/
+   ansi.h), and it marks the function as variadic, which keeps gcc's IPA
+   from cloning it with fixed arguments -- "'va_start' used in function
+   with fixed args" in xz 5.8.4's configure test (test_varargs.constprop). */
+#define	va_start(ap, last)	__builtin_va_start((ap), last)
 #else
 #define	va_start(ap, last) \
 	(ap = ((char *)&(last) + sizeof(last)))
