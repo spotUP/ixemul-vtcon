@@ -864,6 +864,13 @@ readargs_kludge (BPTR bp)
 }
 
 
+/* An argument for a program that is not ixemul's (compatible_startup):
+ * that program reads an AmigaDOS command line, as ReadArgs and the
+ * AmigaDOS shells write it -- double quotes, and inside them * escapes
+ * " and * itself, *N a newline. The backslash escapes this used to write
+ * are not escapes there: vsh -c "echo \"x\"" broke at the second quote
+ * and "echo a*b" lost its * (awk system()/popen through /bin/sh = vsh,
+ * upterm-ports 1.3, rig 3 2026-10-08). An empty argument is "". */
 static char *
 quote (char *orig)
 {
@@ -872,7 +879,7 @@ quote (char *orig)
   
   i = strlen (orig);
   
-  if (strpbrk (orig, "\"\'\\ \t\n"))
+  if (! *orig || strpbrk (orig, "\"\'*;= \t\n"))
     {
       /* worst case, each character needs quoting plus starting and ending " */
       if (i > ((size_t)-3) / 2)
@@ -883,12 +890,18 @@ quote (char *orig)
 
       cp = new;
       *cp++ = '"';
-      while (*orig)
+      for (; *orig; orig++)
         {
-          if (index ("\"\\", *orig))
-            *cp++ = '\\';
-	  *cp++ = *orig++;
-	}
+          if (*orig == '"' || *orig == '*')
+            *cp++ = '*';
+          if (*orig == '\n')
+            {
+              *cp++ = '*';
+              *cp++ = 'N';
+            }
+          else
+            *cp++ = *orig;
+        }
       *cp++ = '"';
       *cp = 0;
       
