@@ -213,7 +213,7 @@ __ix_cli_parse(struct Process *this_proc, long alen, char *_aptr,
   usetup;
   char *arg0;
   struct CommandLineInterface *cli;
-  char *next, *lmax;
+  struct ix_cli_line cl;
   struct Argument *arg, *narg;
   char *line, **cpp, *cp;
   int do_expand, quoted;
@@ -363,15 +363,14 @@ __ix_cli_parse(struct Process *this_proc, long alen, char *_aptr,
   /* lets start humble.. no arguments at all:-)) */
   ArgList.al_num = 0;
 
-  /* the argument line, split as dos.library's ReadItem splits it, with
-   * the * escapes in quotes (cli_args.c): what a native command reads
-   * from the same line is what main() gets */
-  lmax = __ix_cli_line_end (aptr, alen);
-  *lmax = 0;
+  /* the out-of-band argv vsh gives an ixemul program, else the argument
+   * line split as dos.library's ReadItem splits it, without its * escapes
+   * in quotes (cli_args.c). Out-of-band arguments are never globbed: the
+   * shell that wrote them has expanded them. */
+  __ix_cli_begin (&cl, aptr, alen);
 
   /* loop over all arguments, expand all */
-  for (next = aptr, narg = arg = 0;
-       __ix_cli_next_arg (&next, lmax, &line, &quoted); )
+  for (narg = arg = 0; __ix_cli_next (&cl, &line, &quoted); )
     {
       KPRINTF (("got arg '%s'\n", line));
       /* a quoted argument is never expanded */

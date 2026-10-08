@@ -1,9 +1,10 @@
-/* Host test of library/cli_args.c, the AmigaDOS argument line splitter
- * _cli_parse.c gives main() its argv with. The expected argvs are what
- * dos.library 40's ReadItem returned for the same lines (vtcon
- * tests/amiga/readitem.c on the rig, 2026-10-08), except where cli_args.c
- * says ixemul differs on purpose (=, a newline inside quotes, an
- * unterminated quote). Run: make -C tests/host test */
+/* Host test of library/cli_args.c, the argument line splitter _cli_parse.c
+ * gives main() its argv with. A line a person types: split as dos.library's
+ * ReadItem splits it (vtcon tests/amiga/readitem.c on the rig, 2026-10-08)
+ * except where cli_args.c says ixemul differs on purpose (=, no * escapes in
+ * quotes, a newline inside quotes, an unterminated quote). A line vsh writes
+ * for an ixemul program: the argv it carries after the line's newline (the
+ * out-of-band argv), byte for byte. Run: make -C tests/host test */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,18 +12,19 @@
 
 static int failed, run;
 
-/* line -> the arguments, joined with | and quoted ones marked with Q: */
-static void check(const char *name, const char *line, const char *want)
+/* line (len bytes) -> the arguments, joined with | and quoted ones marked
+ * with Q: (an out-of-band argument is marked Q: too: it is never globbed) */
+static void check_len(const char *name, const char *line, size_t len, const char *want)
 {
-    char buf[512], got[512], *cur = buf, *end, *arg;
+    char buf[1024], got[1024], *arg;
+    struct ix_cli_line l;
     int quoted;
-    size_t len = strlen(line);
 
-    memcpy(buf, line, len + 1);
-    end = __ix_cli_line_end(buf, (long)len);
-    *end = 0;
+    memcpy(buf, line, len);
+    buf[len] = 0;
+    __ix_cli_begin(&l, buf, (long)len);
     got[0] = 0;
-    while (__ix_cli_next_arg(&cur, end, &arg, &quoted)) {
+    while (__ix_cli_next(&l, &arg, &quoted)) {
         if (got[0])
             strcat(got, "|");
         if (quoted)
@@ -32,33 +34,49 @@ static void check(const char *name, const char *line, const char *want)
     run++;
     if (strcmp(got, want)) {
         failed++;
-        printf("FAIL %s\n  line [%s]\n  want [%s]\n  got  [%s]\n", name, line, want, got);
+        printf("FAIL %s\n  want [%s]\n  got  [%s]\n", name, want, got);
     }
+}
+
+static void check(const char *name, const char *line, const char *want)
+{
+    check_len(name, line, strlen(line), want);
+}
+
+/* vsh's argument string for 'a**b' 'c*"d' $'\n' '' '"' $'x\001\002y'
+ * (vtcon tests/test_sh_ixargv.c writes the same bytes): the line as vsh
+ * quotes it for AmigaDOS, then the out-of-band argv */
+static const char vsh_args[] =
+    "\"a****b\" \"c***\"d\" \"*N\" \"\" \"*\"\" x\001\002y\n"
+    "\001IXA1371400000023a**b\001c*\"d\001\002J\001\001\"\001x\002A\002By\001\n";
+static const char vsh_want[] = "Q:a**b|Q:c*\"d|Q:\n|Q:|Q:\"|Q:x\001\002y";
+
+/* vsh_args with one byte changed at i */
+static void check_spoilt(const char *name, size_t i, char c, const char *want)
+{
+    char b[sizeof(vsh_args)];
+    memcpy(b, vsh_args, sizeof(vsh_args));
+    b[i] = c;
+    check_len(name, b, sizeof(vsh_args) - 1, want);
 }
 
 int main(void)
 {
-    /* the * escapes in quotes, as ReadItem */
-    check("star_quote", "\"a*\"b\"\n", "Q:a\"b");
-    check("star_star", "\"c**d\"\n", "Q:c*d");
-    check("star_newline", "\"x*Ny\" \"x*ny\"\n", "Q:x\ny|Q:x\ny");
-    check("star_escape", "\"e*Ef\" \"e*ef\"\n", "Q:e\033f|Q:e\033f");
-    /* on purpose unlike ReadItem: * before any other character is a literal
-     * star (ReadItem drops it), so a Unix user's quoted glob or expression
-     * typed in the AmigaShell reaches the program whole */
-    check("star_other_literal", "\"*q*z*1\"\n", "Q:*q*z*1");
+    /* in quotes * is an ordinary character: no escape at all (an AmigaShell
+     * user's python3 -c "print(2**3)" prints 8; ReadItem reads 2*3) */
+    check("python_power", "-c \"print(2**3)\"\n", "-c|Q:print(2**3)");
+    check("star_star", "\"c**d\"\n", "Q:c**d");
     check("python_expr", "-c \"print(6*7)\"\n", "-c|Q:print(6*7)");
     check("find_glob", ". -name \"*.c\"\n", ".|-name|Q:*.c");
     check("grep_star", "\"a*b\" \"x* y\" \"[*]\"\n", "Q:a*b|Q:x* y|Q:[*]");
-    /* the four escapes stay escapes before any letter: "*exe" is ESC xe and
-     * "*n" a newline, as ReadItem reads them. vsh never writes *E, *e or *n
-     * (it writes * as **, " as *" and a newline as *N), so its lines are
-     * unaffected; a person typing "*exe" in the AmigaShell writes "**exe" */
-    check("star_exe_is_escape", "\"*exe\"\n", "Q:\033xe");
-    check("star_n_is_newline", "\"*n\"\n", "Q:\n");
-    check("vsh_star_exe", "\"**exe\" \"**n\"\n", "Q:*exe|Q:*n");
-    /* "*" is *" (a quote) and no closing quote: kept to the end of the line */
-    check("lone_star_quoted", "\"*\"\n", "Q:\"");
+    /* a star can end a quoted argument (*" was an escaped quote: the quote
+     * stayed open) */
+    check("lone_star_quoted", "\"*\"\n", "Q:*");
+    check("regex_ends_in_star", "\"error.*\" next\n", "Q:error.*|next");
+    /* *N *n *E *e are no escapes: globs keep their letters */
+    check("star_letters", "\"x*Ny\" \"*name*\" \"*e*\" \"*E\"\n", "Q:x*Ny|Q:*name*|Q:*e*|Q:*E");
+    /* a quoted argument ends at the next quote, *" included */
+    check("star_quote_closes", "\"a*\"b\"\n", "Q:a*|b\"");
     check("empty_quoted", "\"\" plain \"\"\n", "Q:|plain|Q:");
     check("plain_word", "plain\n", "plain");
     check("no_args", "\n", "");
@@ -70,8 +88,6 @@ int main(void)
     check("quote_then_word", "\"q\"r\n", "Q:q|r");
     check("tab_separates", "a\tb \"t\tab\"\n", "a|b|Q:t\tab");
     check("semicolon_in_quotes", "\"a;b\"\n", "Q:a;b");
-    /* vsh's line for printf 'a"b' 'c*d' 'i\"j' (measured cut as a* / b", c**d, i\* / j") */
-    check("vsh_line", "\"a*\"b\" \"c**d\" \"i\\*\"j\"\n", "Q:a\"b|Q:c*d|Q:i\\\"j");
     /* a quoted argument ending in a backslash: the old \" rule read it as an open quote */
     check("backslash_end", "\"a\\\" b\n", "Q:a\\|b");
     /* on purpose unlike ReadItem: = is part of the word */
@@ -86,18 +102,22 @@ int main(void)
     check("star_at_end", "\"end*\n", "Q:end*");
     /* a line given without its newline, and one with a NUL before its length */
     check("no_newline", "x \"y z\"", "x|Q:y z");
-    {
-        char buf[16] = "ab\0cd\n", *cur = buf, *end, *arg;
-        int q, n = 0;
-        end = __ix_cli_line_end(buf, 6);
-        while (__ix_cli_next_arg(&cur, end, &arg, &q))
-            n++;
-        run++;
-        if (n != 1 || strcmp(buf, "ab")) {
-            failed++;
-            printf("FAIL nul_in_line: %d arguments\n", n);
-        }
-    }
+    check_len("nul_in_line", "ab\0cd\n", 6, "ab");
+
+    /* vsh's out-of-band argv: every byte as bash meant it, never the line */
+    check_len("vsh_argv", vsh_args, sizeof(vsh_args) - 1, vsh_want);
+    check_len("vsh_no_args", "\n\001IXA1000000000000\n", 19, "");
+    /* it must match the line before it: else the line, ended at its newline
+     * (a quote the new rules leave open does not run into the argv) */
+    check_spoilt("vsh_hash_differs", 5, 'x', "Q:a***xb|Q:c***|d\"|Q:*N|Q:|Q:*|Q: x\001\002y");
+    check_spoilt("vsh_header_hash_bad", 43, '9', "Q:a****b|Q:c***|d\"|Q:*N|Q:|Q:*|Q: x\001\002y");
+    check_spoilt("vsh_length_bad", 51, '4', "Q:a****b|Q:c***|d\"|Q:*N|Q:|Q:*|Q: x\001\002y");
+    check_spoilt("vsh_bad_escape", sizeof(vsh_args) - 5, 'Z', "Q:a****b|Q:c***|d\"|Q:*N|Q:|Q:*|Q: x\001\002y");
+    check_spoilt("vsh_unended_arg", sizeof(vsh_args) - 3, 'y', "Q:a****b|Q:c***|d\"|Q:*N|Q:|Q:*|Q: x\001\002y");
+    check_len("vsh_cut_short", vsh_args, sizeof(vsh_args) - 2, "Q:a****b|Q:c***|d\"|Q:*N|Q:|Q:*|Q: x\001\002y");
+    /* a line typed with a newline and no argv after it is still read to it */
+    check("not_an_argv", "a\n\001IXA b\n", "a");
+
     printf("test_cli_args: %d of %d passed\n", run - failed, run);
     return failed != 0;
 }

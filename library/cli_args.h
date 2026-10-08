@@ -1,19 +1,24 @@
-/* cli_args.h -- the AmigaDOS argument line, one argument at a time
- * (cli_args.c; used by _cli_parse.c, tested on the host by
- * tests/host/test_cli_args.c). No ixemul headers: it builds anywhere. */
+/* cli_args.h -- the argument line an ixemul program is started with, one
+ * argument at a time (cli_args.c; used by _cli_parse.c, tested on the host
+ * by tests/host/test_cli_args.c). No ixemul headers: it builds anywhere. */
 #ifndef IX_CLI_ARGS_H
 #define IX_CLI_ARGS_H
 
-/* Where the argument line of len bytes at line ends: at a NUL, and before
- * the newline (or CR LF) that ends every line RunCommand passes. */
-char *__ix_cli_line_end(char *line, long len);
+/* A line being split. */
+struct ix_cli_line {
+  char *cur, *end;  /* what is left of it */
+  int oob;          /* 1: the arguments are the out-of-band argv */
+};
 
-/* The next argument of the line between *linep and lineend, made a
- * NUL-terminated string in place (the line is rewritten: an argument is
- * never longer than its text). Returns 0 when the line holds no further
- * argument, else 1 with *argp set to the argument, *quotedp to 1 when it
- * was written in double quotes, and *linep moved past it. *lineend must
- * be writable (the line's NUL): an argument at the end is ended there. */
-int __ix_cli_next_arg(char **linep, char *lineend, char **argp, int *quotedp);
+/* Starts splitting the argument line of len bytes at line (line[len] must
+ * be writable: the line is rewritten in place, an argument is never longer
+ * than its text). When the line carries a well-formed out-of-band argv that
+ * matches it (vsh's, see cli_args.c), that argv is what is split. */
+void __ix_cli_begin(struct ix_cli_line *l, char *line, long len);
+
+/* The next argument as a NUL-terminated string: 0 when there is none, else
+ * 1 with *argp set and *quotedp 1 when it is never to be globbed (written in
+ * double quotes, or an out-of-band argument). */
+int __ix_cli_next(struct ix_cli_line *l, char **argp, int *quotedp);
 
 #endif
