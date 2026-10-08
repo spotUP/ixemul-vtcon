@@ -6,6 +6,7 @@ compat/test/spawnprobe
 compat/newlibwcs/
 compat/test/wcwidth_test
 compat/test/math_test
+compat/test/own_c99_link
 compat/test/*.o
 thoughts/spot/
 thoughts/searchable/

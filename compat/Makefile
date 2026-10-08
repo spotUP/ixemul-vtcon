@@ -15,8 +15,12 @@ UPTERM_ROOT ?= $(abspath $(CURDIR)/../..)
 VTCON ?= $(UPTERM_ROOT)/vtcon
 CPPFLAGS ?=
 HOSTCC ?= cc
-OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o c99.o selfpath.o langinfo.o \
+OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
        eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o
+
+# c99.c, one archive member per function (c99.c says why)
+C99_FUNCS = strtoll strtoull ftello fseeko ctime_r strsignal fmod round lldiv llabs strtoimax strtoumax
+C99_OBJS  = $(addprefix c99_,$(addsuffix .o,$(C99_FUNCS)))
 
 # C95's wide string functions, which gnulib takes for granted (GNU grep
 # 3.12 failed to link on wcscat, wmemcpy): the self-contained members of the
@@ -46,6 +50,9 @@ $(WCS_OBJS): $(NEWLIBC)
 %.o: %.c
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -c -o $@ $<
 
+c99_%.o: c99.c
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -DC99_$* -c -o $@ c99.c
+
 uclass.o: uclass_tab.h ixc_wide.h
 utf8.o locale.o wchar.o wctype.o: ixc_wide.h
 wcwidth.o: wcwidth.c $(VTCON)/engine/vtwidth.h
@@ -55,7 +62,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test
+test: test/wide_test test/wcwidth_test test/math_test test/own_c99_link
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -69,6 +76,11 @@ test/math_test: test/math_test.c math.c
 test/wcwidth_test: test/wcwidth_test.c wcwidth.c $(VTCON)/engine/vtwidth.h
 	$(HOSTCC) -Wall -O2 -I$(VTCON)/engine -o $@ test/wcwidth_test.c wcwidth.c
 
+# a program's own definition of a C99 function wins over libixcompat's: each
+# is its own archive member (link only; bebbo's gcc, as libixcompat.a)
+test/own_c99_link: test/own_c99_link.c libixcompat.a
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -o $@ test/own_c99_link.c libixcompat.a
+
 spawnprobe: test/spawnprobe
 # libixcompat.a by its path: the driver searches the SDK's lib (an older
 # copy) before any -L given here
@@ -79,5 +91,5 @@ install: libixcompat.a
 	cp libixcompat.a $(SDK)/lib/libixcompat.a
 
 clean:
-	rm -rf $(OBJS) newlibwcs libixcompat.a test/wide_test test/wcwidth_test test/spawnprobe
+	rm -rf $(OBJS) newlibwcs libixcompat.a test/wide_test test/wcwidth_test test/spawnprobe test/own_c99_link
 .PHONY: tables test spawnprobe install clean
