@@ -13,8 +13,10 @@ struct ix_cli_line {
 /* Starts splitting the argument line of len bytes at line (line[len] must
  * be writable: the line is rewritten in place, an argument is never longer
  * than its text). When the line carries a well-formed out-of-band argv that
- * matches it (vsh's, see cli_args.c), that argv is what is split. */
-void __ix_cli_begin(struct ix_cli_line *l, char *line, long len);
+ * matches it (vsh's, see cli_args.c), that argv is what is split; else the
+ * one in var (varlen bytes, the variable __ixargv; 0 for none, rewritten
+ * in place too) when it matches the line. */
+void __ix_cli_begin(struct ix_cli_line *l, char *line, long len, char *var, long varlen);
 
 /* The next argument as a NUL-terminated string: 0 when there is none, else
  * 1 with *argp set and *quotedp 1 when it is never to be globbed (written in

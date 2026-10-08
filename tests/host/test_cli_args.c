@@ -14,15 +14,18 @@ static int failed, run;
 
 /* line (len bytes) -> the arguments, joined with | and quoted ones marked
  * with Q: (an out-of-band argument is marked Q: too: it is never globbed) */
-static void check_len(const char *name, const char *line, size_t len, const char *want)
+static void check_var(const char *name, const char *line, size_t len,
+                      const char *var, size_t varlen, const char *want)
 {
-    char buf[1024], got[1024], *arg;
+    char buf[1024], vbuf[1024], got[1024], *arg;
     struct ix_cli_line l;
     int quoted;
 
     memcpy(buf, line, len);
     buf[len] = 0;
-    __ix_cli_begin(&l, buf, (long)len);
+    if (var)
+        memcpy(vbuf, var, varlen);
+    __ix_cli_begin(&l, buf, (long)len, var ? vbuf : 0, (long)varlen);
     got[0] = 0;
     while (__ix_cli_next(&l, &arg, &quoted)) {
         if (got[0])
@@ -36,6 +39,11 @@ static void check_len(const char *name, const char *line, size_t len, const char
         failed++;
         printf("FAIL %s\n  want [%s]\n  got  [%s]\n", name, want, got);
     }
+}
+
+static void check_len(const char *name, const char *line, size_t len, const char *want)
+{
+    check_var(name, line, len, 0, 0, want);
 }
 
 static void check(const char *name, const char *line, const char *want)
@@ -117,6 +125,30 @@ int main(void)
     check_len("vsh_cut_short", vsh_args, sizeof(vsh_args) - 2, "Q:a****b|Q:c***|d\"|Q:*N|Q:|Q:*|Q: x\001\002y");
     /* a line typed with a newline and no argv after it is still read to it */
     check("not_an_argv", "a\n\001IXA b\n", "a");
+
+    /* the same argv in the variable __ixargv, when a Shell runs the program
+     * (Resident, Run): the line is what the Shell passes, AmigaDOS quoted */
+    {
+        static const char shell_line[] = "\"a****b\" \"c***\"d\" \"*N\" \"\" \"*\"\" x\001\002y\n";
+        const char *var = strchr(vsh_args, '\n') + 1;
+        size_t varlen = strlen(var);
+        char other[] = "\"a****b\" \"c***\"d\" \"*N\" \"\" \"*\"\" x\001\002z\n";
+        check_var("var_argv", shell_line, sizeof(shell_line) - 1, var, varlen, vsh_want);
+        /* made for another line (a grandchild's, a sibling's): the line */
+        check_var("var_other_line", other, sizeof(other) - 1, var, varlen,
+                  "Q:a****b|Q:c***|d\"|Q:*N|Q:|Q:*|Q: x\001\002z");
+        /* cut short: the line */
+        check_var("var_cut", shell_line, sizeof(shell_line) - 1, var, varlen - 1,
+                  "Q:a****b|Q:c***|d\"|Q:*N|Q:|Q:*|Q: x\001\002y");
+        /* an argv after the line wins over the variable */
+        check_var("line_argv_first", vsh_args, sizeof(vsh_args) - 1,
+                  "\001IXA1371400000023zz\001\n", 21, vsh_want);
+        /* (that variable is taken when the line has no argv after it) */
+        check_var("var_same_line", shell_line, sizeof(shell_line) - 1,
+                  "\001IXA1371400000023zz\001\n", 21, "Q:zz");
+        /* no argument */
+        check_var("var_no_args", "\n", 1, "\001IXA1000000000000\n", 18, "");
+    }
 
     printf("test_cli_args: %d of %d passed\n", run - failed, run);
     return failed != 0;

@@ -26,6 +26,13 @@
  *    ixemul program reads only <line>. Nothing else holds it: it cannot
  *    reach a grandchild or the next program, and the copy RunCommand puts
  *    in Input() is read out with the line (_cli_parse.c).
+ *    When a Shell runs the program for vsh (a Resident command, the command
+ *    of Run), vsh cannot write its argument string: the same argv, from
+ *    \001IXA1 on, is then the local variable __ixargv, which the Shell
+ *    and Run copy into the program's process. _cli_parse.c deletes it from
+ *    that process before main() (no environ entry, no copy for a child);
+ *    it is taken on the same terms, matched against the line the program
+ *    got.
  *
  * 2. A line a person types in the AmigaShell (or any shell that is not
  *    vsh), split the way dos.library's ReadItem splits it (measured on
@@ -91,32 +98,28 @@ cli_hex (const char *p, int n)
   return v;
 }
 
-/* The out-of-band argv's arguments in line[0..len): 1 with them between
- * *startp and *endp (the final newline) when there is one that matches the
- * line before it, else 0; *nlp is the line's first newline, or 0. */
+/* Is the out-of-band argv at p (plen bytes, from its \001IXA1 to its final
+ * newline) well formed and made for the line of vislen bytes at vis? */
 static int
-cli_oob_find (char *line, long len, char **startp, char **endp, char **nlp)
+cli_oob_check (const char *vis, long vislen, const char *p, long plen)
 {
-  char *nl = line, *p, *end = line + len;
+  const char *end = p + plen;
   unsigned h = 0;
-  int i;
+  long i;
 
-  while (nl < end && *nl != '\n' && *nl)
-    nl++;
-  *nlp = (nl < end && *nl == '\n') ? nl : 0;
-  if (!*nlp || end - nl < 1 + OOB_HEAD_LEN + 1)
+  if (plen < OOB_HEAD_LEN + 1)
     return 0;
   for (i = 0; i < OOB_MARK_LEN; i++)
-    if (nl[1 + i] != oob_mark[i])
+    if (p[i] != oob_mark[i])
       return 0;
-  for (p = line; p < nl; p++)
-    h = (h * 31 + (unsigned char)*p) & 0xffff;
-  if (cli_hex (nl + 1 + OOB_MARK_LEN, 4) != (long)h
-      || cli_hex (nl + 1 + OOB_MARK_LEN + 4, 8) != nl - line)
+  for (i = 0; i < vislen; i++)
+    h = (h * 31 + (unsigned char)vis[i]) & 0xffff;
+  if (cli_hex (p + OOB_MARK_LEN, 4) != (long)h
+      || cli_hex (p + OOB_MARK_LEN + 4, 8) != vislen)
     return 0;
   /* well formed to the end: ends in a newline right after an argument's end
      (or the header), no raw newline or NUL, every escape a known one */
-  p = nl + 1 + OOB_HEAD_LEN;
+  p += OOB_HEAD_LEN;
   if (end[-1] != '\n' || (end - 1 > p && end[-2] != OOB_END))
     return 0;
   for (; p < end - 1; p++)
@@ -129,20 +132,32 @@ cli_oob_find (char *line, long len, char **startp, char **endp, char **nlp)
           return 0;
         p++;
       }
-  *startp = nl + 1 + OOB_HEAD_LEN;
-  *endp = end - 1;
   return 1;
 }
 
 void
-__ix_cli_begin (struct ix_cli_line *l, char *line, long len)
+__ix_cli_begin (struct ix_cli_line *l, char *line, long len, char *var, long varlen)
 {
-  char *start, *end, *nl;
+  char *nl = line, *end = line + len;
 
-  if (cli_oob_find (line, len, &start, &end, &nl))
+  /* the line's first newline (or its NUL) */
+  while (nl < end && *nl != '\n' && *nl)
+    nl++;
+  /* the argv after the line's newline (a program vsh runs itself) */
+  if (nl < end && *nl == '\n'
+      && cli_oob_check (line, nl - line, nl + 1, end - (nl + 1)))
     {
-      l->cur = start;
-      l->end = end;
+      l->cur = nl + 1 + OOB_HEAD_LEN;
+      l->end = end - 1;
+      l->oob = 1;
+      return;
+    }
+  /* the argv in the variable (a program a Shell runs for vsh: a Resident
+     command, the command of Run) */
+  if (var && cli_oob_check (line, nl - line, var, varlen))
+    {
+      l->cur = var + OOB_HEAD_LEN;
+      l->end = var + varlen - 1;
       l->oob = 1;
       return;
     }
@@ -152,7 +167,8 @@ __ix_cli_begin (struct ix_cli_line *l, char *line, long len)
   end = line;
   while (end < line + len && *end)
     end++;
-  if (nl && nl + 1 + OOB_MARK_LEN <= line + len && nl[1] == oob_mark[0])
+  if (nl < line + len && *nl == '\n' && nl + 1 + OOB_MARK_LEN <= line + len
+      && nl[1] == oob_mark[0])
     end = nl;
   while (end > line && (end[-1] == '\n' || end[-1] == '\r'))
     end--;
@@ -171,7 +187,7 @@ cli_oob_next (struct ix_cli_line *l, char **argp)
   if (rd >= l->end)
     return 0;
   *argp = rd;
-  /* cli_oob_find saw every argument ended and every escape whole */
+  /* cli_oob_check saw every argument ended and every escape whole */
   while (*rd != OOB_END)
     {
       char c = *rd++;

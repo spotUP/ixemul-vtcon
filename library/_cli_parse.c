@@ -61,6 +61,7 @@
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
+#include <dos/var.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -214,6 +215,8 @@ __ix_cli_parse(struct Process *this_proc, long alen, char *_aptr,
   char *arg0;
   struct CommandLineInterface *cli;
   struct ix_cli_line cl;
+  char *ixvar = 0;
+  long ixvarlen = 0;
   struct Argument *arg, *narg;
   char *line, **cpp, *cp;
   int do_expand, quoted;
@@ -367,7 +370,22 @@ __ix_cli_parse(struct Process *this_proc, long alen, char *_aptr,
    * line split as dos.library's ReadItem splits it, without its * escapes
    * in quotes (cli_args.c). Out-of-band arguments are never globbed: the
    * shell that wrote them has expanded them. */
-  __ix_cli_begin (&cl, aptr, alen);
+  /* the argv vsh left for the program a Shell runs for it (cli_args.c),
+   * taken out of this process: never in environ, never copied to a child */
+  {
+    struct LocalVar *lv = FindVar ("__ixargv", LV_VAR);
+
+    if (lv && lv->lv_Len > 0)
+      {
+        ixvarlen = lv->lv_Len;
+        ixvar = alloca (ixvarlen + 1);
+        memcpy (ixvar, lv->lv_Value, ixvarlen);
+        ixvar[ixvarlen] = 0;
+      }
+    if (lv)
+      DeleteVar ("__ixargv", GVF_LOCAL_ONLY);
+  }
+  __ix_cli_begin (&cl, aptr, alen, ixvar, ixvarlen);
 
   /* loop over all arguments, expand all */
   for (narg = arg = 0; __ix_cli_next (&cl, &line, &quoted); )
