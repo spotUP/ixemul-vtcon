@@ -92,3 +92,17 @@ llabs(long long x)
 {
 	return x < 0 ? -x : x;
 }
+
+/* C99 strtoimax and strtoumax (<inttypes.h>; libarchive 3.8.9's 7zip and
+ * zstd option parsers): intmax_t is long long here (stdint.h) */
+long long
+strtoimax(const char *s, char **end, int base)
+{
+	return strtoq(s, end, base);
+}
+
+unsigned long long
+strtoumax(const char *s, char **end, int base)
+{
+	return strtouq(s, end, base);
+}
