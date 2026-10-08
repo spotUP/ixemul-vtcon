@@ -18,6 +18,10 @@ the Docker.app path). After it:
     sh docker/install-sdk-headers.sh        # this tree's public header changes into the SDK ($SDK, default ~/opt/amiga/m68k-amigaos/ixemul/include), originals kept as *.orig
     make -C compat && make -C compat install    # libixcompat.a into the SDK's lib
 
+Host tests of the library's pure parts (the argument line splitter,
+`library/cli_args.c`): `make -C tests/host test`; vtcon's `make test` runs
+them too (`ONLY=ixemul` alone).
+
 Everything that links with `-mcrt=ixemul` (tmux, screen, python, neovim, vsh's
 helpers) needs those two steps once. The branch UP-Term uses is
 `feature/ixemul-80` (pinned in `upterm/repos.lock`). The rest of this repo's

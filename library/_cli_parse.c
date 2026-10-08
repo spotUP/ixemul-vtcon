@@ -65,6 +65,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <glob.h>
+#include "cli_args.h"
 
 extern int __read(), __write(), __ioctl(), __fselect(), __close();
 
@@ -214,8 +215,8 @@ __ix_cli_parse(struct Process *this_proc, long alen, char *_aptr,
   struct CommandLineInterface *cli;
   char *next, *lmax;
   struct Argument *arg, *narg;
-  char *line, **cpp;
-  int do_expand;
+  char *line, **cpp, *cp;
+  int do_expand, quoted;
   int arglen;
   char *aptr;
   struct ArgList ArgList;
@@ -362,83 +363,22 @@ __ix_cli_parse(struct Process *this_proc, long alen, char *_aptr,
   /* lets start humble.. no arguments at all:-)) */
   ArgList.al_num = 0;
 
-  /* find end of command-line, stupid BCPL-stuff.. line can end
-   * either with \n or with \0 .. */
-  for (lmax = aptr; *lmax && *lmax != '\n' && *lmax != '\r'; ++lmax) ;
+  /* the argument line, split as dos.library's ReadItem splits it, with
+   * the * escapes in quotes (cli_args.c): what a native command reads
+   * from the same line is what main() gets */
+  lmax = __ix_cli_line_end (aptr, alen);
   *lmax = 0;
 
   /* loop over all arguments, expand all */
-  for (line = aptr, narg = arg = 0; line < lmax; )
+  for (next = aptr, narg = arg = 0;
+       __ix_cli_next_arg (&next, lmax, &line, &quoted); )
     {
+      KPRINTF (("got arg '%s'\n", line));
+      /* a quoted argument is never expanded */
       do_expand = 0;
-
-      KPRINTF (("remaining cmd line = '%s'\n", aptr));
-      /* skip over leading whitespace */
-      while (isspace (*line)) line++;
-      if (line >= lmax)
-	break;
-
-      /* if argument starts with ", don't expand it and remove the " */
-      if (*line == '\"')
-	{
-	  KPRINTF (("begin quoted argument at '%s'\n", line));
-	  /* scan for end of quoted argument, this can be either at
-	   * end of argumentline or at a second " */
-	  line++;
-	  next = line;
-	  while (next < lmax && *next != '\"')
-	    {
-	      /* Prevent that the loop terminates due to an escaped quote.
-	       * However, if the character after the quote is a space, then
-	       * it is ambiguous whether or not the quote is escaped or is
-	       * the end of the argument.  Consider what happens when you give
-	       * /bin/sh a 'FS=\' argument.  This gets passed to ixemul.library
-	       * as "FS=\" <other args> */
-	      if ((*next == '\'' || *next == '\\') && next[1] == '\"')
-		{
-		  /* in this case we have to shift the whole remaining
-		   * line one position to the left to skip the 
-		   * escape-character */
-		  bcopy (next + 1, next, (lmax - next) + 1);
-		  --lmax;
-		}
-
-	      ++next;
-	    }
-	  *next = 0;
-	  KPRINTF (("got arg '%s'\n", line));
-	}
-      else
-	{
-          /* strange kind of BCPL-quoting, if you want to get a " thru,
-           * you have to quote it with a ', eq. HELLO'"WORLD'" will preserve
-           * the " inside the argument. Since hardly anyone knows this
-           * "feature", I allow for the more common Unix-like escaping, ie
-           * \" will give you the same effect as '". */
-          if ((*line == '\'' || *line == '\\') && line[1] == '\"')
-            {
-  	      KPRINTF (("found escaped quote at '%s'\n", line));
-  	      line++;
-  	    }
-	  /* plain, vanilla argument.. */
-	  next = line + 1;
-	  /* check, whether we have to run thru the expander, or
-	   * if we rather can just copy over the whole argument */
-	  do_expand = iswild (*line);
-	  /* skip over element and make it 0-terminated .. */
-	  while (next < lmax && !isspace (*next))
-	    {
-	      do_expand |= iswild (*next);
-	      if ((*next == '\'' || *next == '\\') && next[1] == '\"')
-		{
-		  bcopy (next + 1, next, (lmax - next) + 1);
-		  --lmax;
-		}
-
-	      ++next;
-	    }
-	  *next = 0;
-	}
+      if (!quoted)
+        for (cp = line; *cp; cp++)
+          do_expand |= iswild (*cp);
 
       if (expand_cmd_line && do_expand)
 	{
@@ -471,7 +411,6 @@ __ix_cli_parse(struct Process *this_proc, long alen, char *_aptr,
 	}
 
       narg = (struct Argument *) ArgList.al_list.tail;
-      line = next + 1;
     } /* for */
 
   /* prepend the program name */
