@@ -71,6 +71,12 @@ typedef struct {
 	long rem;		/* remainder */
 } ldiv_t;
 
+/* C99 (libixcompat.a, UP-Term): libarchive 3.8.9 divides with lldiv */
+typedef struct {
+	long long quot;		/* quotient */
+	long long rem;		/* remainder */
+} lldiv_t;
+
 #if !defined(_ANSI_SOURCE)
 typedef struct {
 	quad_t quot;		/* quotient */
@@ -116,6 +122,8 @@ void	 free __P((void *));
 char	*getenv __P((const char *));
 long	 labs __P((long));
 ldiv_t	 ldiv __P((long, long));
+lldiv_t	 lldiv __P((long long, long long));	/* libixcompat.a */
+long long llabs __P((long long));		/* libixcompat.a */
 void	*malloc __P((size_t));
 void	 qsort __P((void *, size_t, size_t,
 	    int (*)(const void *, const void *)));

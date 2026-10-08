@@ -74,3 +74,21 @@ round(double x)
 {
 	return x < 0 ? -floor(-x + 0.5) : floor(x + 0.5);
 }
+
+/* C99 lldiv and llabs (libarchive 3.8.9's archive_time.c): C99 division
+ * truncates toward zero, so quot and rem come straight from / and % */
+lldiv_t
+lldiv(long long n, long long d)
+{
+	lldiv_t r;
+
+	r.quot = n / d;
+	r.rem = n % d;
+	return r;
+}
+
+long long
+llabs(long long x)
+{
+	return x < 0 ? -x : x;
+}
