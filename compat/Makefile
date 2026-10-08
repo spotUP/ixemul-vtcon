@@ -16,7 +16,7 @@ VTCON ?= $(UPTERM_ROOT)/vtcon
 CPPFLAGS ?=
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o c99.o selfpath.o langinfo.o \
-       eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o
+       eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o
 
 # C95's wide string functions, which gnulib takes for granted (GNU grep
 # 3.12 failed to link on wcscat, wmemcpy): the self-contained members of the
@@ -30,8 +30,9 @@ WCS_FUNCS  = wcscat wcschr wcscmp wcscoll wcscpy wcscspn wcslcpy wcslen wcsncat 
 # failed to link on them under less 710; references: malloc, free)
 SEARCH_FUNCS = tsearch tfind tdelete twalk
 # POSIX.1-2008 strnlen: the SDK's string.h declares it, so gnulib (nano 9.2's
-# fnmatch) took it as present and the link failed (no references)
-STR_FUNCS  = strnlen
+# fnmatch) took it as present and the link failed (no references); POSIX
+# strtok_r, which findutils 4.11 calls (no references)
+STR_FUNCS  = strnlen strtok_r
 WCS_OBJS   = $(addprefix newlibwcs/lib_a-,$(addsuffix .o,$(WCS_FUNCS) $(SEARCH_FUNCS) $(STR_FUNCS)))
 
 libixcompat.a: $(OBJS) $(WCS_OBJS)

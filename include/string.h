@@ -74,6 +74,7 @@ char	*strerror __P((int));
 char	*strsignal __P((int));	/* libixcompat.a (UP-Term) */
 size_t	 strlen __P((const char *));
 size_t   strnlen __P((const char *, size_t));
+char    *strtok_r __P((char *, const char *, char **));
 char    *stpcpy __P((char *, const char *));
 char	*strncat __P((char *, const char *, size_t));
 int	 strncmp __P((const char *, const char *, size_t));
