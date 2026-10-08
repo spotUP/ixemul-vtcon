@@ -93,6 +93,7 @@ setsid(void)
     u.u_session->s_count--;
   u.u_session = s;
   s->s_count = 1;
+  s->s_ttyname[0] = 0;		/* no controlling terminal yet */
   s->pgrp = u.p_pgrp = getpid();
 
   return u.p_pgrp;

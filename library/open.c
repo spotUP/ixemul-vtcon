@@ -250,7 +250,14 @@ open(char *name, int mode, int perms)
 
   amode = (mode & O_CREAT) ? MODE_READWRITE : MODE_OLDFILE;
 
-  if (pathinfo.is_dev_tty)
+  if (pathinfo.is_dev_tty && u.u_session && u.u_session->s_ttyname[0])
+    {
+      /* the session's controlling terminal (TIOCSCTTY): a pty slave */
+      name = u.u_session->s_ttyname;
+      final_namelen = strlen(name) + 1;
+      use_direct_open = 0;
+    }
+  else if (pathinfo.is_dev_tty)
     {
       name = "*";
       final_namelen = 2;     /* "*" plus NUL */

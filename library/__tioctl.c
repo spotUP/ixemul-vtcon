@@ -611,6 +611,26 @@ __tioctl(struct file *f, unsigned int cmd, unsigned int inout,
         break;
       }
 
+    /* --- TIOCSCTTY: become the controlling terminal ---------------------- */
+    /*
+     * The session (setsid) remembers this terminal's name, and open() of
+     * /dev/tty opens it instead of the process's console "*". A program on
+     * a pty -- a tmux pane, ptyrun -- otherwise read EOF from /dev/tty and
+     * less quit at its first key (rig 3, 2026-10-08).
+     */
+
+    case TIOCSCTTY:
+      {
+        if (!u.u_session || !f->f_name || strlen(f->f_name) >= sizeof(u.u_session->s_ttyname))
+          {
+            err = EPERM;
+            break;
+          }
+        strcpy(u.u_session->s_ttyname, f->f_name);
+        result = 0;
+        break;
+      }
+
     /* --- TIOCGPGRP: Get process group ------------------------------------ */
     /*
      * Return the controlling process group for this session.

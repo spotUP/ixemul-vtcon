@@ -85,6 +85,9 @@ struct	session {
 /*	struct	vnode *s_ttyvp;		*//* vnode of controlling terminal */
 /*	struct	tty *s_ttyp;		*//* controlling terminal */
 /*	char	s_login[MAXLOGNAME];	*//* setlogin() name */
+	char	s_ttyname[16];		/* the controlling terminal as open()
+					   names it ("PTY:XY/s"), set by
+					   TIOCSCTTY; empty: /dev/tty is "*" */
 };
 
 /*
