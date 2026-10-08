@@ -91,8 +91,13 @@ __fioctl(struct file *f, unsigned int cmd, unsigned int inout,
 	 * say, that the timeout should be in 1/50s, others say
 	 * its actually in micro/s.. who knows.. */
 	/* a vtcon console or PTY: knows the count (libevent sizes its reads
-	   with it; 1 at a time split a terminal's answers, UP-Term) */
-	if (__vtcon (f))
+	   with it; 1 at a time split a terminal's answers, UP-Term). So does
+	   a PTY: pipe (PTY:<id>/r, vsh's pipes), which is not interactive:
+	   WaitForChar is 1 at its end of file too, and coreutils cat -n, which
+	   writes its buffer only when FIONREAD says 0, lost its output in
+	   `echo y | cat -n`. Other handlers refuse the packet once. */
+	if (__vtcon (f) ||
+	    (!IsInteractive (CTOBPTR (f->f_fh)) && !HANDLER_NIL (f)))
 	  {
 	    long n = __vtcon_nread (f);
 

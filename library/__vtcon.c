@@ -68,15 +68,19 @@ int __vtcon_packet(struct file *f, long action, void *arg, long arg3)
   return LastResult (f) != 0;
 }
 
-/* FIONREAD on a vtcon console or PTY:: the bytes a read would get now, or
-   -1 when the handler does not know the packet (an older vtcon) */
+/* FIONREAD on a vtcon console, PTY: or a PTY: pipe: the bytes a read would
+   get now, or -1 when the handler does not know the packet (an older vtcon,
+   PIPE:; asked once per handler) */
 long __vtcon_nread(struct file *f)
 {
   usetup;
 
+  if (__vtcon_refused (f, ACTION_VTCON_NREAD))
+    return -1;
   LastResult (f) = 0; LastError (f) = 0;
   SendPacket3 (f, __srwport, ACTION_VTCON_NREAD, f->f_fh->fh_Arg1, 0, 0);
   __wait_sync_packet (&f->f_sp);
+  __vtcon_note_reply (f, ACTION_VTCON_NREAD, LastResult (f), LastError (f));
   return LastError (f) ? -1 : LastResult (f);
 }
 
