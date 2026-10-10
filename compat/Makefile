@@ -62,7 +62,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/own_c99_link
+test: test/wide_test test/wcwidth_test test/math_test test/own_c99_link test/math_header.o
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -81,6 +81,10 @@ test/wcwidth_test: test/wcwidth_test.c wcwidth.c $(VTCON)/engine/vtwidth.h
 test/own_c99_link: test/own_c99_link.c libixcompat.a
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -o $@ test/own_c99_link.c libixcompat.a
 
+# <math.h>'s C99 constants (compile only, against the repo's headers)
+test/math_header.o: test/math_header.c ../include/math.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ test/math_header.c
+
 spawnprobe: test/spawnprobe
 # libixcompat.a by its path: the driver searches the SDK's lib (an older
 # copy) before any -L given here
@@ -91,5 +95,5 @@ install: libixcompat.a
 	cp libixcompat.a $(SDK)/lib/libixcompat.a
 
 clean:
-	rm -rf $(OBJS) newlibwcs libixcompat.a test/wide_test test/wcwidth_test test/spawnprobe test/own_c99_link
+	rm -rf $(OBJS) newlibwcs libixcompat.a test/wide_test test/wcwidth_test test/spawnprobe test/own_c99_link test/math_header.o
 .PHONY: tables test spawnprobe install clean

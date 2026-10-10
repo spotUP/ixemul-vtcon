@@ -58,6 +58,19 @@
 
 #include <sys/cdefs.h>
 
+/* C99 7.12: fzy 1.0 scores with INFINITY (libixcompat, UP-Term) */
+#if defined(__GNUC__)
+#ifndef INFINITY
+#define INFINITY	__builtin_inff()
+#endif
+#ifndef NAN
+#define NAN		__builtin_nanf("")
+#endif
+#ifndef HUGE_VALF
+#define HUGE_VALF	__builtin_inff()
+#endif
+#endif
+
 #if (defined(__GNUC__) || defined(__cplusplus)) && defined(__HAVE_68881__)
 #include <math-68881.h>
 #else
