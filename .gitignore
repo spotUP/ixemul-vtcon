@@ -10,3 +10,6 @@ compat/test/own_c99_link
 compat/test/*.o
 thoughts/spot/
 thoughts/searchable/
+compat/test/getopt_test
+compat/test/getopt_ixc.o
+compat/test/ixc_link
