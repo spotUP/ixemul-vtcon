@@ -58,6 +58,7 @@
 #include "kprintf.h"
 
 #include <ctype.h>
+#include <paths.h>
 #include <string.h>
 
 /* 2.0 support */
@@ -265,6 +266,15 @@ __load_seg (char *name, char **args)
   BPTR lock;
   struct my_seg *seg;
   usetup;
+
+  /* /bin/sh and /bin/bash are the shell, _PATH_BSHELL (/gg/bin/sh: the kit
+   * installs vsh as GG:bin/sh), as vsh has them (vtcon shell/sh_exec.c
+   * shell_path_alias): configure scripts, make, popen-less execl and #!
+   * lines name the Unix path, and the Amiga has no such file ("/bin/sh" as
+   * AmigaDOS reads it is bin/sh in the parent directory). Only these two
+   * names; the #! line of a script comes here too (load_seg_or_script). */
+  if (!strcmp (name, "/bin/sh") || !strcmp (name, "/bin/bash"))
+    name = _PATH_BSHELL;
 
   /* perhaps the name is vanilla enough, so that even LoadSeg() groks it? */
   if (args) *args = 0;
