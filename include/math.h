@@ -69,6 +69,13 @@
 #ifndef HUGE_VALF
 #define HUGE_VALF	__builtin_inff()
 #endif
+/* C99 7.12.14, quiet comparisons (file 5.48's softmagic.c) */
+#define isgreater(x, y)		__builtin_isgreater(x, y)
+#define isgreaterequal(x, y)	__builtin_isgreaterequal(x, y)
+#define isless(x, y)		__builtin_isless(x, y)
+#define islessequal(x, y)	__builtin_islessequal(x, y)
+#define islessgreater(x, y)	__builtin_islessgreater(x, y)
+#define isunordered(x, y)	__builtin_isunordered(x, y)
 #endif
 
 #if (defined(__GNUC__) || defined(__cplusplus)) && defined(__HAVE_68881__)
