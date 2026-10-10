@@ -16,7 +16,7 @@ VTCON ?= $(UPTERM_ROOT)/vtcon
 CPPFLAGS ?=
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
-       eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o
+       getopt_long.o pselect.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o
 
 # c99.c, one archive member per function (c99.c says why)
 C99_FUNCS = strtoll strtoull ftello fseeko ctime_r strsignal fmod round lldiv llabs strtoimax strtoumax
@@ -62,17 +62,21 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/own_c99_link test/math_header.o
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/own_c99_link test/ixc_link test/math_header.o
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
 	./test/wcwidth_test
 	./test/math_test
+	./test/getopt_test
 test/wide_test: test/wide_test.c utf8.c uclass.c uclass_tab.h ixc_wide.h
 	$(HOSTCC) -Wall -O2 -o $@ test/wide_test.c utf8.c uclass.c
 test/math_test: test/math_test.c math.c
 	$(HOSTCC) -Wall -O2 -Datan2=ixc_atan2 -c -o test/math_ixc.o math.c
 	$(HOSTCC) -Wall -O2 -o $@ test/math_test.c test/math_ixc.o
+test/getopt_test: test/getopt_test.c getopt_long.c ../include/getopt.h
+	$(HOSTCC) -Wall -O2 -Dgetopt_long=ixc_getopt_long -Dgetopt_long_only=ixc_getopt_long_only -c -o test/getopt_ixc.o getopt_long.c
+	$(HOSTCC) -Wall -O2 -o $@ test/getopt_test.c test/getopt_ixc.o
 test/wcwidth_test: test/wcwidth_test.c wcwidth.c $(VTCON)/engine/vtwidth.h
 	$(HOSTCC) -Wall -O2 -I$(VTCON)/engine -o $@ test/wcwidth_test.c wcwidth.c
 
@@ -85,6 +89,10 @@ test/own_c99_link: test/own_c99_link.c libixcompat.a
 test/math_header.o: test/math_header.c ../include/math.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ test/math_header.c
 
+# getopt_long and pselect resolve from libixcompat.a (link only)
+test/ixc_link: test/ixc_link.c libixcompat.a ../include/getopt.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -o $@ test/ixc_link.c libixcompat.a
+
 spawnprobe: test/spawnprobe
 # libixcompat.a by its path: the driver searches the SDK's lib (an older
 # copy) before any -L given here
@@ -95,5 +103,5 @@ install: libixcompat.a
 	cp libixcompat.a $(SDK)/lib/libixcompat.a
 
 clean:
-	rm -rf $(OBJS) newlibwcs libixcompat.a test/wide_test test/wcwidth_test test/spawnprobe test/own_c99_link test/math_header.o
+	rm -rf $(OBJS) newlibwcs libixcompat.a test/wide_test test/wcwidth_test test/spawnprobe test/own_c99_link test/math_header.o test/ixc_link
 .PHONY: tables test spawnprobe install clean
