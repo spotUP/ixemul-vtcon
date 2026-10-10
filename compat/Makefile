@@ -16,7 +16,7 @@ VTCON ?= $(UPTERM_ROOT)/vtcon
 CPPFLAGS ?=
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
-       getopt_long.o pselect.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o
+       getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o
 
 # c99.c, one archive member per function (c99.c says why)
 C99_FUNCS = strtoll strtoull ftello fseeko ctime_r strsignal fmod round lldiv llabs strtoimax strtoumax

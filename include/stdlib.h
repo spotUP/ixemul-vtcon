@@ -206,6 +206,10 @@ int	 sradixsort __P((const unsigned char **, int, const unsigned char *,
 char	*initstate __P((unsigned, char *, int));
 long	 random __P((void));
 char	*realpath __P((const char *, char *));
+int	 posix_openpt __P((int));	/* libixcompat.a (UP-Term), compat/pty.c */
+int	 grantpt __P((int));
+int	 unlockpt __P((int));
+char	*ptsname __P((int));
 char	*setstate __P((char *));
 void	 srandom __P((unsigned));
 
