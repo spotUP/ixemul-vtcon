@@ -92,6 +92,7 @@ int	 getgroups __P((int, int *));
 char	*getlogin __P((void));
 pid_t	 getpgrp __P((void));
 pid_t	 getpgid __P((pid_t));	/* libixcompat.a (UP-Term) */
+int	 lchown __P((const char *, uid_t, gid_t));	/* libixcompat.a (UP-Term) */
 pid_t	 getpid __P((void));
 pid_t	 getppid __P((void));
 uid_t	 getuid __P((void));

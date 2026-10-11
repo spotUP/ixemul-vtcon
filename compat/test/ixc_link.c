@@ -1,12 +1,13 @@
-/* A program calling getopt_long, pselect and posix_openpt must link against
+/* A program calling getopt_long, pselect, posix_openpt and lchown must link against
  * libixcompat.a: ixemul has none of them (fzy 1.0: "undefined reference to
- * `getopt_long'" and `pselect'; script and ptyrun need the pty calls).
+ * `getopt_long'" and `pselect'; script and ptyrun need the pty calls; coreutils 9's cp lchown).
  * Built by `make test` (bebbo's gcc, the repo's headers); it links or the
  * test fails. */
 #include <getopt.h>
 #include <sys/select.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 int
 main(int argc, char **argv)
@@ -19,5 +20,5 @@ main(int argc, char **argv)
 	FD_ZERO(&r);
 	m = posix_openpt(O_RDWR);
 	return getopt_long(argc, argv, "x", lo, 0) + pselect(0, &r, 0, 0, &ts, 0) +
-	    (m >= 0 && grantpt(m) == 0 && unlockpt(m) == 0 && ptsname(m) != 0 ? 0 : 1);
+	    (m >= 0 && grantpt(m) == 0 && unlockpt(m) == 0 && ptsname(m) != 0 ? 0 : 1) + (argc > 5 ? lchown(argv[1], 0, 0) : 0);
 }
