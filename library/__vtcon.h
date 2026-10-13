@@ -21,5 +21,6 @@ void __sleep_breaks(unsigned long res);
 void __vtcon_winch(struct Task *t);
 int __vtcon_bg(struct file *f, int sig);
 void __vtcon_init(void);
+int __vtcon_pty_mounted(void);
 
 #endif

@@ -103,6 +103,24 @@ int __vtcon(struct file *f)
   return (f->f_ttyflags & IXTTY_VTCON) != 0;
 }
 
+/* Is vtcon's PTY: handler there? Asked of the DOS list when a /dev/ptyXY or
+ * /dev/ttyXY is opened, with no requester: without it (a stock Workbench) the
+ * BSD ptys are ixemul's own, over FIFO: (open.c, __close.c). */
+int __vtcon_pty_mounted(void)
+{
+  struct Process *me = (struct Process *)FindTask (0);
+  APTR oldwin = me->pr_WindowPtr;
+  struct DevProc *dp;
+
+  me->pr_WindowPtr = (APTR)-1;
+  dp = GetDeviceProc ("PTY:", NULL);
+  me->pr_WindowPtr = oldwin;
+  if (!dp)
+    return 0;
+  FreeDeviceProc (dp);
+  return 1;
+}
+
 /* The console's ^\ and ^Z arrive as the CTRL_E and CTRL_F breaks (vtcon:
  * vtcon_packets.h): SIGQUIT and SIGTSTP for the foreground process group,
  * as CTRL_C is SIGINT. Only for a process on a vtcon console, and not when

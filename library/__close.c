@@ -89,7 +89,24 @@
 #include <string.h>
 #include "__vtcon.h"
 
+#ifndef ACTION_STACK
+#define ACTION_STACK 2002L
+#endif
+
 /* --- Close path ---------------------------------------------------------- */
+
+/* a FIFO: pty (open.c uses these when there is no PTY:) */
+static int
+is_pty_name(const char *name)
+{
+  if (!name)
+    return 0;
+
+  if (strncmp(name, "/fifo/pty", 9) != 0)
+    return 0;
+
+  return strlen(name) >= 18;
+}
 
 /*
  * __close() is responsible for:
@@ -135,7 +152,15 @@ __close(struct file *f)
            * WAIT_CHAR from the same task ends it at once (the handler keeps
            * one waiter per task), without putting input into the line.
            */
-          if (select_sp->sp_Pkt.dp_Port && f->f_fh && __vtcon(f))
+          if (f->f_count == 1 && f->f_fh && is_pty_name(f->f_name) &&
+              select_sp->sp_Pkt.dp_Port)
+            {
+              /* a FIFO: pty: the historical wakeup at the global final close */
+              SendPacket3(f, __srwport, ACTION_STACK,
+                          f->f_fh->fh_Arg1, (int)"\n", 1);
+              __wait_sync_packet(&f->f_sp);
+            }
+          else if (select_sp->sp_Pkt.dp_Port && f->f_fh && __vtcon(f))
             {
               SendPacket1(f, __srwport, ACTION_WAIT_CHAR, 0);
               __wait_sync_packet(&f->f_sp);
@@ -158,6 +183,23 @@ __close(struct file *f)
   if (!(f->f_flags & FEXTOPEN))
     {
       __Close (CTOBPTR (f->f_fh));
+
+      if (is_pty_name(f->f_name))
+        {
+          int i = (f->f_name[9] - 'p') * 16 +
+                  f->f_name[10] -
+                  (f->f_name[10] >= 'a' ? 'a' - 10 : '0');
+
+          char mask = (f->f_name[17] == 'm'
+                       ? IX_PTY_MASTER
+                       : IX_PTY_SLAVE);
+
+          ix.ix_ptys[i] &= ~(mask & IX_PTY_OPEN);
+          ix.ix_ptys[i] |=  (mask & IX_PTY_CLOSE);
+
+          if (!(ix.ix_ptys[i] & IX_PTY_OPEN))
+            ix.ix_ptys[i] = 0;
+        }
     }
 
   if (f->f_flags & FUNLINK)
