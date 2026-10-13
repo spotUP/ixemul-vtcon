@@ -17,8 +17,20 @@ fi
 # only for .c edits: all.c does not depend on headers, and a configure.in,
 # Makefile.in or header change needs the full build)
 [ -n "$KEEP" ] && [ -f build295/config.status ] || { rm -rf build295 && mkdir build295; }
+# /inlines/include, first in the include path of configure and of every compile: GG's fd2inline 1.11
+# headers used to be downloaded into the image (the file is gone, 2026-10-13). The NDK's own
+# inline/*.h stand in, without the out-of-line stdarg wrappers that name the library base as a global
+# (gcc 2.95 emits an unused static function, and it fails to link: ixnet's ix_panic.c has
+# IntuitionBase as a local). The wrappers that take the base as a parameter stay.
+INL="$PWD/build-inlines"
+rm -rf "$INL" && mkdir -p "$INL/include/inline"
+for f in "$HOME"/opt/amiga/m68k-amigaos/ndk-include/inline/*.h; do
+  LC_ALL=C awk '/^AMIGA_VA_WRAPPER_ATTR$/ { held = $0; next } held != "" { if ($0 ~ /const __base/) print held; else skip = 1; held = "" } skip { if ($0 == "}") skip = 0; next } { print }' "$f" \
+    > "$INL/include/inline/$(basename "$f")"
+done
 docker run --rm --platform linux/amd64 \
   -v "$PWD":/ix \
+  -v "$INL/include":/inlines/include:ro \
   -v "$HOME/opt/amiga/m68k-amigaos/ndk-include":/ndk:ro \
   -v "$HOME/opt/amiga/m68k-amigaos/ixemul":/ixsdk:ro \
   -v "$HOME/opt/amiga/m68k-amigaos/lib":/amigalib:ro \
