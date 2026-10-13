@@ -1,3 +1,4 @@
+/* Modified 2026-10-05 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 #ifndef _UNP_H_
 #define _UNP_H_
 

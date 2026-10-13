@@ -1,3 +1,4 @@
+/* Modified 2026-10-08 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: fnmatch.c,v 1.11 1995/02/27 03:43:06 cgd Exp $	*/
 
 /*

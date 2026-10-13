@@ -1,3 +1,4 @@
+/* Modified 2026-10-13 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*
  *  This file is part of ixemul.library for the Amiga.
  *  Copyright (C) 1991, 1992  Markus M. Wild
@@ -274,7 +275,17 @@ __load_seg (char *name, char **args)
    * AmigaDOS reads it is bin/sh in the parent directory). Only these two
    * names; the #! line of a script comes here too (load_seg_or_script). */
   if (!strcmp (name, "/bin/sh") || !strcmp (name, "/bin/bash"))
-    name = _PATH_BSHELL;
+    {
+      /* only when that shell is there: without it (no GG: assign, a stock
+       * Workbench) the name is left as it is and fails as it did in 80.1 */
+      BPTR sh = __lock (_PATH_BSHELL, ACCESS_READ);
+
+      if (sh)
+        {
+          __unlock (sh);
+          name = _PATH_BSHELL;
+        }
+    }
 
   /* perhaps the name is vanilla enough, so that even LoadSeg() groks it? */
   if (args) *args = 0;

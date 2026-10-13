@@ -1,3 +1,4 @@
+/* Modified 2026-09-29 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: regexec.c,v 1.6 1995/02/27 13:29:48 cgd Exp $	*/
 
 /*-

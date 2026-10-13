@@ -1,3 +1,4 @@
+/* Modified 2026-09-29 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /* A program for the machine that builds ixemul (a cross build runs it
  * there): only ixemul's syscall list, not its system headers. */
 #include <stdio.h>

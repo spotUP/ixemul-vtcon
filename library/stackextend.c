@@ -1,3 +1,4 @@
+/* Modified 2026-10-06 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 #define	_KERNEL
 #include "ixemul.h"
 

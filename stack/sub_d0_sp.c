@@ -1,3 +1,4 @@
+/* Modified 2026-10-05 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 #include "a4.h"		/* for the A4 macro */
 
 asm("\n\

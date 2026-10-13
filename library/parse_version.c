@@ -1,3 +1,4 @@
+/* Modified 2026-10-13 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,8 +50,9 @@ int main(int argc, char **argv)
 ";
 
   /* the vtcon patches (termios by packet, PTY:, job control): tell this
-     build from the 48.2 it is based on */
-  strcpy(tmp, "UP-Term");
+     build from the 80.1 it is based on. The number stays 80.1 (the ABI every
+     port is built against); the build number follows. */
+  strcpy(tmp, "vtcon-1");
 
 #ifdef NOTRAP
   if (tmp[0])

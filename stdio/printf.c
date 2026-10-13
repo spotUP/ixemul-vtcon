@@ -1,3 +1,4 @@
+/* Modified 2026-10-05 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: printf.c,v 1.5 1995/02/02 02:10:13 jtc Exp $	*/
 
 /*-

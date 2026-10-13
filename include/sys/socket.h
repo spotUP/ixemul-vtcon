@@ -1,3 +1,4 @@
+/* Modified 2026-10-05 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: socket.h,v 1.12 1995/03/29 22:10:11 briggs Exp $	*/
 
 /*

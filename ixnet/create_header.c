@@ -1,3 +1,4 @@
+/* Modified 2026-09-29 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /* ix_internals.h for ixnet, from the target's struct layout: compiled to
  * assembly by the cross compiler, never run (see library/create_header.c). */
 #define _KERNEL

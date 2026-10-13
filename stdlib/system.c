@@ -1,3 +1,4 @@
+/* Modified 2026-10-08 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*
  * Copyright (c) 1988 The Regents of the University of California.
  * All rights reserved.

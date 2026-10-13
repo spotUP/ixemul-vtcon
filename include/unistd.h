@@ -1,3 +1,4 @@
+/* Modified 2026-10-11 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: unistd.h,v 1.25 1995/03/19 22:51:38 mycroft Exp $	*/
 
 /*

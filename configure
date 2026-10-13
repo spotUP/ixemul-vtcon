@@ -1,4 +1,5 @@
 #! /bin/sh
+# Modified 2026-10-05 by spotUP for UP-Term (ixemul-vtcon); see the git history.
 
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf version 2.13 

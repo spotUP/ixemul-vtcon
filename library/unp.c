@@ -1,3 +1,4 @@
+/* Modified 2026-10-05 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*
  *  This file is part of ixemul.library for the Amiga.
  *  Copyright (C) 1996 by Hans Verkuil

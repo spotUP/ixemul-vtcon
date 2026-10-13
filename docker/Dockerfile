@@ -34,7 +34,8 @@ RUN touch /src/gcc/gcc/c-parse.gperf /src/gcc/gcc/configure && \
       CFLAGS_FOR_TARGET=-noixemul   # install-normal without the manuals
 # install-libgcc copies libgcc.a without running the target ranlib
 RUN find $PREFIX/lib/gcc-lib -name 'libgcc*.a' -exec m68k-amigaos-ranlib {} \;
-# GG's fd2inline 1.11 inline headers (OS 3.1), the ones gcc 2.95 was paired
-# with (NDK 3.2's use variadic macros gcc 2.95 cannot parse)
-ADD https://codewiz.org/pub/systemshock/fileareas/GeekGadgets/fd2inline-1.11-bin.tgz /tmp/fd2inline.tgz
-RUN mkdir -p /inlines && tar xzf /tmp/fd2inline.tgz -C /inlines include && rm /tmp/fd2inline.tgz
+# /inlines/include: build.sh puts it first in configure's CPP. It held GG's fd2inline 1.11
+# inline headers (OS 3.1), downloaded from codewiz.org, which no longer serves the file
+# (404, 2026-10-13). Only configure's preprocessor checks look there; the compiler finds
+# <inline/...> in the NDK directory build.sh mounts. So the directory is empty.
+RUN mkdir -p /inlines/include
