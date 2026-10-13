@@ -19,10 +19,10 @@
  *
  * UP-Term (ixemul-vtcon) 2026/10/05
  *
- *   /dev/pty and /dev/tty map to vtcon's PTY: (open.c), so the FIFO: pty
- *   bookkeeping (is_pty_name, ix_ptys) and the ACTION_STACK wakeup are gone.
- *   On a vtcon console a pending WAIT_CHAR of this process is ended by a
- *   newer one from the same task instead.
+ *   /dev/pty and /dev/tty map to vtcon's PTY: when it is mounted (open.c);
+ *   without it the FIFO: pty bookkeeping (is_pty_name, ix_ptys) and the
+ *   ACTION_STACK wakeup are as in 80.1. On a vtcon console a pending
+ *   WAIT_CHAR of this process is ended by a newer one from the same task.
  *
  * Revision 1.6  2026/08/29  ChatGPT modifications (JJ)
  *
