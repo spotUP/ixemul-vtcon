@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* The libm functions ixemul.library 48.2 has no vectors for and the SDK has
  * no ixemul libm to resolve (README.math: with soft float, <math.h> declares
  * them for an external libm). Built on the ones it has (atan). Measured on

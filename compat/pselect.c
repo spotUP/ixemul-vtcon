@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* pselect (UP-Term libixcompat): select with a signal mask and a timespec.
  * ixemul has no pselect; fzy 1.0's tty_input_ready calls it. ixemul has one
  * thread per program, so the mask swap around select() cannot lose a signal

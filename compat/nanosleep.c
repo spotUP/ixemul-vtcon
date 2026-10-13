@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* nanosleep on what ixemul 48.2 has (select with a timeout): ixemul 80's
  * vector 622 is not in the SDK's 48.2 stub set, which the ports keep so
  * they run on both libraries (ixemul-80 migration plan, M8). mandoc 1.14.6's

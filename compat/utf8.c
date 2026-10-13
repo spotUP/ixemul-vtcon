@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* The multibyte codec of libixcompat: strict UTF-8 (no overlong forms, no
  * surrogates, nothing above U+10FFFF), restartable across calls, or
  * ISO 8859-1 one byte per character. See ixc_wide.h. (UP-Term) */

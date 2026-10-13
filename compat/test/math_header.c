@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* <math.h> has the C99 constants INFINITY, NAN and HUGE_VALF: fzy 1.0's
  * match.h uses INFINITY for SCORE_MAX and failed to compile on its absence
  * ("'INFINITY' undeclared"). Compile-only (bebbo's gcc, the repo's

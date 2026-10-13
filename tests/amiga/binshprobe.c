@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* binshprobe: an ixemul program starting the shell by its Unix names, on the
  * rig with vsh installed as the kit installs it (GG:bin/sh is vsh). configure
  * scripts and make start /bin/sh: system() and popen() by _PATH_BSHELL

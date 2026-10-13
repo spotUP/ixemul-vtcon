@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* wcwidth and wcswidth from vtcon's engine/vtwidth.h (VTCON in the
  * Makefile): the table the XCON console draws with, the one tmux-amiga's
  * utf8proc.c uses too, so every program lays text out as the terminal

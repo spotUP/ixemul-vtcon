@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* <wchar.h>'s conversions and <stdlib.h>'s multibyte functions in the
  * LC_CTYPE encoding setlocale chose (locale.c): UTF-8 or ISO 8859-1, on the
  * codec in utf8.c. The <stdlib.h> ones (mblen, mbtowc, wctomb, mbstowcs,

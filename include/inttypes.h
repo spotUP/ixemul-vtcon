@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* inttypes.h for the ixemul SDK (UP-Term): the C99 format macros for the
  * types of <stdint.h> on this ABI (int and long are 32 bits, long long and
  * intmax_t 64, intptr_t a long), and the two conversions libixcompat has.

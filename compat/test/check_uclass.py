@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 spotUP.
+# This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+# software; you can redistribute it and/or modify it under the terms of the
+# GNU Lesser General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version. See LICENSES.README and COPYING.LIB.
 """Compare `wide_test dump` (stdin) with Python's unicodedata: every code
 point's class (the ixc_wide.h mapping of the General_Category) and its
 simple upper/lower case mapping. Python's Unicode version must be the

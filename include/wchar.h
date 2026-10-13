@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* wchar.h for the ixemul SDK (UP-Term). ixemul 48.2 has no wide-character
  * functions beyond <stdlib.h>'s mbtowc/wctomb; libixcompat.a has these,
  * in the encoding setlocale's LC_CTYPE selects: UTF-8 when the locale
