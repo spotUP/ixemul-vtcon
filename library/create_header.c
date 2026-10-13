@@ -1,3 +1,4 @@
+/* Modified 2026-09-29 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /* ix_internals.h from the target's own struct layouts. Built for a cross
  * build: the cross compiler compiles this to assembly (-S, it never runs);
  * every DEFINE leaves a line "->NAME value" there, which the Makefile

@@ -1,3 +1,4 @@
+/* Modified 2026-10-08 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 #ifndef _SEARCH_H
 #define _SEARCH_H
 

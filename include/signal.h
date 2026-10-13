@@ -1,3 +1,4 @@
+/* Modified 2026-09-30 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: signal.h,v 1.7 1995/05/28 03:10:06 jtc Exp $	*/
 
 /*-

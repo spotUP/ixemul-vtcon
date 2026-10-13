@@ -1,3 +1,4 @@
+/* Modified 2026-10-07 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*
  *  This file is part of ixnet.library for the Amiga.
  *  Copyright (C) 1996 Jeff Shepherd

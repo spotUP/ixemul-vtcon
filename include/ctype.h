@@ -1,3 +1,4 @@
+/* Modified 2026-10-04 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: ctype.h,v 1.14 1994/10/26 00:55:47 cgd Exp $	*/
 
 /*

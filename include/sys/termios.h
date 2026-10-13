@@ -1,3 +1,4 @@
+/* Modified 2026-09-30 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: termios.h,v 1.13 1995/04/22 13:03:10 cgd Exp $	*/
 
 /*

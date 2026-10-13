@@ -1,3 +1,4 @@
+/* Modified 2026-10-04 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: dirent.h,v 1.9 1994/12/13 15:58:20 mycroft Exp $	*/
 
 /*-

@@ -1,3 +1,4 @@
+/* Modified 2026-10-05 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*  Derived from NetBSD strtoll.c
  *
  *  Copyright (c) 1992, 1993

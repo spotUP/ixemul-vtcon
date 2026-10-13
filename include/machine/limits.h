@@ -1,3 +1,4 @@
+/* Modified 2026-10-04 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: limits.h,v 1.9 1994/10/26 07:50:48 cgd Exp $	*/
 
 /*

@@ -1,3 +1,4 @@
+dnl Modified 2026-10-05 by spotUP for UP-Term (ixemul-vtcon); see the git history.
 dnl Process this file with autoconf to produce a configure script.
 dnl
 AC_INIT(libsrc/crt0.c)

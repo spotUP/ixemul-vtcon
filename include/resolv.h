@@ -1,3 +1,4 @@
+/* Modified 2026-09-30 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: resolv.h,v 1.8 1994/10/26 00:56:16 cgd Exp $	*/
 
 /*

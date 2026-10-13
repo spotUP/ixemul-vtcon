@@ -1,3 +1,4 @@
+/* Modified 2026-10-10 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /* sys/select.h for the ixemul SDK (UP-Term): POSIX's home of select() and
  * fd_set, which 4.4BSD ixemul keeps in <sys/types.h> (fd_set, FD_*),
  * <sys/time.h> (struct timeval) and <unistd.h> (select). Without this

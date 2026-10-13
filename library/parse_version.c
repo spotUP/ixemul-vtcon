@@ -1,3 +1,4 @@
+/* Modified 2026-10-13 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

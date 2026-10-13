@@ -1,3 +1,4 @@
+# Modified 2026-09-29 by spotUP for UP-Term (ixemul-vtcon); see the git history.
 # Glue comes in two flavors, one for flat address spaces and one for base
 # relative.  When gen_glue is compiled, which form of glue is generated
 # when it is run depends upon whether "__no_baserel" or "__baserel" was defined

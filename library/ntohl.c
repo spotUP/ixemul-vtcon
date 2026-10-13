@@ -1,3 +1,4 @@
+/* Modified 2026-10-05 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: ntohl.S,v 1.3 2013/07/16 23:24:19 matt Exp $	*/
 
 /*-

@@ -1,3 +1,4 @@
+/* Modified 2026-09-30 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: time.h,v 1.16 1995/06/15 23:08:11 cgd Exp $	*/
 
 /*
