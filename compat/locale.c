@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* setlocale with a UTF-8 LC_CTYPE (UP-Term). ixemul.library's setlocale
  * knows only "C" and answers "" with "C", so no program could ever select
  * UTF-8. This one, linked from libixcompat.a ahead of the library's stub,

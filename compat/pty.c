@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* posix_openpt, grantpt, unlockpt, ptsname (UP-Term libixcompat): the Unix 98
  * way to a pseudo-terminal over ixemul's BSD ptys. ixemul's /dev/ptyXY is a
  * master and /dev/ttyXY its slave (c1 in p..u, c2 in 0..9a..f); a master can

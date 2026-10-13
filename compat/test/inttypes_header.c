@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* <inttypes.h> has the C99 format macros, right for this ABI: file 5.48
  * failed on "'PRIx64' undeclared". -Werror=format makes gcc check every
  * macro against the type it names. Compile-only (bebbo's gcc, the repo's

@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* bswap16/32/64 of <byteswap.h> and <endian.h>: ixemul 80's syscall table
  * names them (626-628), but no library source implements them and the
  * SDK's libc.a has no stubs, so findutils 4.11 (locate's word_io.c) failed

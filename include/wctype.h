@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* wctype.h for the ixemul SDK (UP-Term): wide-character classes and case
  * mapping from libixcompat.a, on the Unicode database of vtcon's
  * engine/vtwidth.h (compat/uclass_tab.h). The class rules are POSIX's over

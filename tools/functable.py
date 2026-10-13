@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# Copyright (C) 2026 spotUP.
+# This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+# software; you can redistribute it and/or modify it under the terms of the
+# GNU Lesser General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version. See LICENSES.README and COPYING.LIB.
 """Count an Amiga library's function vectors: load the hunk file, apply
 HUNK_RELOC32 with each hunk based at a distinct fake address, find the
 RomTag (0x4AFC + self pointer), follow RT_INIT (RTF_AUTOINIT) -> funcTable,

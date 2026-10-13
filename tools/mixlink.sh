@@ -1,4 +1,10 @@
 #!/bin/sh
+# Copyright (C) 2026 spotUP.
+# This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+# software; you can redistribute it and/or modify it under the terms of the
+# GNU Lesser General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version. See LICENSES.README and COPYING.LIB.
 # mixlink.sh OUT PART...: link ixemul.library from the gcc 16 build
 # (buildgcc16) with the named parts taken from the gcc 2.95 build
 # (build295) -- to find which objects a compiler gets wrong. Parts: the

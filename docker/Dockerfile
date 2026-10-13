@@ -1,3 +1,9 @@
+# Copyright (C) 2026 spotUP.
+# This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+# software; you can redistribute it and/or modify it under the terms of the
+# GNU Lesser General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version. See LICENSES.README and COPYING.LIB.
 # gcc 2.95.3 + binutils 2.14 for m68k-amigaos: the compiler ixemul 48.2 was
 # built with, so a rebuilt ixemul.library keeps the ABI every GG-built Unix
 # port expects. Only the two recipes of adtools/amigaos-cross-toolchain that

@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* spawn.h for the ixemul SDK (UP-Term): posix_spawn and posix_spawnp from
  * libixcompat.a. ixemul has no fork(), only vfork(); these start the child
  * with vfork and exec it, the child changing only its own process state

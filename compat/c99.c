@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* C99 and POSIX functions ixemul.library 48.2 has no vectors for, built on
  * what it has (UP-Term: libevent, tmux). One thread per ixemul program, so
  * the _r forms may copy from the library's static results.

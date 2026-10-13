@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* getpgid, which the SDK's 48.2 stub set has not (mandoc 1.14.6 failed to
  * link on it): a process's own group from getpgrp. ixemul keeps no table
  * of other processes' groups reachable from here, so any other pid gives

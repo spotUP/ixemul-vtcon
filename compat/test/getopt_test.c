@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* Host test of compat/getopt_long.c (built with -Dgetopt_long=ixc_getopt_long
  * and the long_only twin): each case is an argv, an option string, and the
  * results in order ("c" or "c=arg", ending with the operands left after

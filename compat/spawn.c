@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* posix_spawn and posix_spawnp over ixemul's vfork (UP-Term; vtcon plan
  * item 0.2). ixemul has no fork(). Its vfork child shares the parent's data
  * and heap (not the stack, of which it gets a copy) and holds the parent

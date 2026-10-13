@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2026 spotUP.
+ * This file is part of ixemul-vtcon, a modified ixemul.library. It is free
+ * software; you can redistribute it and/or modify it under the terms of the
+ * GNU Lesser General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version. See LICENSES.README and COPYING.LIB.
+ */
 /* poll() on select() for ixemul (libixcompat.a; UP-Term P7). A descriptor
  * that is not open answers POLLNVAL; POLLIN/POLLOUT from select's read
  * and write sets; select's exception set gives POLLPRI. */
