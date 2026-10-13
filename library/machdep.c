@@ -1,4 +1,4 @@
-/* Modified 2026-10-05 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
+/* Modified 2026-10-13 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*
  *  This file is part of ixemul.library for the Amiga.
  *  Copyright (C) 1991, 1992  Markus M. Wild
@@ -306,7 +306,11 @@ sendsig (struct user *p, sig_t catcher, int sig, int mask, unsigned code, void *
 
   oonstack = p->u_onstack;
 
-  if (!p->u_onstack && (p->u_sigonstack & sigmask(sig)))
+  /* The signal stack only when sigstack() gave one (4.4BSD's SAS_ALTSTACK).
+     SA_ONSTACK alone, which Python sets on every handler it installs, runs
+     the handler on the current stack: with no sigstack the frame went just
+     below address 0 and the machine went down (Ctrl-C in python3). */
+  if (!p->u_onstack && p->u_sigsp && (p->u_sigonstack & sigmask(sig)))
     {
       p->u_onstack = 1;
       usp = (u_int) p->u_sigsp;
