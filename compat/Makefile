@@ -75,13 +75,14 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/getopt_bsd_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
 	./test/wcwidth_test
 	./test/math_test
 	./test/getopt_test
+	./test/getopt_bsd_test
 	./test/nums_test
 	./test/strptime_test
 	./test/pthread_test
@@ -94,6 +95,9 @@ test/math_test: test/math_test.c math.c
 test/getopt_test: test/getopt_test.c getopt_long.c ../include/getopt.h
 	$(HOSTCC) -Wall -O2 -Dgetopt_long=ixc_getopt_long -Dgetopt_long_only=ixc_getopt_long_only -c -o test/getopt_ixc.o getopt_long.c
 	$(HOSTCC) -Wall -O2 -o $@ test/getopt_test.c test/getopt_ixc.o
+test/getopt_bsd_test: test/getopt_bsd_test.c ../static/getopt.c
+	$(HOSTCC) -Wall -O2 -Dgetopt=ixc_bsd_getopt -Doptind=ixc_bsd_optind -Dopterr=ixc_bsd_opterr -Doptopt=ixc_bsd_optopt -Doptarg=ixc_bsd_optarg -c -o test/getopt_bsd_ixc.o ../static/getopt.c
+	$(HOSTCC) -Wall -O2 -o $@ test/getopt_bsd_test.c test/getopt_bsd_ixc.o
 test/nums_test: test/nums_test.c strtonum.c reallocarray.c isnormal.c
 	$(HOSTCC) -Wall -O2 -DIXC_STRTONUM=ixc_strtonum -c -o test/strtonum_ixc.o strtonum.c
 	$(HOSTCC) -Wall -O2 -DIXC_REALLOCARRAY=ixc_reallocarray -c -o test/reallocarray_ixc.o reallocarray.c
