@@ -54,11 +54,43 @@ WCS_OBJS   = $(addprefix newlibwcs/lib_a-,$(addsuffix .o,$(WCS_FUNCS) $(SEARCH_F
 # the classic functions (sqrt pow sin ... 27 of them); this archive holds the
 # C99 math functions it lacks. ixemul/lib is searched before m68k-amigaos/lib,
 # so installing this shadows newlib's.
-LIBM_FUNCS = fmod round log2 exp2
-LIBM_OBJS  = $(addprefix c99_,$(addsuffix .o,$(LIBM_FUNCS)))
-libm.a: $(LIBM_OBJS)
+# The double/float/long double functions of libm.c (one member each), and the
+# members of newlib's libm.a that need no errno (fdlibm: no w_ wrappers; found
+# by closing the undefined symbols of each wanted function over that archive
+# and rejecting any that reach _impure_ptr, __fdlib_version or matherr).
+LIBM_FUNCS = fmod round log2 exp2 \
+  hypot acosh atanh remainder lgamma tgamma nexttoward nexttowardf atan2f \
+  acosf asinf coshf expf exp2f logf log10f log2f sinhf sqrtf acoshf atanhf lgammaf tgammaf \
+  powf fmodf remainderf hypotf ldexpf \
+  acosl acoshl asinl asinhl atanl atanhl cbrtl ceill cosl coshl erfl erfcl expl exp2l expm1l \
+  floorl lgammal logl log10l log1pl log2l logbl nearbyintl rintl roundl sinl sinhl tanl tanhl \
+  tgammal truncl fabsl copysignl atan2l fdiml fmaxl fminl fmodl hypotl nextafterl powl \
+  remainderl fmal nexttowardl ilogbl lrintl lroundl llrintl llroundl ldexpl scalbnl scalblnl \
+  frexpl modfl remquol nanl
+LIBM_C99   = fmod round log2 exp2
+LIBM_NEWLIB = e_acosh e_atanh e_exp e_fmod e_hypot e_log e_remainder e_sqrt ef_exp ef_log \
+  ef_rem_pio2 ef_sqrt er_gamma er_lgamma k_cos k_sin kf_cos kf_rem_pio2 kf_sin kf_tan \
+  s_asinh s_cbrt s_copysign s_erf s_expm1 s_fdim s_fma s_fmax s_fmin s_fpclassify s_ilogb \
+  s_llrint s_llround s_log1p s_logb s_lrint s_lround s_nan s_nearbyint s_nextafter s_remquo \
+  s_rint s_scalbln s_scalbn s_trunc sf_asinh sf_atan sf_cbrt sf_ceil sf_copysign sf_cos \
+  sf_erf sf_expm1 sf_fabs sf_fdim sf_floor sf_fma sf_fmax sf_fmin sf_fpclassify sf_frexp \
+  sf_ilogb sf_llrint sf_llround sf_log1p sf_logb sf_lrint sf_lround sf_modf sf_nan \
+  sf_nearbyint sf_nextafter sf_remquo sf_rint sf_round sf_scalbln sf_scalbn sf_sin sf_tan \
+  sf_tanh sf_trunc sqrtl
+NEWLIBM    ?= $(dir $(AGCC))../m68k-amigaos/lib/libm.a
+LIBM_OBJS  = $(addprefix c99_,$(addsuffix .o,$(LIBM_C99))) \
+             $(addprefix libm_,$(addsuffix .o,$(filter-out $(LIBM_C99),$(LIBM_FUNCS)))) math.o
+NEWLIBM_OBJS = $(addprefix newlibm/lib_a-,$(addsuffix .o,$(LIBM_NEWLIB)))
+libm.a: $(LIBM_OBJS) $(NEWLIBM_OBJS)
 	rm -f $@
-	$(XAR) rcs $@ $(LIBM_OBJS)
+	$(XAR) rcs $@ $(LIBM_OBJS) $(NEWLIBM_OBJS)
+
+$(NEWLIBM_OBJS): $(NEWLIBM)
+	rm -rf newlibm && mkdir -p newlibm
+	cd newlibm && $(XAR) x $(NEWLIBM) $(notdir $(NEWLIBM_OBJS))
+
+libm_%.o: libm.c
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -DLIBM_$* -c -o $@ libm.c
 
 libixcompat.a: $(OBJS) $(WCS_OBJS)
 	rm -f $@
@@ -134,11 +166,19 @@ test/own_c99_link: test/own_c99_link.c libixcompat.a
 # this directory's libm.a ahead of newlib's, as the installed one is
 # (link only; bebbo's gcc). The fixed-up search order is asserted too: with
 # libm.a installed in ixemul/lib, -print-file-name must name it first.
-test/libm_link: test/libm_link.c libm.a
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -L. -o $@ test/libm_link.c -lm
+test/libm_link: test/libm_link.c test/libm_names.txt libm.a
+	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin $(CPPFLAGS) -L. -o $@ test/libm_link.c -lm
 	@if $(dir $(AGCC))m68k-amigaos-nm $@ | grep -q impure_ptr; then \
 	  echo "FAIL: test/libm_link references _impure_ptr"; rm -f $@; exit 1; fi
-	@$(dir $(AGCC))m68k-amigaos-nm $@ | grep -q ' T _log2' || { echo "FAIL: no log2 linked"; rm -f $@; exit 1; }
+	@$(dir $(AGCC))m68k-amigaos-nm $@ | awk '$$2 ~ /[TtWw]/ {print $$3}' | sort -u > $@.syms
+	@missing=$$(while read n; do grep -qx "_$$n" $@.syms || echo $$n; done < test/libm_names.txt); \
+	  if [ -n "$$missing" ]; then echo "FAIL: not linked: $$missing"; rm -f $@; exit 1; fi; \
+	  echo "libm_link: $$(wc -l < test/libm_names.txt) C99 math symbols present, no _impure_ptr"
+
+# values of every function at the edges (0, -0, inf, nan, negative); built for
+# the Amiga, run under vamos or on the machine (not part of "make test")
+test/libm_num: test/libm_num.c libm.a
+	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin $(CPPFLAGS) -L. -o $@ test/libm_num.c -lm
 
 # <math.h>'s C99 constants (compile only, against the repo's headers)
 test/math_header.o: test/math_header.c ../include/math.h
@@ -162,5 +202,5 @@ install: libixcompat.a libm.a
 	cp libm.a $(SDK)/lib/libm.a
 
 clean:
-	rm -rf $(OBJS) newlibwcs libixcompat.a libm.a test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/ixc_link test/inttypes_header.o
+	rm -rf $(OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/ixc_link test/inttypes_header.o
 .PHONY: tables test spawnprobe install clean
