@@ -96,6 +96,24 @@ fmod(double x, double y)
 }
 #endif
 
+#ifdef C99_log2
+/* base-2 logarithm (C99); libm's log is ixemul's own, no errno detour */
+double
+log2(double x)
+{
+	return log(x) * 1.44269504088896340736;
+}
+#endif
+
+#ifdef C99_exp2
+/* 2**x (C99) */
+double
+exp2(double x)
+{
+	return pow(2.0, x);
+}
+#endif
+
 #ifdef C99_round
 /* half away from zero (C99) */
 double
