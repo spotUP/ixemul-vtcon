@@ -29,7 +29,8 @@ LIBFLAGS = -fno-builtin
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
        getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o \
-       strtonum.o reallocarray.o isnormal.o strptime.o pthread.o getline.o inet_pton.o inet_ntop.o
+       strtonum.o reallocarray.o isnormal.o strptime.o pthread.o getline.o inet_pton.o inet_ntop.o \
+       stralloc.o strlcpy.o gai.o
 
 # c99.c, one archive member per function (c99.c says why)
 C99_FUNCS = strtoll strtoull ftello fseeko ctime_r strsignal fmod round log2 exp2 lldiv llabs strtoimax strtoumax
@@ -119,7 +120,7 @@ pthread.o: pthread.c ../include/pthread.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ pthread.c
 
 # AF_INET6 and INET6_ADDRSTRLEN are in the tree's headers, not yet the installed ones
-inet_pton.o inet_ntop.o: %.o: %.c ../include/sys/socket.h ../include/arpa/inet.h
+gai.o inet_pton.o inet_ntop.o: %.o: %.c ../include/sys/socket.h ../include/arpa/inet.h ../include/netinet/in.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ $<
 
 wcwidth.o: wcwidth.c $(VTCON)/engine/vtwidth.h
@@ -129,7 +130,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -141,6 +142,7 @@ test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums
 	./test/pthread_test
 	./test/getline_test
 	./test/inet_test
+	./test/libc_gaps_test
 test/wide_test: test/wide_test.c utf8.c uclass.c uclass_tab.h ixc_wide.h
 	$(HOSTCC) -Wall -O2 -o $@ test/wide_test.c utf8.c uclass.c
 test/math_test: test/math_test.c math.c
@@ -167,6 +169,26 @@ test/inet_test: test/inet_test.c inet_pton.c inet_ntop.c
 	$(HOSTCC) -Wall -O2 -Dinet_pton=ixc_inet_pton -Dinet_ntop=ixc_inet_ntop -c -o test/inet_pton_ixc.o inet_pton.c
 	$(HOSTCC) -Wall -O2 -Dinet_pton=ixc_inet_pton -Dinet_ntop=ixc_inet_ntop -c -o test/inet_ntop_ixc.o inet_ntop.c
 	$(HOSTCC) -Wall -O2 -Dinet_pton=ixc_inet_pton -Dinet_ntop=ixc_inet_ntop -o $@ test/inet_test.c test/inet_pton_ixc.o test/inet_ntop_ixc.o
+# asprintf vasprintf strndup strlcpy strlcat and getaddrinfo & co: compat's code under ixc_
+# names, on the host. gai.c on the Amiga also needs the tree's <netinet/in.h> (sockaddr_in6)
+GAPS_REN = -D_FORTIFY_SOURCE=0 -Dasprintf=ixc_asprintf -Dvasprintf=ixc_vasprintf -Dstrndup=ixc_strndup \
+  -Dstrlcpy=ixc_strlcpy -Dstrlcat=ixc_strlcat -Dgetaddrinfo=ixc_getaddrinfo \
+  -Dfreeaddrinfo=ixc_freeaddrinfo -Dgetnameinfo=ixc_getnameinfo -Dgai_strerror=ixc_gai_strerror \
+  -Dinet_pton=ixc_inet_pton -Dinet_ntop=ixc_inet_ntop
+test/libc_gaps_test: test/libc_gaps_test.c stralloc.c strlcpy.c gai.c inet_pton.c inet_ntop.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -c -o test/stralloc_ixc.o stralloc.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -c -o test/strlcpy_ixc.o strlcpy.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -c -o test/gai_ixc.o gai.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -c -o test/inet_pton_ixc.o inet_pton.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -c -o test/inet_ntop_ixc.o inet_ntop.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -o $@ test/libc_gaps_test.c test/stralloc_ixc.o \
+	  test/strlcpy_ixc.o test/gai_ixc.o test/inet_pton_ixc.o test/inet_ntop_ixc.o
+
+# the same test built for the Amiga against the repo's headers, no implicit declaration
+# allowed, linked with libixcompat.a (link only; no rig)
+test/libc_gaps_link: test/libc_gaps_test.c libixcompat.a ../include/netdb.h ../include/string.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -I../include $(CPPFLAGS) -o $@ test/libc_gaps_test.c libixcompat.a
+
 test/inet_host: test/inet_test.c
 	$(HOSTCC) -Wall -O2 -o $@ test/inet_test.c
 
@@ -243,5 +265,5 @@ install: libixcompat.a libm.a
 	cp libm.a $(SDK)/lib/libm.a
 
 clean:
-	rm -rf $(OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
+	rm -rf $(OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
 .PHONY: tables test spawnprobe install clean selfcall
