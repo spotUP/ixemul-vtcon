@@ -298,6 +298,8 @@ __END_DECLS
 __BEGIN_DECLS
 int	 asprintf __P((char **, const char *, ...));
 char	*fgetln __P((FILE *, size_t *));
+ssize_t	 getdelim __P((char **, size_t *, int, FILE *));
+ssize_t	 getline __P((char **, size_t *, FILE *));
 int	 fpurge __P((FILE *));
 int	 getw __P((FILE *));
 int	 pclose __P((FILE *));

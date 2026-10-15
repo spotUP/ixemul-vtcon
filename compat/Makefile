@@ -11,7 +11,7 @@
 #   make -C compat            -> compat/libixcompat.a
 #   make -C compat install    -> into the SDK's lib directory
 #   make -C compat test       -> host tests of the wide-character core, strtonum,
-#                                reallocarray, isnormal, strptime, the pthread subset
+#                                reallocarray, isnormal, strptime, the pthread subset, getline
 #   make -C compat spawnprobe -> test/spawnprobe, the posix_spawn rig probe
 #   make -C compat tables     -> regenerate uclass_tab.h (gen_uclass.py)
 # wcwidth includes vtcon's engine/vtwidth.h (VTCON), the terminal's table.
@@ -24,7 +24,7 @@ CPPFLAGS ?=
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
        getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o \
-       strtonum.o reallocarray.o isnormal.o strptime.o pthread.o
+       strtonum.o reallocarray.o isnormal.o strptime.o pthread.o getline.o
 
 # c99.c, one archive member per function (c99.c says why)
 C99_FUNCS = strtoll strtoull ftello fseeko ctime_r strsignal fmod round lldiv llabs strtoimax strtoumax
@@ -70,7 +70,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -80,6 +80,7 @@ test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums
 	./test/nums_test
 	./test/strptime_test
 	./test/pthread_test
+	./test/getline_test
 test/wide_test: test/wide_test.c utf8.c uclass.c uclass_tab.h ixc_wide.h
 	$(HOSTCC) -Wall -O2 -o $@ test/wide_test.c utf8.c uclass.c
 test/math_test: test/math_test.c math.c
@@ -97,6 +98,9 @@ test/strptime_test: test/strptime_test.c strptime.c
 	$(HOSTCC) -Wall -O2 -DIXC_STRPTIME=ixc_strptime -c -o test/strptime_ixc.o strptime.c
 	$(HOSTCC) -Wall -O2 -o $@ test/strptime_test.c test/strptime_ixc.o
 # the host's <pthread.h> would be found first without ../include; the rename header keeps the two apart
+test/getline_test: test/getline_test.c getline.c
+	$(HOSTCC) -Wall -O2 -DIXC_GETDELIM=ixc_getdelim -DIXC_GETLINE=ixc_getline -c -o test/getline_ixc.o getline.c
+	$(HOSTCC) -Wall -O2 -o $@ test/getline_test.c test/getline_ixc.o
 test/pthread_test: test/pthread_test.c pthread.c ../include/pthread.h test/pthread_ixc.h
 	$(HOSTCC) -Wall -O2 -include test/pthread_ixc.h -I../include -c -o test/pthread_ixc.o pthread.c
 	$(HOSTCC) -Wall -O2 -include test/pthread_ixc.h -I../include -o $@ test/pthread_test.c test/pthread_ixc.o
@@ -129,5 +133,5 @@ install: libixcompat.a
 	cp libixcompat.a $(SDK)/lib/libixcompat.a
 
 clean:
-	rm -rf $(OBJS) newlibwcs libixcompat.a test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/ixc_link test/inttypes_header.o
+	rm -rf $(OBJS) newlibwcs libixcompat.a test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/ixc_link test/inttypes_header.o
 .PHONY: tables test spawnprobe install clean
