@@ -41,7 +41,17 @@ same(double got, double want, double tol)
 	return (got > want ? got - want : want - got) <= tol * (want > 0 ? want : -want);
 }
 
-#define T(expr, want, tol) do { double g_ = (double)(expr); total++; \
+/* -DLIBM_NUM_TRACE=\"file\": name each row in that file before it runs (fflush
+ * per row), so the row that hangs or crashes the machine is the last line */
+#ifdef LIBM_NUM_TRACE
+static FILE *trace_;
+#define TRACE_(s) do { if (!trace_) trace_ = fopen(LIBM_NUM_TRACE, "w"); \
+	if (trace_) { fprintf(trace_, "%d %s\n", total, s); fflush(trace_); } } while (0)
+#else
+#define TRACE_(s) do { } while (0)
+#endif
+
+#define T(expr, want, tol) do { TRACE_(#expr); double g_ = (double)(expr); total++; \
 	if (!same(g_, (want), (tol))) { printf("[FAIL] %s = %.17g, want %.17g\n", #expr, g_, (double)(want)); fails++; } } while (0)
 
 int

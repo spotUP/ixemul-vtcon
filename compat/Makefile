@@ -21,6 +21,11 @@ SDK  ?= $(HOME)/opt/amiga/m68k-amigaos/ixemul
 UPTERM_ROOT ?= $(abspath $(CURDIR)/../..)
 VTCON ?= $(UPTERM_ROOT)/vtcon
 CPPFLAGS ?=
+# these files implement functions gcc knows as builtins: without -fno-builtin
+# gcc folds an implementation into a call to itself (libm.c's sqrtf, return
+# (float)sqrt(x), became `jsr _sqrtf`: endless recursion that overran the
+# stack and hung the Amiga). test/selfcall checks the archives for it.
+LIBFLAGS = -fno-builtin
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
        getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o \
@@ -90,7 +95,7 @@ $(NEWLIBM_OBJS): $(NEWLIBM)
 	cd newlibm && $(XAR) x $(NEWLIBM) $(notdir $(NEWLIBM_OBJS))
 
 libm_%.o: libm.c
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -DLIBM_$* -c -o $@ libm.c
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -DLIBM_$* -c -o $@ libm.c
 
 libixcompat.a: $(OBJS) $(WCS_OBJS)
 	rm -f $@
@@ -101,10 +106,10 @@ $(WCS_OBJS): $(NEWLIBC)
 	cd newlibwcs && $(XAR) x $(NEWLIBC) $(notdir $(WCS_OBJS))
 
 %.o: %.c
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -c -o $@ $<
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 c99_%.o: c99.c
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -DC99_$* -c -o $@ c99.c
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -DC99_$* -c -o $@ c99.c
 
 uclass.o: uclass_tab.h ixc_wide.h
 utf8.o locale.o wchar.o wctype.o: ixc_wide.h
@@ -124,7 +129,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -194,10 +199,18 @@ test/libm_link: test/libm_link.c test/libm_names.txt libm.a
 	  if [ -n "$$missing" ]; then echo "FAIL: not linked: $$missing"; rm -f $@; exit 1; fi; \
 	  echo "libm_link: $$(wc -l < test/libm_names.txt) C99 math symbols present, no _impure_ptr"
 
+# no libm.a function branches back to its own entry (LIBFLAGS). Not run on
+# libixcompat.a: newlib's tdelete recurses on purpose (_trecurse) and
+# uclass.c's casemap loops back to its entry (a loop, not a call)
+selfcall: libm.a
+	OBJDUMP=$(dir $(AGCC))m68k-amigaos-objdump python3 -I ../tools/selfcall_check.py libm.a
+
 # values of every function at the edges (0, -0, inf, nan, negative); built for
-# the Amiga, run under vamos or on the machine (not part of "make test")
+# the Amiga, run under vamos or on the machine (not part of "make test").
+# Linked against this directory's libm.a by path: with a libm.a installed in
+# ixemul/lib, -L. -lm picks the installed one and tests the old build
 test/libm_num: test/libm_num.c libm.a
-	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin $(CPPFLAGS) -L. -o $@ test/libm_num.c -lm
+	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin $(CPPFLAGS) -o $@ test/libm_num.c libm.a
 
 # <math.h>'s C99 constants (compile only, against the repo's headers)
 test/math_header.o: test/math_header.c ../include/math.h
@@ -231,4 +244,4 @@ install: libixcompat.a libm.a
 
 clean:
 	rm -rf $(OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
-.PHONY: tables test spawnprobe install clean
+.PHONY: tables test spawnprobe install clean selfcall
