@@ -128,11 +128,14 @@ test/ixc_link: test/ixc_link.c libixcompat.a ../include/getopt.h
 test/inttypes_header.o: test/inttypes_header.c ../include/inttypes.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=format -I../include $(CPPFLAGS) -c -o $@ test/inttypes_header.c
 
-spawnprobe: test/spawnprobe
+spawnprobe: test/spawnprobe test/envprobe
 # libixcompat.a by its path: the driver searches the SDK's lib (an older
 # copy) before any -L given here
 test/spawnprobe: test/spawnprobe.c libixcompat.a
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -o $@ test/spawnprobe.c libixcompat.a
+
+test/envprobe: test/envprobe.c libixcompat.a
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -o $@ test/envprobe.c libixcompat.a
 
 install: libixcompat.a
 	cp libixcompat.a $(SDK)/lib/libixcompat.a
