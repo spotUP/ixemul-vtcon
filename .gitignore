@@ -17,3 +17,4 @@ compat/test/pthread_test
 compat/test/getline_test
 compat/test/getopt_ixc.o
 compat/test/ixc_link
+__pycache__/
