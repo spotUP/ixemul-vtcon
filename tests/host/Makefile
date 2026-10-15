@@ -11,6 +11,7 @@ OUT = ../../build-host
 
 test: $(OUT)/test_cli_args
 	$(OUT)/test_cli_args
+	python3 -I test_selfcall.py
 
 $(OUT)/test_cli_args: test_cli_args.c ../../library/cli_args.c ../../library/cli_args.h
 	@mkdir -p $(OUT)
