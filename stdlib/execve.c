@@ -346,39 +346,16 @@ on_real_stack (BPTR *segs, char **argv, char **environ, int omask)
       syscall (SYS_close, f);
     }
 
-  /* BIG question what to do with registered atexit() handlers before
-     an exec.. Unix for sure does nothing, since the process space is
-     physically written over. In the AmigaOS I could (!) imagine
-     cases where calling some atexit() handlers (mostly in the case
-     of destructors for C++ objects) would result in erronous
-     behaving of the program. However, since atexit() handlers also
-     serve to get rid of acquired Amiga resources, I morally feel
-     obliged to call the handlers.. lets see if this results in
-     incompatibilities with programs that expect Unix behavior. (Note
-     that I don't call exit() after exeve() returns, I call _exit(),
-     and _exit() does not walk the atexit() list).
+  /* Registered atexit() handlers are dropped, not called: POSIX says
+     exec replaces the process image, so the old image's handlers never
+     run. Calling them broke every program that registers a handler
+     which touches state the new image inherits. coreutils registers
+     atexit (close_stdout), which closes fd 1 and fd 2, so `env FOO=1
+     printenv FOO' started printenv with no stdout or stderr. Amiga
+     resources a handler would release belong to the process and go
+     when it exits. The new image registers its own stdio _cleanup. */
 
-     There is one special case that I catch here, this is stdio. No
-     Unix program would ever expect stdio buffers to be flushed by
-     an execve() call. So since stdio is in the library I know the
-     address of the handler to skip ;-)) */
-     
-  while (__atexit)
-    {
-      while (__atexit->ind --)
-	{
-	  /* this is the stdio function to flush all buffers */
-	  extern void _cleanup();
-	
-	  if (__atexit->fns[__atexit->ind] != _cleanup)
-	    {
-	      if (u.u_a4)
-	        asm volatile ("movel %0, a4" : : "g" (u.u_a4));
-	      __atexit->fns[__atexit->ind] ();
-	    }
-	}
-      __atexit = __atexit->next;
-    }
+  __atexit = 0;
 
   /* `ignored signals remain ignored across an execve, but
       signals that are caught are reset to their default values.

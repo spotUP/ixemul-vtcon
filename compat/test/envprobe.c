@@ -25,6 +25,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 extern char **environ;
 
@@ -53,6 +54,14 @@ replace_environ(char *entry)
 	environ = n;
 }
 
+/* What coreutils' atexit (close_stdout) does: close stdout and stderr */
+static void
+close_std(void)
+{
+	close(1);
+	close(2);
+}
+
 static int
 setter(char *self, const char *way)
 {
@@ -66,7 +75,12 @@ setter(char *self, const char *way)
 		setenv("ENVPROBE", way, 1);
 	else if (strcmp(way, "putenv") == 0)
 		putenv(entry);
-	else if (strcmp(way, "replace") == 0 || strcmp(way, "execvp") == 0)
+	else if (strcmp(way, "atexit") == 0) {
+		/* exec replaces the image: the old image's atexit handlers
+		   must not run (coreutils env: the child lost fd 1 and 2) */
+		setenv("ENVPROBE", way, 1);
+		atexit(close_std);
+	} else if (strcmp(way, "replace") == 0 || strcmp(way, "execvp") == 0)
 		replace_environ(entry);
 	else if (strcmp(way, "spawnenv") == 0) {
 		setenv("ENVPROBE", way, 1);
@@ -85,7 +99,7 @@ setter(char *self, const char *way)
 int
 main(int argc, char **argv)
 {
-	static const char *ways[] = { "setenv", "putenv", "replace", "execvp", "spawnenv" };
+	static const char *ways[] = { "setenv", "putenv", "replace", "execvp", "spawnenv", "atexit" };
 	char *self = argv[0], what[80];
 	const char *v;
 	unsigned i;
@@ -94,6 +108,8 @@ main(int argc, char **argv)
 
 	if (argc == 3 && strcmp(argv[1], "child") == 0) {
 		v = getenv("ENVPROBE");
+		if (fcntl(1, F_GETFD) == -1 || fcntl(2, F_GETFD) == -1)
+			return (2);
 		return (v != NULL && strcmp(v, argv[2]) == 0 ? 0 : 1);
 	}
 	if (argc == 3 && strcmp(argv[1], "set") == 0)
