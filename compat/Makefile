@@ -63,6 +63,11 @@ c99_%.o: c99.c
 
 uclass.o: uclass_tab.h ixc_wide.h
 utf8.o locale.o wchar.o wctype.o: ixc_wide.h
+# the toolchain ships newlib's <pthread.h>, which shadows ixemul's until the SDK headers are
+# reinstalled; build against the tree's own header so the struct layout matches
+pthread.o: pthread.c ../include/pthread.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ pthread.c
+
 wcwidth.o: wcwidth.c $(VTCON)/engine/vtwidth.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -I$(VTCON)/engine -c -o $@ wcwidth.c
 
