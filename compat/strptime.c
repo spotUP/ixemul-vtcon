@@ -112,7 +112,15 @@ derive(struct tm *tm)
 	tm->tm_yday = cum[tm->tm_mon] + (tm->tm_mon > 1 && leap(y) ? 1 : 0) + tm->tm_mday - 1;
 	if (tm->tm_mon < 2)
 		y--;
-	tm->tm_wday = (y + y / 4 - y / 100 + y / 400 + t[tm->tm_mon] + tm->tm_mday) % 7;
+	/* floor division so years before 1 (y negative) come out right */
+	{
+		int q4 = y >= 0 ? y / 4 : -((3 - y) / 4);
+		int q100 = y >= 0 ? y / 100 : -((99 - y) / 100);
+		int q400 = y >= 0 ? y / 400 : -((399 - y) / 400);
+		int w = (y + q4 - q100 + q400 + t[tm->tm_mon] + tm->tm_mday) % 7;
+
+		tm->tm_wday = w < 0 ? w + 7 : w;
+	}
 }
 
 char *
@@ -321,6 +329,8 @@ IXC_STRPTIME(const char *buf, const char *fmt, struct tm *tm)
 		/* %j with a year: month and day from the day of the year */
 		int y = tm->tm_year + 1900, d = tm->tm_yday, m = 11;
 
+		if (d >= (leap(y) ? 366 : 365))
+			return NULL;
 		while (m > 0 && d < cum[m] + (m > 1 && leap(y) ? 1 : 0))
 			m--;
 		tm->tm_mon = m;
