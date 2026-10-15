@@ -120,7 +120,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -184,6 +184,15 @@ test/libm_num: test/libm_num.c libm.a
 test/math_header.o: test/math_header.c ../include/math.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ test/math_header.c
 
+# <math.h> declares every name in test/libm_names.txt. -I../include comes
+# first, ahead of the installed header; MATH_INC overrides the dir to run the
+# test against another header (the pre-fix one, to see it fail).
+MATH_INC ?= ../include
+test/math_c99.o: test/math_c99.c test/libm_names.txt $(MATH_INC)/math.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin -std=c99 -Werror=implicit-function-declaration -I$(MATH_INC) $(CPPFLAGS) -c -o $@ test/math_c99.c
+test/math_c99_gnu89.o: test/math_c99.c test/libm_names.txt $(MATH_INC)/math.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin -std=gnu89 -Werror=implicit-function-declaration -I$(MATH_INC) $(CPPFLAGS) -c -o $@ test/math_c99.c
+
 # getopt_long and pselect resolve from libixcompat.a (link only)
 test/ixc_link: test/ixc_link.c libixcompat.a ../include/getopt.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -o $@ test/ixc_link.c libixcompat.a
@@ -202,5 +211,5 @@ install: libixcompat.a libm.a
 	cp libm.a $(SDK)/lib/libm.a
 
 clean:
-	rm -rf $(OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/ixc_link test/inttypes_header.o
+	rm -rf $(OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
 .PHONY: tables test spawnprobe install clean
