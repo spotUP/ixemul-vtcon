@@ -150,6 +150,7 @@ __END_DECLS
 __BEGIN_DECLS
 int	isinf __P((double));
 int	isnan __P((double));
+int	isnormal __P((double));
 __END_DECLS
 
 #endif /* _MATH_H_ */
