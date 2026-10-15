@@ -56,6 +56,7 @@ main(void)
 	T(cbrt(INF_), INF_, 0); T(cbrt(-INF_), -INF_, 0); T(cbrt(NAN_), NAN_, 0); T(cbrtf(-8), -2, 1e-6); T(cbrtl(-125), -5, 1e-14);
 	T(trunc(2.7), 2, 0); T(trunc(-2.7), -2, 0); T(trunc(-0.5), -0.0, 0); T(trunc(INF_), INF_, 0); T(truncf(-1.5f), -1, 0); T(truncl(9.9L), 9, 0);
 	T(rint(2.5), 2, 0); T(rint(3.5), 4, 0); T(rint(-2.5), -2, 0); T(rint(-0.2), -0.0, 0); T(nearbyint(1.5), 2, 0); T(rintf(0.5f), 0, 0); T(rintl(-1.5L), -2, 0);
+	T(round(-0.5), -1, 0); T(round(0.5), 1, 0); T(round(-0.49999999999999994), -0.0, 0); T(round(4503599627370497.0), 4503599627370497.0, 0); T(round(1e300), 1e300, 0);
 	T(round(2.5), 3, 0); T(round(-2.5), -3, 0); T(round(0.49999999999999994), 0, 0); T(round(-0.0), -0.0, 0); T(roundf(-0.4f), -0.0, 0); T(roundl(2.5L), 3, 0);
 	T(lround(2.5), 3, 0); T(lround(-2.5), -3, 0); T(llround(-1.5), -2, 0); T(lrint(2.5), 2, 0); T(llrint(-3.5), -4, 0);
 	T(copysign(3, -0.0), -3, 0); T(copysign(-3, 0.0), 3, 0); T(copysign(0.0, -1), -0.0, 0); T(copysign(NAN_, -1) != copysign(NAN_, -1), 1, 0);
@@ -75,6 +76,9 @@ main(void)
 	T(fdim(5, 3), 2, 0); T(fdim(3, 5), 0, 0); T(fdim(INF_, INF_), 0, 0);
 	T(fma(2, 3, 4), 10, 0); T(fma(0, INF_, 1), NAN_, 0); T(fma(-0.0, 1, -0.0), -0.0, 0);
 	T(fmod(5.5, 2), 1.5, 0); T(fmod(-5.5, 2), -1.5, 0); T(fmod(5.5, INF_), 5.5, 0); T(fmod(1, 0), NAN_, 0); T(fmod(-0.0, 3), -0.0, 0); T(fmod(INF_, 3), NAN_, 0); T(fmodf(7, 4), 3, 0);
+	/* exact remainder for large quotients (x - trunc(x/y)*y rounds the quotient), subnormals */
+	T(fmod(1e300, 3.0), 0.0, 0); T(fmod(-1e300, 3.0), -0.0, 0); T(fmod(1e300, 7.0), 1, 0); T(fmod(-1e300, 7.0), -1, 0); T(fmod(1.7976931348623157e308, 5e-324), 0.0, 0);
+	T(fmod(1e300, 0.1), 0.00011215964963492975, 0); T(fmod(9007199254740993.0, 2.0), 0.0, 0); T(fmod(5e-324, 3.0), 5e-324, 0);
 	T(remainder(5, 3), -1, 0); T(remainder(7, 2), -1, 0); T(remainder(1, 0), NAN_, 0); T(remainder(-6, 4), 2, 0);
 	T(ilogb(8), 3, 0); T(ilogb(0.25), -2, 0); T(logb(8), 3, 0); T(logb(0), -INF_, 0); T(logb(-INF_), INF_, 0);
 	T(scalbn(1, 10), 1024, 0); T(scalbn(-0.0, 5), -0.0, 0); T(ldexp(1.5, 2), 6, 0); T(ldexpf(1, -1), 0.5, 0);
