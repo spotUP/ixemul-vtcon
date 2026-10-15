@@ -61,6 +61,9 @@ typedef int socklen_t;
 #ifndef INET_ADDRSTRLEN
 #define INET_ADDRSTRLEN 16
 #endif
+#ifndef INET6_ADDRSTRLEN
+#define INET6_ADDRSTRLEN 46
+#endif
 
 __BEGIN_DECLS
 unsigned long	inet_addr __P((const char *));

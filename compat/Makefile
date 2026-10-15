@@ -24,7 +24,7 @@ CPPFLAGS ?=
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
        getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o \
-       strtonum.o reallocarray.o isnormal.o strptime.o pthread.o getline.o
+       strtonum.o reallocarray.o isnormal.o strptime.o pthread.o getline.o inet_pton.o inet_ntop.o
 
 # c99.c, one archive member per function (c99.c says why)
 C99_FUNCS = strtoll strtoull ftello fseeko ctime_r strsignal fmod round log2 exp2 lldiv llabs strtoimax strtoumax
@@ -113,6 +113,10 @@ utf8.o locale.o wchar.o wctype.o: ixc_wide.h
 pthread.o: pthread.c ../include/pthread.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ pthread.c
 
+# AF_INET6 and INET6_ADDRSTRLEN are in the tree's headers, not yet the installed ones
+inet_pton.o inet_ntop.o: %.o: %.c ../include/sys/socket.h ../include/arpa/inet.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ $<
+
 wcwidth.o: wcwidth.c $(VTCON)/engine/vtwidth.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -I$(VTCON)/engine -c -o $@ wcwidth.c
 
@@ -120,7 +124,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -131,6 +135,7 @@ test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums
 	./test/strptime_test
 	./test/pthread_test
 	./test/getline_test
+	./test/inet_test
 test/wide_test: test/wide_test.c utf8.c uclass.c uclass_tab.h ixc_wide.h
 	$(HOSTCC) -Wall -O2 -o $@ test/wide_test.c utf8.c uclass.c
 test/math_test: test/math_test.c math.c
@@ -151,6 +156,20 @@ test/strptime_test: test/strptime_test.c strptime.c
 test/getline_test: test/getline_test.c getline.c
 	$(HOSTCC) -Wall -O2 -DIXC_GETDELIM=ixc_getdelim -DIXC_GETLINE=ixc_getline -c -o test/getline_ixc.o getline.c
 	$(HOSTCC) -Wall -O2 -o $@ test/getline_test.c test/getline_ixc.o
+# inet_pton/inet_ntop (AF_INET, AF_INET6): compat's code under ixc_ names against
+# the vectors; test/inet_host is the same vectors against this machine's libc
+test/inet_test: test/inet_test.c inet_pton.c inet_ntop.c
+	$(HOSTCC) -Wall -O2 -Dinet_pton=ixc_inet_pton -Dinet_ntop=ixc_inet_ntop -c -o test/inet_pton_ixc.o inet_pton.c
+	$(HOSTCC) -Wall -O2 -Dinet_pton=ixc_inet_pton -Dinet_ntop=ixc_inet_ntop -c -o test/inet_ntop_ixc.o inet_ntop.c
+	$(HOSTCC) -Wall -O2 -Dinet_pton=ixc_inet_pton -Dinet_ntop=ixc_inet_ntop -o $@ test/inet_test.c test/inet_pton_ixc.o test/inet_ntop_ixc.o
+test/inet_host: test/inet_test.c
+	$(HOSTCC) -Wall -O2 -o $@ test/inet_test.c
+
+# the same test, built for the Amiga against the repo's headers and linked
+# with libixcompat.a (link only; no rig)
+test/inet_link: test/inet_test.c libixcompat.a ../include/arpa/inet.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -o $@ test/inet_test.c libixcompat.a
+
 test/pthread_test: test/pthread_test.c pthread.c ../include/pthread.h test/pthread_ixc.h
 	$(HOSTCC) -Wall -O2 -include test/pthread_ixc.h -I../include -c -o test/pthread_ixc.o pthread.c
 	$(HOSTCC) -Wall -O2 -include test/pthread_ixc.h -I../include -o $@ test/pthread_test.c test/pthread_ixc.o
@@ -211,5 +230,5 @@ install: libixcompat.a libm.a
 	cp libm.a $(SDK)/lib/libm.a
 
 clean:
-	rm -rf $(OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
+	rm -rf $(OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
 .PHONY: tables test spawnprobe install clean
