@@ -69,6 +69,44 @@ main(void)
 
 	CHECK(pthread_equal(pthread_self(), pthread_self()), "self equals self");
 
+	{
+		pthread_attr_t at;
+		pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
+		pthread_condattr_t ca;
+		pthread_rwlock_t rw = PTHREAD_RWLOCK_INITIALIZER;
+		pthread_rwlockattr_t ra;
+		pthread_mutex_t cm = PTHREAD_MUTEX_INITIALIZER;
+		struct timespec ts = { 0, 0 };
+		pthread_t th = 0;
+		size_t ss = 0;
+		int ds = -1;
+
+		CHECK(pthread_attr_init(&at) == 0 && pthread_attr_getdetachstate(&at, &ds) == 0 && ds == PTHREAD_CREATE_JOINABLE, "attr default joinable");
+		CHECK(pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED) == 0 && pthread_attr_getdetachstate(&at, &ds) == 0 && ds == PTHREAD_CREATE_DETACHED, "attr detach state stored");
+		CHECK(pthread_attr_setdetachstate(&at, 99) == EINVAL, "bad detach state");
+		CHECK(pthread_attr_setstacksize(&at, 65536) == 0 && pthread_attr_getstacksize(&at, &ss) == 0 && ss == 65536, "attr stack size stored");
+		CHECK(pthread_attr_destroy(&at) == 0, "attr destroy");
+		CHECK(pthread_create(&th, 0, 0, 0) == EAGAIN, "create is EAGAIN");
+		CHECK(pthread_join(th, 0) == ESRCH && pthread_detach(th) == ESRCH, "join and detach are ESRCH");
+
+		CHECK(pthread_condattr_init(&ca) == 0 && pthread_condattr_destroy(&ca) == 0, "condattr");
+		CHECK(pthread_cond_init(&cv, &ca) == 0 && pthread_cond_signal(&cv) == 0 && pthread_cond_broadcast(&cv) == 0, "cond init, signal, broadcast");
+		CHECK(pthread_cond_wait(&cv, &cm) == EDEADLK, "cond wait is EDEADLK");
+		CHECK(pthread_cond_timedwait(&cv, &cm, &ts) == ETIMEDOUT, "cond timedwait is ETIMEDOUT");
+		CHECK(pthread_cond_destroy(&cv) == 0, "cond destroy");
+
+		CHECK(pthread_rwlockattr_init(&ra) == 0 && pthread_rwlockattr_destroy(&ra) == 0, "rwlockattr");
+		CHECK(pthread_rwlock_init(&rw, &ra) == 0, "rwlock init");
+		CHECK(pthread_rwlock_rdlock(&rw) == 0 && pthread_rwlock_tryrdlock(&rw) == 0, "two readers");
+		CHECK(pthread_rwlock_trywrlock(&rw) == EBUSY && pthread_rwlock_wrlock(&rw) == EDEADLK, "writer blocked by readers");
+		CHECK(pthread_rwlock_destroy(&rw) == EBUSY, "destroy while read-locked is EBUSY");
+		CHECK(pthread_rwlock_unlock(&rw) == 0 && pthread_rwlock_trywrlock(&rw) == EBUSY, "one reader left");
+		CHECK(pthread_rwlock_unlock(&rw) == 0 && pthread_rwlock_wrlock(&rw) == 0, "free, then write-locked");
+		CHECK(pthread_rwlock_tryrdlock(&rw) == EBUSY && pthread_rwlock_rdlock(&rw) == EDEADLK && pthread_rwlock_trywrlock(&rw) == EBUSY && pthread_rwlock_wrlock(&rw) == EDEADLK, "held by writer");
+		CHECK(pthread_rwlock_unlock(&rw) == 0 && pthread_rwlock_unlock(&rw) == EPERM, "unlock writer, then unheld is EPERM");
+		CHECK(pthread_rwlock_destroy(&rw) == 0, "rwlock destroy");
+	}
+
 	if (fails)
 		return 1;
 	puts("[OK] pthread subset");
