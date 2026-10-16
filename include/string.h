@@ -102,6 +102,8 @@ int	 strcasecmp __P((const char *, const char *));
 char	*strdup __P((const char *));
 char	*strsignal __P((int));
 char	*strndup __P((const char *, size_t));
+size_t	 strlcpy __P((char *, const char *, size_t));
+size_t	 strlcat __P((char *, const char *, size_t));
 char	*strcasestr __P((const char *, const char *));
 void	 strmode __P((int, char *));
 int	 strncasecmp __P((const char *, const char *, size_t));

@@ -82,26 +82,120 @@ strsignal(int sig)
 #endif
 
 #ifdef C99_fmod
-/* x - n*y with n = x/y rounded toward zero, the sign of x (C99) */
+/* x - n*y, n = x/y truncated toward zero, computed exactly (C99): the
+ * remainder is exact, so it is a shift-and-subtract over the 53-bit
+ * significands (fdlibm's e_fmod), not x - trunc(x/y)*y, which rounds the
+ * quotient and is wrong once it needs more than 53 bits (fmod(1e300, 3)) */
 double
 fmod(double x, double y)
 {
-	double q, n;
+	unsigned long long ux, uy, ax, ay, mx, my, sign;
+	int ex, ey;
 
-	if (y == 0.0 || x != x || y != y)
-		return (x * y) / (x * y);	/* NaN */
-	q = x / y;
-	n = q < 0 ? ceil(q) : floor(q);
-	return x - n * y;
+	memcpy(&ux, &x, sizeof ux);
+	memcpy(&uy, &y, sizeof uy);
+	sign = ux & 0x8000000000000000ULL;
+	ax = ux & ~0x8000000000000000ULL;
+	ay = uy & ~0x8000000000000000ULL;
+	if (ay == 0 || ax >= 0x7ff0000000000000ULL || ay > 0x7ff0000000000000ULL)
+		return (x * y) / (x * y);	/* y == 0, x infinite, a NaN: NaN */
+	if (ax < ay)
+		return x;
+	if (ax == ay) {
+		ux = sign;
+		memcpy(&x, &ux, sizeof x);
+		return x;		/* a zero with the sign of x */
+	}
+	ex = (int)(ax >> 52);
+	ey = (int)(ay >> 52);
+	mx = ax & 0x000fffffffffffffULL;
+	my = ay & 0x000fffffffffffffULL;
+	if (ex)
+		mx |= 0x0010000000000000ULL;
+	else			/* subnormal: normalise, the exponent goes below 1 */
+		for (ex = 1; mx < 0x0010000000000000ULL; ex--)
+			mx <<= 1;
+	if (ey)
+		my |= 0x0010000000000000ULL;
+	else
+		for (ey = 1; my < 0x0010000000000000ULL; ey--)
+			my <<= 1;
+	for (; ex > ey; ex--) {
+		if (mx >= my) {
+			mx -= my;
+			if (mx == 0) {
+				ux = sign;
+				memcpy(&x, &ux, sizeof x);
+				return x;
+			}
+		}
+		mx <<= 1;
+	}
+	if (mx >= my)
+		mx -= my;
+	if (mx == 0) {
+		ux = sign;
+		memcpy(&x, &ux, sizeof x);
+		return x;
+	}
+	while (mx < 0x0010000000000000ULL) {	/* renormalise */
+		mx <<= 1;
+		ex--;
+	}
+	if (ex >= 1)
+		ux = sign | ((unsigned long long)ex << 52) | (mx & 0x000fffffffffffffULL);
+	else
+		ux = sign | (mx >> (1 - ex));	/* subnormal result, exact */
+	memcpy(&x, &ux, sizeof x);
+	return x;
+}
+#endif
+
+#ifdef C99_log2
+/* base-2 logarithm (C99); libm's log is ixemul's own, no errno detour */
+double
+log2(double x)
+{
+	return log(x) * 1.44269504088896340736;
+}
+#endif
+
+#ifdef C99_exp2
+/* 2**x (C99) */
+double
+exp2(double x)
+{
+	return pow(2.0, x);
 }
 #endif
 
 #ifdef C99_round
-/* half away from zero (C99) */
+/* half away from zero (C99), on the bits: floor(x + 0.5) rounds up
+ * 0.49999999999999994 (x + 0.5 is 1.0 in double), so add half an ulp-of-the-
+ * integer-part to the magnitude and clear the fraction instead */
 double
 round(double x)
 {
-	return x < 0 ? -floor(-x + 0.5) : floor(x + 0.5);
+	unsigned long long u, sign;
+	int e;
+
+	memcpy(&u, &x, sizeof u);
+	sign = u & 0x8000000000000000ULL;
+	u &= ~0x8000000000000000ULL;
+	e = (int)(u >> 52);			/* biased exponent */
+	if (e >= 1075)
+		return x;			/* integral already, infinity, NaN */
+	if (e < 1022)
+		u = 0;				/* |x| < 0.5 */
+	else if (e == 1022)
+		u = 0x3ff0000000000000ULL;	/* 0.5 <= |x| < 1 */
+	else {
+		u += 1ULL << (1074 - e);	/* + 0.5; a carry rolls into the exponent */
+		u &= ~((1ULL << (1075 - e)) - 1);
+	}
+	u |= sign;
+	memcpy(&x, &u, sizeof x);
+	return x;
 }
 #endif
 

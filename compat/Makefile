@@ -21,13 +21,19 @@ SDK  ?= $(HOME)/opt/amiga/m68k-amigaos/ixemul
 UPTERM_ROOT ?= $(abspath $(CURDIR)/../..)
 VTCON ?= $(UPTERM_ROOT)/vtcon
 CPPFLAGS ?=
+# these files implement functions gcc knows as builtins: without -fno-builtin
+# gcc folds an implementation into a call to itself (libm.c's sqrtf, return
+# (float)sqrt(x), became `jsr _sqrtf`: endless recursion that overran the
+# stack and hung the Amiga). test/selfcall checks the archives for it.
+LIBFLAGS = -fno-builtin
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
        getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o \
-       strtonum.o reallocarray.o isnormal.o strptime.o pthread.o getline.o
+       strtonum.o reallocarray.o isnormal.o strptime.o pthread.o getline.o inet_pton.o inet_ntop.o \
+       stralloc.o strlcpy.o gai.o
 
 # c99.c, one archive member per function (c99.c says why)
-C99_FUNCS = strtoll strtoull ftello fseeko ctime_r strsignal fmod round lldiv llabs strtoimax strtoumax
+C99_FUNCS = strtoll strtoull ftello fseeko ctime_r strsignal fmod round log2 exp2 lldiv llabs strtoimax strtoumax
 C99_OBJS  = $(addprefix c99_,$(addsuffix .o,$(C99_FUNCS)))
 
 # C95's wide string functions, which gnulib takes for granted (GNU grep
@@ -47,6 +53,51 @@ SEARCH_FUNCS = tsearch tfind tdelete twalk
 STR_FUNCS  = strnlen strtok_r
 WCS_OBJS   = $(addprefix newlibwcs/lib_a-,$(addsuffix .o,$(WCS_FUNCS) $(SEARCH_FUNCS) $(STR_FUNCS)))
 
+# libm.a: what "-lm" must find in ixemul's library directory. The toolchain's
+# m68k-amigaos/lib/libm.a is newlib's: its errno goes through _impure_ptr,
+# which ixemul.library does not export, so every "-lm" link failed on
+# _impure_ptr (jq's configure, Lua's log2). ixemul's libc.a already holds
+# the classic functions (sqrt pow sin ... 27 of them); this archive holds the
+# C99 math functions it lacks. ixemul/lib is searched before m68k-amigaos/lib,
+# so installing this shadows newlib's.
+# The double/float/long double functions of libm.c (one member each), and the
+# members of newlib's libm.a that need no errno (fdlibm: no w_ wrappers; found
+# by closing the undefined symbols of each wanted function over that archive
+# and rejecting any that reach _impure_ptr, __fdlib_version or matherr).
+LIBM_FUNCS = fmod round log2 exp2 \
+  hypot acosh atanh remainder lgamma tgamma nexttoward nexttowardf atan2f \
+  acosf asinf coshf expf exp2f logf log10f log2f sinhf sqrtf acoshf atanhf lgammaf tgammaf \
+  pow powf fdim fdimf sqrtl fmodf remainderf hypotf ldexpf \
+  acosl acoshl asinl asinhl atanl atanhl cbrtl ceill cosl coshl erfl erfcl expl exp2l expm1l \
+  floorl lgammal logl log10l log1pl log2l logbl nearbyintl rintl roundl sinl sinhl tanl tanhl \
+  tgammal truncl fabsl copysignl atan2l fdiml fmaxl fminl fmodl hypotl nextafterl powl \
+  remainderl fmal nexttowardl ilogbl lrintl lroundl llrintl llroundl ldexpl scalbnl scalblnl \
+  frexpl modfl remquol nanl
+LIBM_C99   = fmod round log2 exp2
+LIBM_NEWLIB = e_acosh e_atanh e_exp e_fmod e_hypot e_log e_pow e_remainder e_sqrt ef_exp ef_log ef_pow \
+  ef_rem_pio2 ef_sqrt er_gamma er_lgamma k_cos k_sin kf_cos kf_rem_pio2 kf_sin kf_tan \
+  s_asinh s_cbrt s_copysign s_erf s_expm1 s_fma s_fmax s_fmin s_fpclassify s_ilogb \
+  s_llrint s_llround s_log1p s_logb s_lrint s_lround s_nan s_nearbyint s_nextafter s_remquo \
+  s_rint s_scalbln s_scalbn s_trunc sf_asinh sf_atan sf_cbrt sf_ceil sf_copysign sf_cos \
+  sf_erf sf_expm1 sf_fabs sf_floor sf_fma sf_fmax sf_fmin sf_fpclassify sf_frexp \
+  sf_ilogb sf_llrint sf_llround sf_log1p sf_logb sf_lrint sf_lround sf_modf sf_nan \
+  sf_nearbyint sf_nextafter sf_remquo sf_rint sf_round sf_scalbln sf_scalbn sf_sin sf_tan \
+  sf_tanh sf_trunc
+NEWLIBM    ?= $(dir $(AGCC))../m68k-amigaos/lib/libm.a
+LIBM_OBJS  = $(addprefix c99_,$(addsuffix .o,$(LIBM_C99))) \
+             $(addprefix libm_,$(addsuffix .o,$(filter-out $(LIBM_C99),$(LIBM_FUNCS)))) math.o
+NEWLIBM_OBJS = $(addprefix newlibm/lib_a-,$(addsuffix .o,$(LIBM_NEWLIB)))
+libm.a: $(LIBM_OBJS) $(NEWLIBM_OBJS)
+	rm -f $@
+	$(XAR) rcs $@ $(LIBM_OBJS) $(NEWLIBM_OBJS)
+
+$(NEWLIBM_OBJS): $(NEWLIBM)
+	rm -rf newlibm && mkdir -p newlibm
+	cd newlibm && $(XAR) x $(NEWLIBM) $(notdir $(NEWLIBM_OBJS))
+
+libm_%.o: libm.c
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -DLIBM_$* -c -o $@ libm.c
+
 libixcompat.a: $(OBJS) $(WCS_OBJS)
 	rm -f $@
 	$(XAR) rcs $@ $(OBJS) $(WCS_OBJS)
@@ -56,10 +107,10 @@ $(WCS_OBJS): $(NEWLIBC)
 	cd newlibwcs && $(XAR) x $(NEWLIBC) $(notdir $(WCS_OBJS))
 
 %.o: %.c
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -c -o $@ $<
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 c99_%.o: c99.c
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -DC99_$* -c -o $@ c99.c
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -DC99_$* -c -o $@ c99.c
 
 uclass.o: uclass_tab.h ixc_wide.h
 utf8.o locale.o wchar.o wctype.o: ixc_wide.h
@@ -68,6 +119,10 @@ utf8.o locale.o wchar.o wctype.o: ixc_wide.h
 pthread.o: pthread.c ../include/pthread.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ pthread.c
 
+# AF_INET6 and INET6_ADDRSTRLEN are in the tree's headers, not yet the installed ones
+gai.o inet_pton.o inet_ntop.o: %.o: %.c ../include/sys/socket.h ../include/arpa/inet.h ../include/netinet/in.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ $<
+
 wcwidth.o: wcwidth.c $(VTCON)/engine/vtwidth.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -I$(VTCON)/engine -c -o $@ wcwidth.c
 
@@ -75,7 +130,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -86,6 +141,8 @@ test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/nums
 	./test/strptime_test
 	./test/pthread_test
 	./test/getline_test
+	./test/inet_test
+	./test/libc_gaps_test
 test/wide_test: test/wide_test.c utf8.c uclass.c uclass_tab.h ixc_wide.h
 	$(HOSTCC) -Wall -O2 -o $@ test/wide_test.c utf8.c uclass.c
 test/math_test: test/math_test.c math.c
@@ -106,6 +163,40 @@ test/strptime_test: test/strptime_test.c strptime.c
 test/getline_test: test/getline_test.c getline.c
 	$(HOSTCC) -Wall -O2 -DIXC_GETDELIM=ixc_getdelim -DIXC_GETLINE=ixc_getline -c -o test/getline_ixc.o getline.c
 	$(HOSTCC) -Wall -O2 -o $@ test/getline_test.c test/getline_ixc.o
+# inet_pton/inet_ntop (AF_INET, AF_INET6): compat's code under ixc_ names against
+# the vectors; test/inet_host is the same vectors against this machine's libc
+test/inet_test: test/inet_test.c inet_pton.c inet_ntop.c
+	$(HOSTCC) -Wall -O2 -Dinet_pton=ixc_inet_pton -Dinet_ntop=ixc_inet_ntop -c -o test/inet_pton_ixc.o inet_pton.c
+	$(HOSTCC) -Wall -O2 -Dinet_pton=ixc_inet_pton -Dinet_ntop=ixc_inet_ntop -c -o test/inet_ntop_ixc.o inet_ntop.c
+	$(HOSTCC) -Wall -O2 -Dinet_pton=ixc_inet_pton -Dinet_ntop=ixc_inet_ntop -o $@ test/inet_test.c test/inet_pton_ixc.o test/inet_ntop_ixc.o
+# asprintf vasprintf strndup strlcpy strlcat and getaddrinfo & co: compat's code under ixc_
+# names, on the host. gai.c on the Amiga also needs the tree's <netinet/in.h> (sockaddr_in6)
+GAPS_REN = -D_FORTIFY_SOURCE=0 -Dasprintf=ixc_asprintf -Dvasprintf=ixc_vasprintf -Dstrndup=ixc_strndup \
+  -Dstrlcpy=ixc_strlcpy -Dstrlcat=ixc_strlcat -Dgetaddrinfo=ixc_getaddrinfo \
+  -Dfreeaddrinfo=ixc_freeaddrinfo -Dgetnameinfo=ixc_getnameinfo -Dgai_strerror=ixc_gai_strerror \
+  -Dinet_pton=ixc_inet_pton -Dinet_ntop=ixc_inet_ntop
+test/libc_gaps_test: test/libc_gaps_test.c stralloc.c strlcpy.c gai.c inet_pton.c inet_ntop.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -c -o test/stralloc_ixc.o stralloc.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -c -o test/strlcpy_ixc.o strlcpy.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -c -o test/gai_ixc.o gai.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -c -o test/inet_pton_ixc.o inet_pton.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -c -o test/inet_ntop_ixc.o inet_ntop.c
+	$(HOSTCC) -Wall -O2 $(GAPS_REN) -o $@ test/libc_gaps_test.c test/stralloc_ixc.o \
+	  test/strlcpy_ixc.o test/gai_ixc.o test/inet_pton_ixc.o test/inet_ntop_ixc.o
+
+# the same test built for the Amiga against the repo's headers, no implicit declaration
+# allowed, linked with libixcompat.a (link only; no rig)
+test/libc_gaps_link: test/libc_gaps_test.c libixcompat.a ../include/netdb.h ../include/string.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -I../include $(CPPFLAGS) -o $@ test/libc_gaps_test.c libixcompat.a
+
+test/inet_host: test/inet_test.c
+	$(HOSTCC) -Wall -O2 -o $@ test/inet_test.c
+
+# the same test, built for the Amiga against the repo's headers and linked
+# with libixcompat.a (link only; no rig)
+test/inet_link: test/inet_test.c libixcompat.a ../include/arpa/inet.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -o $@ test/inet_test.c libixcompat.a
+
 test/pthread_test: test/pthread_test.c pthread.c ../include/pthread.h test/pthread_ixc.h
 	$(HOSTCC) -Wall -O2 -include test/pthread_ixc.h -I../include -c -o test/pthread_ixc.o pthread.c
 	$(HOSTCC) -Wall -O2 -include test/pthread_ixc.h -I../include -o $@ test/pthread_test.c test/pthread_ixc.o
@@ -117,9 +208,44 @@ test/wcwidth_test: test/wcwidth_test.c wcwidth.c $(VTCON)/engine/vtwidth.h
 test/own_c99_link: test/own_c99_link.c libixcompat.a
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -o $@ test/own_c99_link.c libixcompat.a
 
+# "-lm" links sqrt, log2 and pow and the result has no _impure_ptr. -L. puts
+# this directory's libm.a ahead of newlib's, as the installed one is
+# (link only; bebbo's gcc). The fixed-up search order is asserted too: with
+# libm.a installed in ixemul/lib, -print-file-name must name it first.
+test/libm_link: test/libm_link.c test/libm_names.txt libm.a
+	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin $(CPPFLAGS) -L. -o $@ test/libm_link.c -lm
+	@if $(dir $(AGCC))m68k-amigaos-nm $@ | grep -q impure_ptr; then \
+	  echo "FAIL: test/libm_link references _impure_ptr"; rm -f $@; exit 1; fi
+	@$(dir $(AGCC))m68k-amigaos-nm $@ | awk '$$2 ~ /[TtWw]/ {print $$3}' | sort -u > $@.syms
+	@missing=$$(while read n; do grep -qx "_$$n" $@.syms || echo $$n; done < test/libm_names.txt); \
+	  if [ -n "$$missing" ]; then echo "FAIL: not linked: $$missing"; rm -f $@; exit 1; fi; \
+	  echo "libm_link: $$(wc -l < test/libm_names.txt) C99 math symbols present, no _impure_ptr"
+
+# no libm.a function branches back to its own entry (LIBFLAGS). Not run on
+# libixcompat.a: newlib's tdelete recurses on purpose (_trecurse) and
+# uclass.c's casemap loops back to its entry (a loop, not a call)
+selfcall: libm.a
+	OBJDUMP=$(dir $(AGCC))m68k-amigaos-objdump python3 -I ../tools/selfcall_check.py libm.a
+
+# values of every function at the edges (0, -0, inf, nan, negative); built for
+# the Amiga, run under vamos or on the machine (not part of "make test").
+# Linked against this directory's libm.a by path: with a libm.a installed in
+# ixemul/lib, -L. -lm picks the installed one and tests the old build
+test/libm_num: test/libm_num.c libm.a
+	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin $(CPPFLAGS) -o $@ test/libm_num.c libm.a
+
 # <math.h>'s C99 constants (compile only, against the repo's headers)
 test/math_header.o: test/math_header.c ../include/math.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ test/math_header.c
+
+# <math.h> declares every name in test/libm_names.txt. -I../include comes
+# first, ahead of the installed header; MATH_INC overrides the dir to run the
+# test against another header (the pre-fix one, to see it fail).
+MATH_INC ?= ../include
+test/math_c99.o: test/math_c99.c test/libm_names.txt $(MATH_INC)/math.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin -std=c99 -Werror=implicit-function-declaration -I$(MATH_INC) $(CPPFLAGS) -c -o $@ test/math_c99.c
+test/math_c99_gnu89.o: test/math_c99.c test/libm_names.txt $(MATH_INC)/math.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin -std=gnu89 -Werror=implicit-function-declaration -I$(MATH_INC) $(CPPFLAGS) -c -o $@ test/math_c99.c
 
 # getopt_long and pselect resolve from libixcompat.a (link only)
 test/ixc_link: test/ixc_link.c libixcompat.a ../include/getopt.h
@@ -134,9 +260,15 @@ spawnprobe: test/spawnprobe
 test/spawnprobe: test/spawnprobe.c libixcompat.a
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -o $@ test/spawnprobe.c libixcompat.a
 
-install: libixcompat.a
+install: libixcompat.a libm.a
 	cp libixcompat.a $(SDK)/lib/libixcompat.a
+	cp libm.a $(SDK)/lib/libm.a
 
 clean:
-	rm -rf $(OBJS) newlibwcs libixcompat.a test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/ixc_link test/inttypes_header.o
-.PHONY: tables test spawnprobe install clean
+	rm -rf $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
+# clean must leave no object behind: a stale libm_sqrtf.o once survived it
+# and kept a self-calling sqrtf in every rebuilt libm.a.
+cleancheck: clean
+	@left=$$(ls *.o test/*.o 2>/dev/null); if [ -n "$$left" ]; then echo "[ERROR] clean left: $$left"; exit 1; fi; echo "[OK] clean removes every object"
+
+.PHONY: tables test spawnprobe install clean selfcall cleancheck

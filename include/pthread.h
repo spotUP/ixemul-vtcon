@@ -11,14 +11,18 @@
  * of its own; this is what libraries written against pthreads (jq's
  * thread-local decNumber context and allocator handler) need to run in it:
  * once-only initialisation, thread-specific keys, mutexes. There is no
- * pthread_create, pthread_join or condition variable: a program that starts
- * threads fails to link, which is the honest answer. The toolchain's own
+ * thread to wait for: pthread_create fails with EAGAIN, a condition wait can
+ * never be signalled (EDEADLK), so a program that starts threads degrades
+ * to its single-threaded path. The type set is complete enough for gnulib's
+ * <pthread.h> wrapper (sed). The toolchain's own
  * <pthread.h> (libnix) clashes with ixemul's <sys/types.h>; this header
  * shadows it when the SDK headers are overlaid (docker/install-sdk-headers.sh). */
 #ifndef _IXEMUL_PTHREAD_H_
 #define _IXEMUL_PTHREAD_H_
 
 #include <sys/types.h>
+#include <stddef.h>
+#include <time.h>
 #include <sys/cdefs.h>
 
 typedef int pthread_once_t;
@@ -38,6 +42,18 @@ typedef struct { int type; } pthread_mutexattr_t;
 
 typedef unsigned long pthread_t;
 
+typedef struct { int detachstate; size_t stacksize; } pthread_attr_t;
+#define PTHREAD_CREATE_JOINABLE 0
+#define PTHREAD_CREATE_DETACHED 1
+
+typedef struct { int unused; } pthread_condattr_t;
+typedef struct { int unused; } pthread_cond_t;
+#define PTHREAD_COND_INITIALIZER { 0 }
+
+typedef struct { int unused; } pthread_rwlockattr_t;
+typedef struct { int readers; int writer; } pthread_rwlock_t;
+#define PTHREAD_RWLOCK_INITIALIZER { 0, 0 }
+
 __BEGIN_DECLS
 int	pthread_once __P((pthread_once_t *, void (*)(void)));
 /* the destructor is stored but never run: the thread ends with the program */
@@ -55,6 +71,32 @@ int	pthread_mutex_trylock __P((pthread_mutex_t *));
 int	pthread_mutex_unlock __P((pthread_mutex_t *));
 pthread_t pthread_self __P((void));
 int	pthread_equal __P((pthread_t, pthread_t));
+int	pthread_attr_init __P((pthread_attr_t *));
+int	pthread_attr_destroy __P((pthread_attr_t *));
+int	pthread_attr_setdetachstate __P((pthread_attr_t *, int));
+int	pthread_attr_getdetachstate __P((const pthread_attr_t *, int *));
+int	pthread_attr_setstacksize __P((pthread_attr_t *, size_t));
+int	pthread_attr_getstacksize __P((const pthread_attr_t *, size_t *));
+int	pthread_create __P((pthread_t *, const pthread_attr_t *, void *(*)(void *), void *));
+int	pthread_join __P((pthread_t, void **));
+int	pthread_detach __P((pthread_t));
+int	pthread_condattr_init __P((pthread_condattr_t *));
+int	pthread_condattr_destroy __P((pthread_condattr_t *));
+int	pthread_cond_init __P((pthread_cond_t *, const pthread_condattr_t *));
+int	pthread_cond_destroy __P((pthread_cond_t *));
+int	pthread_cond_signal __P((pthread_cond_t *));
+int	pthread_cond_broadcast __P((pthread_cond_t *));
+int	pthread_cond_wait __P((pthread_cond_t *, pthread_mutex_t *));
+int	pthread_cond_timedwait __P((pthread_cond_t *, pthread_mutex_t *, const struct timespec *));
+int	pthread_rwlockattr_init __P((pthread_rwlockattr_t *));
+int	pthread_rwlockattr_destroy __P((pthread_rwlockattr_t *));
+int	pthread_rwlock_init __P((pthread_rwlock_t *, const pthread_rwlockattr_t *));
+int	pthread_rwlock_destroy __P((pthread_rwlock_t *));
+int	pthread_rwlock_rdlock __P((pthread_rwlock_t *));
+int	pthread_rwlock_tryrdlock __P((pthread_rwlock_t *));
+int	pthread_rwlock_wrlock __P((pthread_rwlock_t *));
+int	pthread_rwlock_trywrlock __P((pthread_rwlock_t *));
+int	pthread_rwlock_unlock __P((pthread_rwlock_t *));
 __END_DECLS
 
 #endif /* _IXEMUL_PTHREAD_H_ */

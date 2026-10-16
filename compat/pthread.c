@@ -149,3 +149,207 @@ pthread_equal(pthread_t a, pthread_t b)
 {
 	return a == b;
 }
+
+/* attributes: stored, never acted on */
+int
+pthread_attr_init(pthread_attr_t *a)
+{
+	a->detachstate = PTHREAD_CREATE_JOINABLE;
+	a->stacksize = 0;
+	return 0;
+}
+
+int
+pthread_attr_destroy(pthread_attr_t *a)
+{
+	(void)a;
+	return 0;
+}
+
+int
+pthread_attr_setdetachstate(pthread_attr_t *a, int state)
+{
+	if (state != PTHREAD_CREATE_JOINABLE && state != PTHREAD_CREATE_DETACHED)
+		return EINVAL;
+	a->detachstate = state;
+	return 0;
+}
+
+int
+pthread_attr_getdetachstate(const pthread_attr_t *a, int *state)
+{
+	*state = a->detachstate;
+	return 0;
+}
+
+int
+pthread_attr_setstacksize(pthread_attr_t *a, size_t size)
+{
+	a->stacksize = size;
+	return 0;
+}
+
+int
+pthread_attr_getstacksize(const pthread_attr_t *a, size_t *size)
+{
+	*size = a->stacksize;
+	return 0;
+}
+
+/* no second thread can be started, so none can be joined or detached */
+int
+pthread_create(pthread_t *t, const pthread_attr_t *a, void *(*fn)(void *), void *arg)
+{
+	(void)t; (void)a; (void)fn; (void)arg;
+	return EAGAIN;
+}
+
+int
+pthread_join(pthread_t t, void **ret)
+{
+	(void)t; (void)ret;
+	return ESRCH;
+}
+
+int
+pthread_detach(pthread_t t)
+{
+	(void)t;
+	return ESRCH;
+}
+
+/* condition variables: nobody else can signal, so a wait would hang for ever */
+int
+pthread_condattr_init(pthread_condattr_t *a)
+{
+	(void)a;
+	return 0;
+}
+
+int
+pthread_condattr_destroy(pthread_condattr_t *a)
+{
+	(void)a;
+	return 0;
+}
+
+int
+pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a)
+{
+	(void)a;
+	c->unused = 0;
+	return 0;
+}
+
+int
+pthread_cond_destroy(pthread_cond_t *c)
+{
+	(void)c;
+	return 0;
+}
+
+int
+pthread_cond_signal(pthread_cond_t *c)
+{
+	(void)c;
+	return 0;
+}
+
+int
+pthread_cond_broadcast(pthread_cond_t *c)
+{
+	(void)c;
+	return 0;
+}
+
+int
+pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m)
+{
+	(void)c; (void)m;
+	return EDEADLK;
+}
+
+int
+pthread_cond_timedwait(pthread_cond_t *c, pthread_mutex_t *m, const struct timespec *ts)
+{
+	(void)c; (void)m; (void)ts;
+	return ETIMEDOUT;
+}
+
+/* read-write locks: a reader count and a writer flag */
+int
+pthread_rwlockattr_init(pthread_rwlockattr_t *a)
+{
+	(void)a;
+	return 0;
+}
+
+int
+pthread_rwlockattr_destroy(pthread_rwlockattr_t *a)
+{
+	(void)a;
+	return 0;
+}
+
+int
+pthread_rwlock_init(pthread_rwlock_t *l, const pthread_rwlockattr_t *a)
+{
+	(void)a;
+	l->readers = 0;
+	l->writer = 0;
+	return 0;
+}
+
+int
+pthread_rwlock_destroy(pthread_rwlock_t *l)
+{
+	return l->readers || l->writer ? EBUSY : 0;
+}
+
+int
+pthread_rwlock_rdlock(pthread_rwlock_t *l)
+{
+	if (l->writer)
+		return EDEADLK;
+	l->readers++;
+	return 0;
+}
+
+int
+pthread_rwlock_tryrdlock(pthread_rwlock_t *l)
+{
+	if (l->writer)
+		return EBUSY;
+	l->readers++;
+	return 0;
+}
+
+int
+pthread_rwlock_wrlock(pthread_rwlock_t *l)
+{
+	if (l->writer || l->readers)
+		return EDEADLK;
+	l->writer = 1;
+	return 0;
+}
+
+int
+pthread_rwlock_trywrlock(pthread_rwlock_t *l)
+{
+	if (l->writer || l->readers)
+		return EBUSY;
+	l->writer = 1;
+	return 0;
+}
+
+int
+pthread_rwlock_unlock(pthread_rwlock_t *l)
+{
+	if (l->writer)
+		l->writer = 0;
+	else if (l->readers)
+		l->readers--;
+	else
+		return EPERM;
+	return 0;
+}

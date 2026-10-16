@@ -121,6 +121,7 @@ struct	linger {
 #define pseudo_AF_RTIP	22		/* Help Identify RTIP packets */
 #define	AF_IPX		23		/* Novell Internet Protocol */
 #define	AF_SIP		24		/* Simple Internet Protocol */
+#define	AF_INET6	24		/* IPv6 (the BSD value; shares 24 with the unused AF_SIP) */
 #define pseudo_AF_PIP	25		/* Help Identify PIP packets */
 
 #define	AF_MAX		26
@@ -179,6 +180,7 @@ struct sockproto {
 #define	PF_LOCAL	AF_LOCAL
 #define	PF_UNIX		PF_LOCAL	/* backward compatibility */
 #define	PF_INET		AF_INET
+#define	PF_INET6	AF_INET6
 #define	PF_IMPLINK	AF_IMPLINK
 #define	PF_PUP		AF_PUP
 #define	PF_CHAOS	AF_CHAOS

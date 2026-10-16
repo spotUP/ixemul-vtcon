@@ -374,51 +374,73 @@ asm("\n\
 
 
 
-/*  Special patch to work around bug in IEEEDPCmp:
- *  if the first 32 bits of both doubles are equal, and
- *  both doubles are negative, then the result can no longer
- *  be trusted.
- * 
- *  This is the output of a small test program:
+/*  Soft-float compares work on the bit patterns, not through IEEEDPCmp and
+ *  IEEESPCmp: those have no notion of Inf or NaN (IEEEDPCmp(Inf, Inf) says
+ *  unequal) and IEEEDPCmp also misorders two negatives whose first 32 bits
+ *  match (found by Bart Van Assche).
  *
- *    test -2.000001 -2.0000009
- *    a = -2.0000009999999996956888, b = -2.0000008999999998593466
- *    (0xc0000000 0x8637bd05, 0xc0000000 0x78cbc3b8)
- *    cmp(a,b) = 0, cmp(b,a) = 1
- *
- *    test -2.0000001 -2.0000002
- *    a = -2.00000009999999983634211, b = -2.0000001999999996726842
- *    (0xc0000000 0xd6bf94d, 0xc0000000 0x1ad7f29a)
- *    cmp(a,b) = 1, cmp(b,a) = 1
- *
- *  As you can see, the results are wrong.
- *
- *  So, we just make both variables positive and exchange them before
- *  passing them to IEEEDPCmp.
- *
- *  This bug was discovered by Bart Van Assche, thanks!
+ *  Return contract (libgcc): sign of the result orders a against b, and an
+ *  unordered pair (either is NaN) returns `unord`, chosen per entry point so
+ *  that its comparison comes out false (eq/ne/cmp 1, gt/ge -1, lt/le 1).
+ *  +0 and -0 compare equal.
  */
 
-static int ieeedpcmp(double a, double b)
+static int magcmp(unsigned long ah, unsigned long al,
+                  unsigned long bh, unsigned long bl)
 {
-  if (*((char *)&a) & *((char *)&b) & 0x80)  /* both doubles negative? */
-    {
-      *((char *)&a) &= 0x7f;    /* yes, make positive */
-      *((char *)&b) &= 0x7f;
-      return IEEEDPCmp(b, a);   /* pass them to IEEEDPCmp the other way round */
-    }
-  return IEEEDPCmp(a, b);
+  if (ah != bh)
+    return ah < bh ? -1 : 1;
+  if (al != bl)
+    return al < bl ? -1 : 1;
+  return 0;
+}
+
+static int dfcmp(double a, double b, int unord)
+{
+  union { double d; unsigned long w[2]; } x, y;
+  unsigned long xh, yh;
+  int c;
+
+  x.d = a;
+  y.d = b;
+  xh = x.w[0] & 0x7fffffff;
+  yh = y.w[0] & 0x7fffffff;
+  if (xh > 0x7ff00000 || (xh == 0x7ff00000 && x.w[1]) ||
+      yh > 0x7ff00000 || (yh == 0x7ff00000 && y.w[1]))
+    return unord;
+  if (!(xh | x.w[1] | yh | y.w[1]))
+    return 0;
+  if ((x.w[0] ^ y.w[0]) & 0x80000000)
+    return (x.w[0] & 0x80000000) ? -1 : 1;
+  c = magcmp(xh, x.w[1], yh, y.w[1]);
+  return (x.w[0] & 0x80000000) ? -c : c;
+}
+
+static int sfcmp(FLOAT a, FLOAT b, int unord)
+{
+  unsigned long x = a, y = b;
+  unsigned long xm = x & 0x7fffffff, ym = y & 0x7fffffff;
+  int c;
+
+  if (xm > 0x7f800000 || ym > 0x7f800000)
+    return unord;
+  if (!(xm | ym))
+    return 0;
+  if ((x ^ y) & 0x80000000)
+    return (x & 0x80000000) ? -1 : 1;
+  c = magcmp(xm, 0, ym, 0);
+  return (x & 0x80000000) ? -c : c;
 }
 
 
 int __eqdf2(double a, double b)
 {
-  return ieeedpcmp(a, b);
+  return dfcmp(a, b, 1);
 }
 
 int __eqsf2(FLOAT a, FLOAT b)
 {
-  return IEEESPCmp(a, b);
+  return sfcmp(a, b, 1);
 }
 
 SItype __fixsfsi(FLOAT a)
@@ -433,52 +455,52 @@ SFVALUE __floatsisf(SItype a)
 
 int __gedf2(double a, double b)
 {
-  return ieeedpcmp(a, b);
+  return dfcmp(a, b, -1);
 }
 
 int __gesf2(FLOAT a, FLOAT b)
 {
-  return IEEESPCmp(a, b);
+  return sfcmp(a, b, -1);
 }
 
 int __gtdf2(double a, double b)
 {
-  return ieeedpcmp(a, b);
+  return dfcmp(a, b, -1);
 }
 
 int __gtsf2(FLOAT a, FLOAT b)
 {
-  return IEEESPCmp(a, b);
+  return sfcmp(a, b, -1);
 }
 
 int __ledf2(double a, double b)
 {
-  return ieeedpcmp(a, b);
+  return dfcmp(a, b, 1);
 }
 
 int __lesf2(FLOAT a, FLOAT b)
 {
-  return IEEESPCmp(a, b);
+  return sfcmp(a, b, 1);
 }
 
 int __ltdf2(double a, double b)
 {
-  return ieeedpcmp(a, b);
+  return dfcmp(a, b, 1);
 }
 
 int __ltsf2(FLOAT a, FLOAT b)
 {
-  return IEEESPCmp(a, b);
+  return sfcmp(a, b, 1);
 }
 
 int __nedf2(double a, double b)
 {
-  return !!ieeedpcmp(a, b);
+  return !!dfcmp(a, b, 1);
 }
 
 int __nesf2(FLOAT a, FLOAT b)
 {
-  return !!IEEESPCmp(a, b);
+  return !!sfcmp(a, b, 1);
 }
 
 /* double + double */
@@ -498,7 +520,7 @@ SFVALUE __addsf3(FLOAT a, FLOAT b)
 /* double == double: 0 */
 int __cmpdf2(double a, double b)
 {
-  return ieeedpcmp(a, b);
+  return dfcmp(a, b, 1);
 }
 
 /* single > single: 1 */
@@ -506,7 +528,7 @@ int __cmpdf2(double a, double b)
 /* single == single: 0 */
 int __cmpsf2(FLOAT a, FLOAT b)
 {
-  return IEEESPCmp(a, b);
+  return sfcmp(a, b, 1);
 }
 
 /* double / double */
