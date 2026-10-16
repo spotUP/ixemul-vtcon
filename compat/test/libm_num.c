@@ -8,6 +8,8 @@
 #define INF_ (__builtin_inf())
 
 double acosh(double), asinh(double), atanh(double), cbrt(double), copysign(double, double);
+double pow(double, double);
+float fdimf(float, float);
 double erf(double), erfc(double), exp2(double), expm1(double), fdim(double, double);
 double fma(double, double, double), fmax(double, double), fmin(double, double), fmod(double, double);
 double hypot(double, double), lgamma(double), log1p(double), log2(double), logb(double);
@@ -83,7 +85,7 @@ main(void)
 	T(erf(0), 0, 0); T(erf(-0.0), -0.0, 0); T(erf(1), 0.84270079294971487, 1e-15); T(erf(-INF_), -1, 0); T(erfc(0), 1, 0); T(erfc(INF_), 0, 0); T(erfc(-INF_), 2, 0);
 	T(tgamma(5), 24, 1e-13); T(tgamma(0.5), 1.7724538509055161, 1e-13); T(tgamma(0.0), INF_, 0); T(tgamma(-0.0), -INF_, 0); T(tgamma(-1), NAN_, 0); T(tgamma(INF_), INF_, 0); T(tgamma(-INF_), NAN_, 0); T(tgammaf(4), 6, 1e-5);
 	T(lgamma(1), 0, 0); T(lgamma(2), 0, 0); T(lgamma(5), 3.1780538303479457, 1e-14); T(lgamma(0), INF_, 0); T(lgamma(INF_), INF_, 0); T(lgammaf(3), 0.69314718055994531, 1e-6);
-	T(fdim(5, 3), 2, 0); T(fdim(3, 5), 0, 0); T(fdim(INF_, INF_), 0, 0);
+	T(fdim(5, 3), 2, 0); T(fdim(3, 5), 0, 0); T(fdim(INF_, INF_), 0, 0); T(fdimf(INF_, INF_), 0, 0);
 	T(fma(2, 3, 4), 10, 0); T(fma(0, INF_, 1), NAN_, 0); T(fma(-0.0, 1, -0.0), -0.0, 0);
 	T(fmod(5.5, 2), 1.5, 0); T(fmod(-5.5, 2), -1.5, 0); T(fmod(5.5, INF_), 5.5, 0); T(fmod(1, 0), NAN_, 0); T(fmod(-0.0, 3), -0.0, 0); T(fmod(INF_, 3), NAN_, 0); T(fmodf(7, 4), 3, 0);
 	/* exact remainder for large quotients (x - trunc(x/y)*y rounds the quotient), subnormals */
@@ -96,7 +98,7 @@ main(void)
 	T(nextafter(1, 2) > 1, 1, 0); T(nextafter(1, 1), 1, 0); T(nextafter(0, -1) < 0, 1, 0);
 	T(sqrtf(9), 3, 0); T(sqrtf(-1), NAN_, 0); T(sqrtf(-0.0f), -0.0, 0); T(sqrtl(2.25L), 1.5, 0);
 	T(expf(0), 1, 0); T(expf(1), 2.7182818284590452, 1e-6); T(logf(1), 0, 0); T(logf(0), -INF_, 0); T(logf(-1), NAN_, 0);
-	T(powf(2, 10), 1024, 1e-6); T(powf(2, -1), 0.5, 1e-6); T(powf(0, 0), 1, 0);
+	T(powf(2, 10), 1024, 1e-6); T(powf(2, -1), 0.5, 1e-6); T(powf(0, 0), 1, 0); T(pow(0, 0), 1, 0); T(pow(0, -1), INF_, 0);
 	printf("%d checks, %d failures\n", total, fails);
 	return fails != 0;
 }

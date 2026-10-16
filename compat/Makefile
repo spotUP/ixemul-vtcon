@@ -67,22 +67,22 @@ WCS_OBJS   = $(addprefix newlibwcs/lib_a-,$(addsuffix .o,$(WCS_FUNCS) $(SEARCH_F
 LIBM_FUNCS = fmod round log2 exp2 \
   hypot acosh atanh remainder lgamma tgamma nexttoward nexttowardf atan2f \
   acosf asinf coshf expf exp2f logf log10f log2f sinhf sqrtf acoshf atanhf lgammaf tgammaf \
-  powf fmodf remainderf hypotf ldexpf \
+  pow powf fdim fdimf sqrtl fmodf remainderf hypotf ldexpf \
   acosl acoshl asinl asinhl atanl atanhl cbrtl ceill cosl coshl erfl erfcl expl exp2l expm1l \
   floorl lgammal logl log10l log1pl log2l logbl nearbyintl rintl roundl sinl sinhl tanl tanhl \
   tgammal truncl fabsl copysignl atan2l fdiml fmaxl fminl fmodl hypotl nextafterl powl \
   remainderl fmal nexttowardl ilogbl lrintl lroundl llrintl llroundl ldexpl scalbnl scalblnl \
   frexpl modfl remquol nanl
 LIBM_C99   = fmod round log2 exp2
-LIBM_NEWLIB = e_acosh e_atanh e_exp e_fmod e_hypot e_log e_remainder e_sqrt ef_exp ef_log \
+LIBM_NEWLIB = e_acosh e_atanh e_exp e_fmod e_hypot e_log e_pow e_remainder e_sqrt ef_exp ef_log ef_pow \
   ef_rem_pio2 ef_sqrt er_gamma er_lgamma k_cos k_sin kf_cos kf_rem_pio2 kf_sin kf_tan \
-  s_asinh s_cbrt s_copysign s_erf s_expm1 s_fdim s_fma s_fmax s_fmin s_fpclassify s_ilogb \
+  s_asinh s_cbrt s_copysign s_erf s_expm1 s_fma s_fmax s_fmin s_fpclassify s_ilogb \
   s_llrint s_llround s_log1p s_logb s_lrint s_lround s_nan s_nearbyint s_nextafter s_remquo \
   s_rint s_scalbln s_scalbn s_trunc sf_asinh sf_atan sf_cbrt sf_ceil sf_copysign sf_cos \
-  sf_erf sf_expm1 sf_fabs sf_fdim sf_floor sf_fma sf_fmax sf_fmin sf_fpclassify sf_frexp \
+  sf_erf sf_expm1 sf_fabs sf_floor sf_fma sf_fmax sf_fmin sf_fpclassify sf_frexp \
   sf_ilogb sf_llrint sf_llround sf_log1p sf_logb sf_lrint sf_lround sf_modf sf_nan \
   sf_nearbyint sf_nextafter sf_remquo sf_rint sf_round sf_scalbln sf_scalbn sf_sin sf_tan \
-  sf_tanh sf_trunc sqrtl
+  sf_tanh sf_trunc
 NEWLIBM    ?= $(dir $(AGCC))../m68k-amigaos/lib/libm.a
 LIBM_OBJS  = $(addprefix c99_,$(addsuffix .o,$(LIBM_C99))) \
              $(addprefix libm_,$(addsuffix .o,$(filter-out $(LIBM_C99),$(LIBM_FUNCS)))) math.o

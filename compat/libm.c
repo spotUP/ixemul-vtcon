@@ -39,6 +39,8 @@ extern double __ieee754_atanh(double);
 extern double __ieee754_remainder(double, double);
 extern double __ieee754_lgamma_r(double, int *);
 extern double __ieee754_gamma_r(double, int *);
+extern double __ieee754_pow(double, double);
+extern float __ieee754_powf(float, float);
 
 #ifdef LIBM_hypot
 double
@@ -84,12 +86,13 @@ lgamma(double x)
 #endif
 
 #ifdef LIBM_tgamma
-/* gamma(x) = sign * exp(lgamma(x)); poles at 0 and the negative integers */
+/* gamma(x) = sign * |gamma(x)|: __ieee754_gamma_r already returns |gamma(x)|
+   (newlib's er_gamma is exp(lgamma_r)), so it is not exponentiated again; poles at 0 and the negative integers */
 double
 tgamma(double x)
 {
 	int sign;
-	double l;
+	double g;
 
 	if (x == 0.0)
 		return 1.0 / x;
@@ -97,8 +100,8 @@ tgamma(double x)
 		return (x - x) / (x - x);	/* NaN */
 	if (x == __builtin_inf())
 		return x;
-	l = __ieee754_gamma_r(x, &sign);
-	return sign < 0 ? -exp(l) : exp(l);
+	g = __ieee754_gamma_r(x, &sign);
+	return sign < 0 ? -g : g;
 }
 #endif
 
@@ -246,11 +249,55 @@ tgammaf(float x)
 }
 #endif
 
+/* ixemul.library's pow (math-68881.h) returns NaN for pow(0, y<=0); the
+   fdlibm kernel has the C99 values (pow(0,0) = 1, pow(0,-1) = +Inf) */
+#ifdef LIBM_pow
+double
+pow(double x, double y)
+{
+	return __ieee754_pow(x, y);
+}
+#endif
+
 #ifdef LIBM_powf
 float
 powf(float x, float y)
 {
-	return (float)pow(x, y);
+	return __ieee754_powf(x, y);
+}
+#endif
+
+/* C99 fdim: NaN propagates, else x > y ? x - y : +0 (newlib returns +Inf
+   for an infinite x whatever y is) */
+#ifdef LIBM_fdim
+double
+fdim(double x, double y)
+{
+	if (x != x)
+		return x;
+	if (y != y)
+		return y;
+	return x > y ? x - y : 0.0;
+}
+#endif
+
+#ifdef LIBM_fdimf
+float
+fdimf(float x, float y)
+{
+	if (x != x)
+		return x;
+	if (y != y)
+		return y;
+	return x > y ? x - y : 0.0f;
+}
+#endif
+
+#ifdef LIBM_sqrtl
+long double
+sqrtl(long double x)
+{
+	return sqrt(x);
 }
 #endif
 
