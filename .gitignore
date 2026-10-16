@@ -11,6 +11,7 @@ compat/test/*.o
 thoughts/spot/
 thoughts/searchable/
 compat/test/getopt_test
+compat/test/getopt_bsd_test
 compat/test/nums_test
 compat/test/strptime_test
 compat/test/pthread_test

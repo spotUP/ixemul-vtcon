@@ -65,20 +65,19 @@ getopt(nargc, nargv, ostr)
 			place = EMSG;
 			return(EOF);
 		}
-		if (place[1] && *++place == '-') {	/* found "--" */
+		if (!place[1]) {		/* bare "-" is an operand */
+			place = EMSG;
+			return(EOF);
+		}
+		if (place[1] == '-' && !place[2]) {	/* exactly "--" */
 			++optind;
 			place = EMSG;
 			return(EOF);
 		}
+		++place;			/* skip the leading '-' */
 	}					/* option letter okay? */
 	if ((optopt = (int)*place++) == (int)':' ||
 	    !(oli = index(ostr, optopt))) {
-		/*
-		 * if the user didn't specify '-' as an option,
-		 * assume it means EOF.
-		 */
-		if (optopt == (int)'-')
-			return(EOF);
 		if (!*place)
 			++optind;
 		if (opterr) {
