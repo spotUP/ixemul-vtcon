@@ -254,18 +254,21 @@ test/ixc_link: test/ixc_link.c libixcompat.a ../include/getopt.h
 test/inttypes_header.o: test/inttypes_header.c ../include/inttypes.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=format -I../include $(CPPFLAGS) -c -o $@ test/inttypes_header.c
 
-spawnprobe: test/spawnprobe
+spawnprobe: test/spawnprobe test/envprobe
 # libixcompat.a by its path: the driver searches the SDK's lib (an older
 # copy) before any -L given here
 test/spawnprobe: test/spawnprobe.c libixcompat.a
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -o $@ test/spawnprobe.c libixcompat.a
+
+test/envprobe: test/envprobe.c libixcompat.a
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -o $@ test/envprobe.c libixcompat.a
 
 install: libixcompat.a libm.a
 	cp libixcompat.a $(SDK)/lib/libixcompat.a
 	cp libm.a $(SDK)/lib/libm.a
 
 clean:
-	rm -rf $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
+	rm -rf $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/*_ixc.o test/spawnprobe test/envprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
 # clean must leave no object behind: a stale libm_sqrtf.o once survived it
 # and kept a self-calling sqrtf in every rebuilt libm.a.
 cleancheck: clean
