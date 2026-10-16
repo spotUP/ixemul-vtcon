@@ -265,5 +265,10 @@ install: libixcompat.a libm.a
 	cp libm.a $(SDK)/lib/libm.a
 
 clean:
-	rm -rf $(OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
-.PHONY: tables test spawnprobe install clean selfcall
+	rm -rf $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/*_ixc.o test/spawnprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
+# clean must leave no object behind: a stale libm_sqrtf.o once survived it
+# and kept a self-calling sqrtf in every rebuilt libm.a.
+cleancheck: clean
+	@left=$$(ls *.o test/*.o 2>/dev/null); if [ -n "$$left" ]; then echo "[ERROR] clean left: $$left"; exit 1; fi; echo "[OK] clean removes every object"
+
+.PHONY: tables test spawnprobe install clean selfcall cleancheck
