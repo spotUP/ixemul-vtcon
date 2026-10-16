@@ -334,9 +334,11 @@ double	round __P((double));
 #endif
 __END_DECLS
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4))
 /* C99 7.12.3 classification macros (type-generic through the builtins). The
- * isinf/isnan/isnormal functions stay declared above for old code. */
+ * isinf/isnan/isnormal functions stay declared above for old code, and for
+ * gcc before 4.4 (the library itself is built with 2.95), which lacks
+ * __builtin_fpclassify and would turn the builtins into undefined calls. */
 #undef fpclassify
 #undef isfinite
 #undef isinf
