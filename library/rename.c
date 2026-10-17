@@ -41,7 +41,9 @@ struct rename_vec {
 static int
 __rename_func (struct lockinfo *info, struct rename_vec *rv, int *error)
 {
+  usetup;
   struct StandardPacket *sp = &info->sp;
+  int before = -1;
 
   if (SameLock(info->parent_lock, rv->target_dir_lock) == LOCK_DIFFERENT)
     {
@@ -50,6 +52,15 @@ __rename_func (struct lockinfo *info, struct rename_vec *rv, int *error)
     }
   else
     {
+      /* the target must not be a name the handler shortens (RAM: keeps
+         30 characters): checked before rename() would unlink an existing
+         target, which would be another file (UP-Term) */
+      before = __name_truncated (sp, info->handler, rv->target_dir_lock,
+                                 rv->target_name);
+      if (before == 1)
+        goto too_long;
+
+      sp->sp_Pkt.dp_Port = __srwport;
       sp->sp_Pkt.dp_Type = ACTION_RENAME_OBJECT;
       sp->sp_Pkt.dp_Arg1 = info->parent_lock;
       sp->sp_Pkt.dp_Arg2 = info->bstr;
@@ -63,7 +74,30 @@ __rename_func (struct lockinfo *info, struct rename_vec *rv, int *error)
   info->result = sp->sp_Pkt.dp_Res1;
   *error = info->result != -1;
 
+  if (!*error && before == -1
+      && __name_truncated (sp, info->handler, rv->target_dir_lock,
+                           rv->target_name) == 1)
+    {
+      /* put the object back under its old name */
+      sp->sp_Pkt.dp_Port = __srwport;
+      sp->sp_Pkt.dp_Type = ACTION_RENAME_OBJECT;
+      sp->sp_Pkt.dp_Arg1 = rv->target_dir_lock;
+      sp->sp_Pkt.dp_Arg2 = rv->target_name;
+      sp->sp_Pkt.dp_Arg3 = info->parent_lock;
+      sp->sp_Pkt.dp_Arg4 = info->bstr;
+      PutPacket (info->handler, sp);
+      __wait_sync_packet (sp);
+      goto too_long;
+    }
+
   /* retry if necessary */
+  return 1;
+
+too_long:
+  sp->sp_Pkt.dp_Res1 = 0;
+  sp->sp_Pkt.dp_Res2 = IX_ERROR_NAME_TOO_LONG;
+  info->result = 0;
+  *error = 1;
   return 1;
 }
 

@@ -32,8 +32,21 @@ struct open_vec {
 static int
 __open_func (struct lockinfo *info, struct open_vec *ov, int *error)
 {
+  usetup;
   struct StandardPacket *sp = &info->sp;
+  int creates = ov->action != MODE_OLDFILE, before = -1;
 
+  /* a create must not land on, or make, a name the handler shortened
+     (RAM: keeps 30 characters; UP-Term) */
+  if (creates)
+    {
+      before = __name_truncated (sp, info->handler, info->parent_lock,
+                                 info->bstr);
+      if (before == 1)
+        goto too_long;
+    }
+
+  sp->sp_Pkt.dp_Port = __srwport;
   sp->sp_Pkt.dp_Type = ov->action;
   sp->sp_Pkt.dp_Arg1 = CTOBPTR (ov->fh);
   sp->sp_Pkt.dp_Arg2 = info->parent_lock;
@@ -47,8 +60,29 @@ __open_func (struct lockinfo *info, struct open_vec *ov, int *error)
 
   /* handler is supposed to supply this, but if it didn't... */
   if (!*error && !ov->fh->fh_Type) ov->fh->fh_Type = info->handler;
+
+  /* a new name: did the handler keep all of it? */
+  if (!*error && creates && before == -1
+      && __name_truncated (sp, info->handler, info->parent_lock,
+                           info->bstr) == 1)
+    {
+      sp->sp_Pkt.dp_Port = __srwport;
+      sp->sp_Pkt.dp_Type = ACTION_END;
+      sp->sp_Pkt.dp_Arg1 = ov->fh->fh_Arg1;
+      PutPacket (info->handler, sp);
+      __wait_sync_packet (sp);
+      __name_delete (sp, info->handler, info->parent_lock, info->bstr);
+      goto too_long;
+    }
  
   /* continue if we failed because of symlink - reference */
+  return 1;
+
+too_long:
+  sp->sp_Pkt.dp_Res1 = 0;
+  sp->sp_Pkt.dp_Res2 = IX_ERROR_NAME_TOO_LONG;
+  info->result = 0;
+  *error = 1;
   return 1;
 }
 

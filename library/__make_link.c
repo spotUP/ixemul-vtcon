@@ -48,8 +48,18 @@ struct link_vec {
 static int
 __link_func (struct lockinfo *info, struct link_vec *lv, int *error)
 {
+  usetup;
   struct StandardPacket *sp = &info->sp;
+  int before;
 
+  /* the link's name must not be one the handler shortens (RAM: keeps 30
+     characters; UP-Term) */
+  before = __name_truncated (sp, info->handler, info->parent_lock,
+                             info->bstr);
+  if (before == 1)
+    goto too_long;
+
+  sp->sp_Pkt.dp_Port = __srwport;
   sp->sp_Pkt.dp_Type = ACTION_MAKE_LINK;
   sp->sp_Pkt.dp_Arg1 = info->parent_lock;
   sp->sp_Pkt.dp_Arg2 = info->bstr;
@@ -61,8 +71,24 @@ __link_func (struct lockinfo *info, struct link_vec *lv, int *error)
   info->result = sp->sp_Pkt.dp_Res1;
   
   *error = info->result != -1;
+
+  /* a soft link cannot be located (ERROR_IS_SOFT_LINK): -1, kept */
+  if (!*error && before == -1
+      && __name_truncated (sp, info->handler, info->parent_lock,
+                           info->bstr) == 1)
+    {
+      __name_delete (sp, info->handler, info->parent_lock, info->bstr);
+      goto too_long;
+    }
   
   /* shouldn't be possible to get the ERR_SOFT_LINK here.. */
+  return 0;
+
+too_long:
+  sp->sp_Pkt.dp_Res1 = 0;
+  sp->sp_Pkt.dp_Res2 = IX_ERROR_NAME_TOO_LONG;
+  info->result = 0;
+  *error = 1;
   return 0;
 }
 

@@ -46,15 +46,23 @@ link (const char *old, const char *new)
   BPTR lock;
   int res = -1;
   int omask;
+  int err;
+  usetup;
 
   /* since we obtain a lock which we have to free later, block signals */
   omask = syscall (SYS_sigsetmask, ~0);
   if ((lock = __lock (old, ACCESS_READ)))
     {
       res = (__make_link (new, lock, LINK_HARD) == -1) ? 0 : -1;
+      /* the unlock below must not hide why the link failed */
+      err = IoErr ();
       __unlock (lock);
     }
+  else
+    err = IoErr ();
   syscall (SYS_sigsetmask, omask);
 
+  if (res)
+    errno = __ioerr_to_errno (err);
   return res;
 }

@@ -334,6 +334,13 @@ struct lockinfo
   int result;
 };
 
+/* IoErr() of a create whose name the handler would shorten (RAM: on
+ * OS 3.1 keeps 30 characters); __ioerr_to_errno gives ENAMETOOLONG.
+ * __name_truncated and __name_delete are in __plock.c (UP-Term). */
+#define IX_ERROR_NAME_TOO_LONG 7272
+int  __name_truncated (struct StandardPacket *, struct MsgPort *, BPTR, BPTR);
+void __name_delete (struct StandardPacket *, struct MsgPort *, BPTR, BPTR);
+
 /* The stack pointers and SR are machine state the compiler cannot see:
  * "memory" makes each a barrier, so gcc 3+ do not move them across calls
  * (sig_launch compared the usp from before psig() pushed a signal frame,

@@ -34,8 +34,18 @@
 static int
 __mkdir_func (struct lockinfo *info, void *dummy, int *error)
 {
+  usetup;
   struct StandardPacket *sp = &info->sp;
+  int before;
 
+  /* the new name must not be one the handler shortens (RAM: keeps 30
+     characters; UP-Term) */
+  before = __name_truncated (sp, info->handler, info->parent_lock,
+                             info->bstr);
+  if (before == 1)
+    goto too_long;
+
+  sp->sp_Pkt.dp_Port = __srwport;
   sp->sp_Pkt.dp_Type = ACTION_CREATE_DIR;
   sp->sp_Pkt.dp_Arg1 = info->parent_lock;
   sp->sp_Pkt.dp_Arg2 = info->bstr;
@@ -45,8 +55,24 @@ __mkdir_func (struct lockinfo *info, void *dummy, int *error)
   info->result = sp->sp_Pkt.dp_Res1;
 
   *error = info->result == 0;
+
+  if (!*error && before == -1
+      && __name_truncated (sp, info->handler, info->parent_lock,
+                           info->bstr) == 1)
+    {
+      UnLock (info->result);
+      __name_delete (sp, info->handler, info->parent_lock, info->bstr);
+      goto too_long;
+    }
     
   /* continue if we failed because of symlink - reference */
+  return 1;
+
+too_long:
+  sp->sp_Pkt.dp_Res1 = 0;
+  sp->sp_Pkt.dp_Res2 = IX_ERROR_NAME_TOO_LONG;
+  info->result = 0;
+  *error = 1;
   return 1;
 }
 

@@ -76,6 +76,8 @@ int __ioerr_to_errno(int ioerr)
       case 5252:			        err = EPERM;            break;
       /* catch-all for illegal accesses to / */
       case 6262:			        err = EPERM;            break;
+      /* a create whose name the handler would shorten (UP-Term) */
+      case IX_ERROR_NAME_TOO_LONG:              err = ENAMETOOLONG;     break;
       default:				        err = EIO;              break;
     }
   KPRINTF (("ioerr = %ld, err = %ld\n", ioerr, err));

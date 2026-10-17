@@ -574,3 +574,112 @@ static void unslashify(char *name)
     }
 }
 
+
+/*
+ * Names a handler shortens (UP-Term, 2026-10-17). A handler may keep only
+ * the first N characters of a name and match lookups on those N as well:
+ * RAM: on OS 3.1 keeps 30, so a create of a 38-character name succeeds
+ * under its first 30 characters and a later lookup of a different
+ * 38-character name with the same 30 finds that object (git's loose
+ * objects on RAM:). AmigaOS 3.x has no packet that gives a handler's name
+ * length, so the name the handler stored is compared with the one asked
+ * for.
+ *
+ * __name_truncated: 1 when the object NAME (a BSTR) in DIR exists and the
+ * handler stored it under a shorter name that is a case-insensitive prefix
+ * of NAME, 0 when it exists under the whole name, -1 when it does not
+ * exist or cannot be examined (a console, a soft link). A new directory
+ * (exclusive lock) and a hard link (examines as its target) are looked up
+ * in DIR's entries instead. Uses SP for the
+ * locate packet; the caller sets SP's results again after it.
+ */
+/*
+ * __name_listed: the stored name of WANT (a BSTR) read from DIR's entries,
+ * for when the object's own lock cannot give it. 0 when DIR lists the
+ * whole name, 1 when it lists only a shorter case-insensitive prefix of
+ * it, -1 when neither or DIR cannot be examined. FIB is the caller's
+ * longword-aligned buffer.
+ */
+static int
+__name_listed (BPTR dir, unsigned char *want, struct FileInfoBlock *fib)
+{
+  int want_len = want[0], have_len, res = -1;
+
+  if (! dir || ! Examine (dir, fib))
+    return -1;
+  while (ExNext (dir, fib))
+    {
+      have_len = strlen (fib->fib_FileName);
+      if (have_len > want_len
+          || strncasecmp (fib->fib_FileName, (char *) want + 1, have_len))
+        continue;
+      if (have_len == want_len)
+        return 0;
+      res = 1;
+    }
+  return res;
+}
+
+int
+__name_truncated (struct StandardPacket *sp, struct MsgPort *handler,
+                  BPTR dir, BPTR name)
+{
+  char fibbuf[sizeof (struct FileInfoBlock) + 3];
+  usetup;
+  struct FileInfoBlock *fib = (struct FileInfoBlock *)
+                               (((long) fibbuf + 3) & ~3L);
+  unsigned char *want = BTOCPTR (name);
+  int want_len = want[0], have_len, res = -1;
+  BPTR lock;
+
+  sp->sp_Pkt.dp_Port = __srwport;
+  sp->sp_Pkt.dp_Type = ACTION_LOCATE_OBJECT;
+  sp->sp_Pkt.dp_Arg1 = dir;
+  sp->sp_Pkt.dp_Arg2 = name;
+  sp->sp_Pkt.dp_Arg3 = ACCESS_READ;
+  PutPacket (handler, sp);
+  __wait_sync_packet (sp);
+  lock = sp->sp_Pkt.dp_Res1;
+  if (! lock)
+    {
+      /* a new directory is held under CreateDir's exclusive lock */
+      if (sp->sp_Pkt.dp_Res2 == ERROR_OBJECT_IN_USE)
+        return __name_listed (dir, want, fib);
+      return -1;
+    }
+
+  /* dos.library's Examine gives fib_FileName as a C string */
+  if (Examine (lock, fib))
+    {
+      have_len = strlen (fib->fib_FileName);
+      if (have_len == want_len
+          && ! strncasecmp (fib->fib_FileName, (char *) want + 1, have_len))
+        res = 0;
+      else if (have_len < want_len
+               && ! strncasecmp (fib->fib_FileName, (char *) want + 1,
+                                 have_len))
+        res = 1;
+      else
+        res = 2;
+    }
+  UnLock (lock);
+  /* a hard link examines as its target, so its name is in DIR only */
+  if (res == 2)
+    res = __name_listed (dir, want, fib);
+  return res;
+}
+
+/* Deletes NAME in DIR again after __name_truncated found it shortened. */
+void
+__name_delete (struct StandardPacket *sp, struct MsgPort *handler,
+               BPTR dir, BPTR name)
+{
+  usetup;
+
+  sp->sp_Pkt.dp_Port = __srwport;
+  sp->sp_Pkt.dp_Type = ACTION_DELETE_OBJECT;
+  sp->sp_Pkt.dp_Arg1 = dir;
+  sp->sp_Pkt.dp_Arg2 = name;
+  PutPacket (handler, sp);
+  __wait_sync_packet (sp);
+}
