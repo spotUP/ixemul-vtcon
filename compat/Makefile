@@ -64,6 +64,9 @@ WCS_OBJS   = $(addprefix newlibwcs/lib_a-,$(addsuffix .o,$(WCS_FUNCS) $(SEARCH_F
 # members of newlib's libm.a that need no errno (fdlibm: no w_ wrappers; found
 # by closing the undefined symbols of each wanted function over that archive
 # and rejecting any that reach _impure_ptr, __fdlib_version or matherr).
+# cexp/cimag/creal (and f, l): gcc -O2 turns sin(x) and cos(x) of one argument into a call
+# to cexp (sincos -> cexpi -> cexp); their only references are exp, sin, cos, cimag, creal
+# (ixemul's libc.a and this archive), no errno.
 LIBM_FUNCS = fmod round log2 exp2 \
   hypot acosh atanh remainder lgamma tgamma nexttoward nexttowardf atan2f \
   acosf asinf coshf expf exp2f logf log10f log2f sinhf sqrtf acoshf atanhf lgammaf tgammaf \
@@ -82,7 +85,8 @@ LIBM_NEWLIB = e_acosh e_atanh e_exp e_fmod e_hypot e_log e_pow e_remainder e_sqr
   sf_erf sf_expm1 sf_fabs sf_floor sf_fma sf_fmax sf_fmin sf_fpclassify sf_frexp \
   sf_ilogb sf_llrint sf_llround sf_log1p sf_logb sf_lrint sf_lround sf_modf sf_nan \
   sf_nearbyint sf_nextafter sf_remquo sf_rint sf_round sf_scalbln sf_scalbn sf_sin sf_tan \
-  sf_tanh sf_trunc
+  sf_tanh sf_trunc \
+  cexp cexpf cexpl cimag cimagf cimagl creal crealf creall
 NEWLIBM    ?= $(dir $(AGCC))../m68k-amigaos/lib/libm.a
 LIBM_OBJS  = $(addprefix c99_,$(addsuffix .o,$(LIBM_C99))) \
              $(addprefix libm_,$(addsuffix .o,$(filter-out $(LIBM_C99),$(LIBM_FUNCS)))) math.o
