@@ -8,7 +8,7 @@
  */
 /* statvfs/fstatvfs (compat/statvfs.c). Host: -Dixc_statvfs/-Dixc_fstatvfs names
  * of the compat code; Amiga: reaches libixcompat.a through <sys/statvfs.h>.
- * Checks the invariants opkg relies on (free bytes = f_bavail * f_frsize) and
+ * Checks (argv[1] = directory, default ".") the invariants opkg relies on (free bytes = f_bavail * f_frsize) and
  * that path and descriptor forms agree. A write test: free space must drop when
  * a file of 1 MB is written and synced, by at least 512 KB (host filesystems allocate lazily) and
  * at most 3 MB: a wrong unit (512 vs 4096 byte blocks) misses both bounds. */
@@ -35,20 +35,21 @@ freebytes(const struct statvfs *v)
 }
 
 int
-main(void)
+main(int argc, char **argv)
 {
+	const char *dir = argc > 1 ? argv[1] : ".";
 	struct statvfs a, b, c, d;
-	char name[64], blk[4096];
+	char name[128], blk[4096];
 	int fd, i;
 	double before, after;
 
-	CHECK(ixc_statvfs(".", &a) == 0);
+	CHECK(ixc_statvfs(dir, &a) == 0);
 	CHECK(a.f_frsize > 0 && a.f_bsize >= a.f_frsize);
 	CHECK(a.f_blocks > 0);
 	CHECK(a.f_bavail <= a.f_bfree && a.f_bfree <= a.f_blocks);
 	CHECK(a.f_namemax > 0);
 
-	fd = open(".", O_RDONLY);
+	fd = open(dir, O_RDONLY);
 	CHECK(fd >= 0);
 	CHECK(ixc_fstatvfs(fd, &b) == 0);
 	CHECK(b.f_frsize == a.f_frsize && b.f_blocks == a.f_blocks);
@@ -59,18 +60,18 @@ main(void)
 	errno = 0;
 	CHECK(ixc_fstatvfs(-1, &c) == -1 && errno == EBADF);
 
-	sprintf(name, "statvfs_test.%ld.tmp", (long)getpid());
+	sprintf(name, "%s%sstatvfs_test.%ld.tmp", dir, strchr(dir, ':') && dir[strlen(dir) - 1] == ':' ? "" : "/", (long)getpid());
 	fd = open(name, O_RDWR | O_CREAT | O_TRUNC, 0600);
 	CHECK(fd >= 0);
-	CHECK(ixc_statvfs(".", &c) == 0);
+	CHECK(ixc_statvfs(dir, &c) == 0);
 	before = freebytes(&c);
 	memset(blk, 'x', sizeof blk);
 	for (i = 0; i < 256; i++)
 		CHECK(write(fd, blk, sizeof blk) == sizeof blk);
 	fsync(fd);
-	CHECK(ixc_statvfs(".", &d) == 0);
+	CHECK(ixc_statvfs(dir, &d) == 0);
 	after = freebytes(&d);
-	printf("free before %.0f after %.0f drop %.0f\n", before, after, before - after);
+	printf("%s: free before %.0f after %.0f drop %.0f\n", dir, before, after, before - after);
 #ifndef IXC_HOST	/* a shared host disk moves under us; the Amiga volume is ours */
 	CHECK(before - after >= 1048576.0 / 2);
 	CHECK(before - after <= 1048576.0 + 2.0 * 1048576.0);
