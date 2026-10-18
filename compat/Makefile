@@ -28,7 +28,7 @@ CPPFLAGS ?=
 LIBFLAGS = -fno-builtin
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
-       getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o lockf.o \
+       getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o lockf.o mkdtemp.o statvfs.o memstream.o \
        strtonum.o reallocarray.o isnormal.o strptime.o pthread.o getline.o inet_pton.o inet_ntop.o \
        stralloc.o strlcpy.o gai.o
 
@@ -124,8 +124,17 @@ pthread.o: pthread.c ../include/pthread.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ pthread.c
 
 # F_LOCK and friends are in the tree's <unistd.h>, not yet the installed one
+mkdtemp.o: mkdtemp.c
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -c -o $@ mkdtemp.c
+
 lockf.o: lockf.c ../include/unistd.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) -I../include $(CPPFLAGS) -c -o $@ lockf.c
+
+# statvfs.h and the stdio prototypes are in the tree's headers, not yet the installed ones
+statvfs.o: statvfs.c ../include/sys/statvfs.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) -I../include $(CPPFLAGS) -c -o $@ statvfs.c
+memstream.o: memstream.c ../include/stdio.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) -I../include $(CPPFLAGS) -c -o $@ memstream.c
 
 # AF_INET6 and INET6_ADDRSTRLEN are in the tree's headers, not yet the installed ones
 gai.o inet_pton.o inet_ntop.o: %.o: %.c ../include/sys/socket.h ../include/arpa/inet.h ../include/netinet/in.h
@@ -138,7 +147,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/getopt_bsd_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/getopt_bsd_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/getopt_bsd_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/getopt_bsd_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -153,6 +162,9 @@ test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/geto
 	./test/inet_test
 	./test/libc_gaps_test
 	./test/lockf_test
+	./test/mkdtemp_test
+	./test/statvfs_test
+	./test/memstream_test
 test/wide_test: test/wide_test.c utf8.c uclass.c uclass_tab.h ixc_wide.h
 	$(HOSTCC) -Wall -O2 -o $@ test/wide_test.c utf8.c uclass.c
 test/math_test: test/math_test.c math.c
@@ -212,6 +224,25 @@ test/lockf_test: test/lockf_test.c lockf.c
 # allowed: fails to compile without the prototype, to link without libixcompat.a's lockf
 test/lockf_link: test/lockf_test.c libixcompat.a ../include/unistd.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -Dixc_lockf=lockf -I../include $(CPPFLAGS) -o $@ test/lockf_test.c libixcompat.a
+
+# mkdtemp, statvfs and memstream (fmemopen, open_memstream): host builds compile the
+# compat code under ixc_ names; the *_link builds are the Amiga tests against the repo
+# headers and libixcompat.a (no implicit declarations, so a missing prototype or symbol fails)
+test/mkdtemp_test: test/mkdtemp_test.c mkdtemp.c
+	$(HOSTCC) -Wall -O2 -DIXC_MKDTEMP=ixc_mkdtemp -c -o test/mkdtemp_ixc.o mkdtemp.c
+	$(HOSTCC) -Wall -O2 -o $@ test/mkdtemp_test.c test/mkdtemp_ixc.o
+test/mkdtemp_link: test/mkdtemp_test.c libixcompat.a ../include/stdlib.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -Dixc_mkdtemp=mkdtemp -I../include $(CPPFLAGS) -o $@ test/mkdtemp_test.c libixcompat.a
+test/statvfs_test: test/statvfs_test.c statvfs.c
+	$(HOSTCC) -Wall -O2 -DIXC_HOST -DIXC_STATVFS=ixc_statvfs -DIXC_FSTATVFS=ixc_fstatvfs -c -o test/statvfs_ixc.o statvfs.c
+	$(HOSTCC) -Wall -O2 -DIXC_HOST -o $@ test/statvfs_test.c test/statvfs_ixc.o
+test/statvfs_link: test/statvfs_test.c libixcompat.a ../include/sys/statvfs.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -Dixc_statvfs=statvfs -Dixc_fstatvfs=fstatvfs -I../include $(CPPFLAGS) -o $@ test/statvfs_test.c libixcompat.a
+test/memstream_test: test/memstream_test.c memstream.c
+	$(HOSTCC) -Wall -O2 -DIXC_MEMSTREAM -c -o test/memstream_ixc.o memstream.c
+	$(HOSTCC) -Wall -O2 -DIXC_MEMSTREAM -o $@ test/memstream_test.c test/memstream_ixc.o
+test/memstream_link: test/memstream_test.c libixcompat.a ../include/stdio.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -I../include $(CPPFLAGS) -o $@ test/memstream_test.c libixcompat.a
 
 test/inet_host: test/inet_test.c
 	$(HOSTCC) -Wall -O2 -o $@ test/inet_test.c
@@ -295,7 +326,7 @@ install: libixcompat.a libm.a
 	cp libm.a $(SDK)/lib/libm.a
 
 clean:
-	rm -rf $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/softcmp_test test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/*_ixc.o test/spawnprobe test/envprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
+	rm -rf $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/softcmp_test test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/*_ixc.o test/spawnprobe test/envprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
 # clean must leave no object behind: a stale libm_sqrtf.o once survived it
 # and kept a self-calling sqrtf in every rebuilt libm.a.
 cleancheck: clean

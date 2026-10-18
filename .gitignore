@@ -24,3 +24,9 @@ compat/test/libm_link.syms
 compat/test/libm_num
 compat/test/lockf_test
 compat/test/lockf_link
+compat/test/mkdtemp_test
+compat/test/mkdtemp_link
+compat/test/statvfs_test
+compat/test/statvfs_link
+compat/test/memstream_test
+compat/test/memstream_link

@@ -331,6 +331,8 @@ FILE	*funopen __P((const void *,
 		int (*)(void *, const char *, int),
 		fpos_t (*)(void *, fpos_t, int),
 		int (*)(void *)));
+FILE	*fmemopen __P((void *, size_t, const char *));	/* libixcompat.a (UP-Term), on funopen */
+FILE	*open_memstream __P((char **, size_t *));	/* libixcompat.a (UP-Term), on funopen */
 __END_DECLS
 #define	fropen(cookie, fn) funopen(cookie, fn, 0, 0, 0)
 #define	fwopen(cookie, fn) funopen(cookie, 0, fn, 0, 0)
