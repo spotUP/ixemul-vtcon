@@ -28,7 +28,7 @@ CPPFLAGS ?=
 LIBFLAGS = -fno-builtin
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
-       getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o \
+       getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o lockf.o \
        strtonum.o reallocarray.o isnormal.o strptime.o pthread.o getline.o inet_pton.o inet_ntop.o \
        stralloc.o strlcpy.o gai.o
 
@@ -123,6 +123,10 @@ utf8.o locale.o wchar.o wctype.o: ixc_wide.h
 pthread.o: pthread.c ../include/pthread.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ pthread.c
 
+# F_LOCK and friends are in the tree's <unistd.h>, not yet the installed one
+lockf.o: lockf.c ../include/unistd.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) -I../include $(CPPFLAGS) -c -o $@ lockf.c
+
 # AF_INET6 and INET6_ADDRSTRLEN are in the tree's headers, not yet the installed ones
 gai.o inet_pton.o inet_ntop.o: %.o: %.c ../include/sys/socket.h ../include/arpa/inet.h ../include/netinet/in.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ $<
@@ -134,7 +138,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/getopt_bsd_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/getopt_bsd_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/getopt_bsd_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/getopt_bsd_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -148,6 +152,7 @@ test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/geto
 	./test/getline_test
 	./test/inet_test
 	./test/libc_gaps_test
+	./test/lockf_test
 test/wide_test: test/wide_test.c utf8.c uclass.c uclass_tab.h ixc_wide.h
 	$(HOSTCC) -Wall -O2 -o $@ test/wide_test.c utf8.c uclass.c
 test/math_test: test/math_test.c math.c
@@ -196,6 +201,17 @@ test/libc_gaps_test: test/libc_gaps_test.c stralloc.c strlcpy.c gai.c inet_pton.
 # allowed, linked with libixcompat.a (link only; no rig)
 test/libc_gaps_link: test/libc_gaps_test.c libixcompat.a ../include/netdb.h ../include/string.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -I../include $(CPPFLAGS) -o $@ test/libc_gaps_test.c libixcompat.a
+
+# lockf on flock: compat's code under the ixc_ name against the host's flock (two
+# descriptors of one file conflict on the host as on the Amiga)
+test/lockf_test: test/lockf_test.c lockf.c
+	$(HOSTCC) -Wall -O2 -DIXC_LOCKF=ixc_lockf -c -o test/lockf_ixc.o lockf.c
+	$(HOSTCC) -Wall -O2 -o $@ test/lockf_test.c test/lockf_ixc.o
+
+# the same test for the Amiga (-Dixc_lockf=lockf), repo headers, no implicit declaration
+# allowed: fails to compile without the prototype, to link without libixcompat.a's lockf
+test/lockf_link: test/lockf_test.c libixcompat.a ../include/unistd.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -Dixc_lockf=lockf -I../include $(CPPFLAGS) -o $@ test/lockf_test.c libixcompat.a
 
 test/inet_host: test/inet_test.c
 	$(HOSTCC) -Wall -O2 -o $@ test/inet_test.c
@@ -279,7 +295,7 @@ install: libixcompat.a libm.a
 	cp libm.a $(SDK)/lib/libm.a
 
 clean:
-	rm -rf $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/softcmp_test test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/*_ixc.o test/spawnprobe test/envprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
+	rm -rf $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/softcmp_test test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/*_ixc.o test/spawnprobe test/envprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
 # clean must leave no object behind: a stale libm_sqrtf.o once survived it
 # and kept a self-calling sqrtf in every rebuilt libm.a.
 cleancheck: clean

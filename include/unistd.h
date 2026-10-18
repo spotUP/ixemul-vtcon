@@ -66,6 +66,12 @@
 #define	NULL		0	/* null pointer constant */
 #endif
 
+/* lockf(3) commands */
+#define	F_ULOCK		0	/* unlock a locked region */
+#define	F_LOCK		1	/* lock a region, wait if held */
+#define	F_TLOCK		2	/* lock a region, fail if held */
+#define	F_TEST		3	/* test a region for a lock */
+
 __BEGIN_DECLS
 __dead void	 _exit __P((int)) __attribute__((noreturn));
 int	 access __P((const char *, int));
@@ -94,6 +100,7 @@ char	*getlogin __P((void));
 pid_t	 getpgrp __P((void));
 pid_t	 getpgid __P((pid_t));	/* libixcompat.a (UP-Term) */
 int	 lchown __P((const char *, uid_t, gid_t));	/* libixcompat.a (UP-Term) */
+int	 lockf __P((int, int, off_t));	/* libixcompat.a (UP-Term), on flock */
 pid_t	 getpid __P((void));
 pid_t	 getppid __P((void));
 uid_t	 getuid __P((void));

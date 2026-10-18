@@ -22,3 +22,5 @@ __pycache__/
 compat/newlibm/
 compat/test/libm_link.syms
 compat/test/libm_num
+compat/test/lockf_test
+compat/test/lockf_link
