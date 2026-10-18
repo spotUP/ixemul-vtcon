@@ -312,6 +312,9 @@ static int get_component(struct lockinfo *info)
   }
 
   len = sep - name;
+  /* a BSTR holds 255: a longer component is refused, never copied into str[257] */
+  if (len > 255)
+    return -1;
   if (len)
     bcopy(name, str + 1, len);
   *str = len;
@@ -355,6 +358,11 @@ static int resolve_name_on_device(struct lockinfo *info, int (*last_func)(), voi
     }
 
     is_last = get_component(info);
+    if (is_last < 0)
+    {
+      SetIoErr(IX_ERROR_NAME_TOO_LONG);
+      return DONE;
+    }
     info->sp.sp_Pkt.dp_Port = __srwport;
     error = FALSE;
 
