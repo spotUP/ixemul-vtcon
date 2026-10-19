@@ -39,6 +39,7 @@
 #define _KERNEL
 #include "ixemul.h"
 #include "kprintf.h"
+#include "vol_path.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -528,7 +529,10 @@ static void unslashify(char *name)
   char *oname = name;
 
   if (index (name, ':'))
-    return;
+    {
+      ix_vol_slashes (name);
+      return;
+    }
 
   while (oname[0] == '/' &&
          (oname[1] == '/' || !memcmp(oname + 1, "./", 2) || !memcmp(oname + 1, "../", 3)))
