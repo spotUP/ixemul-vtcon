@@ -90,7 +90,9 @@
 #define isunordered(x, y)	__builtin_isunordered(x, y)
 #endif
 
-#if (defined(__GNUC__) || defined(__cplusplus)) && defined(__HAVE_68881__)
+/* __NO_MATH_INLINES (glibc's name): the library's own math sources, built
+   for the FPU, define these functions and must not see the inlines */
+#if (defined(__GNUC__) || defined(__cplusplus)) && defined(__HAVE_68881__) && !defined(__NO_MATH_INLINES)
 #include "math-68881.h"
 #else
 
@@ -313,7 +315,7 @@ long double	tgammal __P((long double));
 double	trunc __P((double));
 long double	truncl __P((long double));
 /* the 68881 header defines these as static inlines of its own */
-#if !((defined(__GNUC__) || defined(__cplusplus)) && defined(__HAVE_68881__))
+#if !((defined(__GNUC__) || defined(__cplusplus)) && defined(__HAVE_68881__) && !defined(__NO_MATH_INLINES))
 double	exp2 __P((double));
 float	exp2f __P((float));
 float	log10f __P((float));

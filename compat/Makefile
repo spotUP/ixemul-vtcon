@@ -21,6 +21,14 @@ SDK  ?= $(HOME)/opt/amiga/m68k-amigaos/ixemul
 UPTERM_ROOT ?= $(abspath $(CURDIR)/../..)
 VTCON ?= $(UPTERM_ROOT)/vtcon
 CPPFLAGS ?=
+# the tree's headers; the FPU build (below) runs this Makefile from a subdirectory
+INCDIR ?= ../include
+# ... with SRCDIR set: sources come from there, objects and archives stay in
+# the subdirectory (VPATH would also find the soft archives as up to date)
+ifdef SRCDIR
+vpath %.c $(SRCDIR)
+vpath %.h $(SRCDIR)
+endif
 # these files implement functions gcc knows as builtins: without -fno-builtin
 # gcc folds an implementation into a call to itself (libm.c's sqrtf, return
 # (float)sqrt(x), became `jsr _sqrtf`: endless recursion that overran the
@@ -100,7 +108,7 @@ $(NEWLIBM_OBJS): $(NEWLIBM)
 	cd newlibm && $(XAR) x $(NEWLIBM) $(notdir $(NEWLIBM_OBJS))
 
 libm_%.o: libm.c
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -DLIBM_$* -c -o $@ libm.c
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -DLIBM_$* -c -o $@ $<
 
 libixcompat.a: $(OBJS) $(WCS_OBJS)
 	rm -f $@
@@ -114,40 +122,40 @@ $(WCS_OBJS): $(NEWLIBC)
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 c99_%.o: c99.c
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -DC99_$* -c -o $@ c99.c
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -DC99_$* -c -o $@ $<
 
 uclass.o: uclass_tab.h ixc_wide.h
 utf8.o locale.o wchar.o wctype.o: ixc_wide.h
 # the toolchain ships newlib's <pthread.h>, which shadows ixemul's until the SDK headers are
 # reinstalled; build against the tree's own header so the struct layout matches
-pthread.o: pthread.c ../include/pthread.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ pthread.c
+pthread.o: pthread.c $(INCDIR)/pthread.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I$(INCDIR) $(CPPFLAGS) -c -o $@ $<
 
 # F_LOCK and friends are in the tree's <unistd.h>, not yet the installed one
 mkdtemp.o: mkdtemp.c
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -c -o $@ mkdtemp.c
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-lockf.o: lockf.c ../include/unistd.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) -I../include $(CPPFLAGS) -c -o $@ lockf.c
+lockf.o: lockf.c $(INCDIR)/unistd.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) -I$(INCDIR) $(CPPFLAGS) -c -o $@ $<
 
 # statvfs.h and the stdio prototypes are in the tree's headers, not yet the installed ones
-statvfs.o: statvfs.c ../include/sys/statvfs.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) -I../include $(CPPFLAGS) -c -o $@ statvfs.c
-memstream.o: memstream.c ../include/stdio.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) -I../include $(CPPFLAGS) -c -o $@ memstream.c
+statvfs.o: statvfs.c $(INCDIR)/sys/statvfs.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) -I$(INCDIR) $(CPPFLAGS) -c -o $@ $<
+memstream.o: memstream.c $(INCDIR)/stdio.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(LIBFLAGS) -I$(INCDIR) $(CPPFLAGS) -c -o $@ $<
 
 # AF_INET6 and INET6_ADDRSTRLEN are in the tree's headers, not yet the installed ones
-gai.o inet_pton.o inet_ntop.o: %.o: %.c ../include/sys/socket.h ../include/arpa/inet.h ../include/netinet/in.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ $<
+gai.o inet_pton.o inet_ntop.o: %.o: %.c $(INCDIR)/sys/socket.h $(INCDIR)/arpa/inet.h $(INCDIR)/netinet/in.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I$(INCDIR) $(CPPFLAGS) -c -o $@ $<
 
 wcwidth.o: wcwidth.c $(VTCON)/engine/vtwidth.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -I$(VTCON)/engine -c -o $@ wcwidth.c
+	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -I$(VTCON)/engine -c -o $@ $<
 
 tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/getopt_bsd_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/getopt_bsd_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/math_68881_order.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/getopt_bsd_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/getopt_bsd_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/math_68881_order.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall test/fpret_test
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -170,7 +178,7 @@ test/wide_test: test/wide_test.c utf8.c uclass.c uclass_tab.h ixc_wide.h
 test/math_test: test/math_test.c math.c
 	$(HOSTCC) -Wall -O2 -Datan2=ixc_atan2 -c -o test/math_ixc.o math.c
 	$(HOSTCC) -Wall -O2 -o $@ test/math_test.c test/math_ixc.o
-test/getopt_test: test/getopt_test.c getopt_long.c ../include/getopt.h
+test/getopt_test: test/getopt_test.c getopt_long.c $(INCDIR)/getopt.h
 	$(HOSTCC) -Wall -O2 -Dgetopt_long=ixc_getopt_long -Dgetopt_long_only=ixc_getopt_long_only -c -o test/getopt_ixc.o getopt_long.c
 	$(HOSTCC) -Wall -O2 -o $@ test/getopt_test.c test/getopt_ixc.o
 test/getopt_bsd_test: test/getopt_bsd_test.c ../static/getopt.c
@@ -211,8 +219,8 @@ test/libc_gaps_test: test/libc_gaps_test.c stralloc.c strlcpy.c gai.c inet_pton.
 
 # the same test built for the Amiga against the repo's headers, no implicit declaration
 # allowed, linked with libixcompat.a (link only; no rig)
-test/libc_gaps_link: test/libc_gaps_test.c libixcompat.a ../include/netdb.h ../include/string.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -I../include $(CPPFLAGS) -o $@ test/libc_gaps_test.c libixcompat.a
+test/libc_gaps_link: test/libc_gaps_test.c libixcompat.a $(INCDIR)/netdb.h $(INCDIR)/string.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -I$(INCDIR) $(CPPFLAGS) -o $@ test/libc_gaps_test.c libixcompat.a
 
 # lockf on flock: compat's code under the ixc_ name against the host's flock (two
 # descriptors of one file conflict on the host as on the Amiga)
@@ -222,8 +230,8 @@ test/lockf_test: test/lockf_test.c lockf.c
 
 # the same test for the Amiga (-Dixc_lockf=lockf), repo headers, no implicit declaration
 # allowed: fails to compile without the prototype, to link without libixcompat.a's lockf
-test/lockf_link: test/lockf_test.c libixcompat.a ../include/unistd.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -Dixc_lockf=lockf -I../include $(CPPFLAGS) -o $@ test/lockf_test.c libixcompat.a
+test/lockf_link: test/lockf_test.c libixcompat.a $(INCDIR)/unistd.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -Dixc_lockf=lockf -I$(INCDIR) $(CPPFLAGS) -o $@ test/lockf_test.c libixcompat.a
 
 # mkdtemp, statvfs and memstream (fmemopen, open_memstream): host builds compile the
 # compat code under ixc_ names; the *_link builds are the Amiga tests against the repo
@@ -231,30 +239,30 @@ test/lockf_link: test/lockf_test.c libixcompat.a ../include/unistd.h
 test/mkdtemp_test: test/mkdtemp_test.c mkdtemp.c
 	$(HOSTCC) -Wall -O2 -DIXC_MKDTEMP=ixc_mkdtemp -c -o test/mkdtemp_ixc.o mkdtemp.c
 	$(HOSTCC) -Wall -O2 -o $@ test/mkdtemp_test.c test/mkdtemp_ixc.o
-test/mkdtemp_link: test/mkdtemp_test.c libixcompat.a ../include/stdlib.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -Dixc_mkdtemp=mkdtemp -I../include $(CPPFLAGS) -o $@ test/mkdtemp_test.c libixcompat.a
+test/mkdtemp_link: test/mkdtemp_test.c libixcompat.a $(INCDIR)/stdlib.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -Dixc_mkdtemp=mkdtemp -I$(INCDIR) $(CPPFLAGS) -o $@ test/mkdtemp_test.c libixcompat.a
 test/statvfs_test: test/statvfs_test.c statvfs.c
 	$(HOSTCC) -Wall -O2 -DIXC_HOST -DIXC_STATVFS=ixc_statvfs -DIXC_FSTATVFS=ixc_fstatvfs -c -o test/statvfs_ixc.o statvfs.c
 	$(HOSTCC) -Wall -O2 -DIXC_HOST -o $@ test/statvfs_test.c test/statvfs_ixc.o
-test/statvfs_link: test/statvfs_test.c libixcompat.a ../include/sys/statvfs.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -Dixc_statvfs=statvfs -Dixc_fstatvfs=fstatvfs -I../include $(CPPFLAGS) -o $@ test/statvfs_test.c libixcompat.a
+test/statvfs_link: test/statvfs_test.c libixcompat.a $(INCDIR)/sys/statvfs.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -Dixc_statvfs=statvfs -Dixc_fstatvfs=fstatvfs -I$(INCDIR) $(CPPFLAGS) -o $@ test/statvfs_test.c libixcompat.a
 test/memstream_test: test/memstream_test.c memstream.c
 	$(HOSTCC) -Wall -O2 -DIXC_MEMSTREAM -c -o test/memstream_ixc.o memstream.c
 	$(HOSTCC) -Wall -O2 -DIXC_MEMSTREAM -o $@ test/memstream_test.c test/memstream_ixc.o
-test/memstream_link: test/memstream_test.c libixcompat.a ../include/stdio.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -I../include $(CPPFLAGS) -o $@ test/memstream_test.c libixcompat.a
+test/memstream_link: test/memstream_test.c libixcompat.a $(INCDIR)/stdio.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration -I$(INCDIR) $(CPPFLAGS) -o $@ test/memstream_test.c libixcompat.a
 
 test/inet_host: test/inet_test.c
 	$(HOSTCC) -Wall -O2 -o $@ test/inet_test.c
 
 # the same test, built for the Amiga against the repo's headers and linked
 # with libixcompat.a (link only; no rig)
-test/inet_link: test/inet_test.c libixcompat.a ../include/arpa/inet.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -o $@ test/inet_test.c libixcompat.a
+test/inet_link: test/inet_test.c libixcompat.a $(INCDIR)/arpa/inet.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I$(INCDIR) $(CPPFLAGS) -o $@ test/inet_test.c libixcompat.a
 
-test/pthread_test: test/pthread_test.c pthread.c ../include/pthread.h test/pthread_ixc.h
-	$(HOSTCC) -Wall -O2 -include test/pthread_ixc.h -I../include -c -o test/pthread_ixc.o pthread.c
-	$(HOSTCC) -Wall -O2 -include test/pthread_ixc.h -I../include -o $@ test/pthread_test.c test/pthread_ixc.o
+test/pthread_test: test/pthread_test.c pthread.c $(INCDIR)/pthread.h test/pthread_ixc.h
+	$(HOSTCC) -Wall -O2 -include test/pthread_ixc.h -I$(INCDIR) -c -o test/pthread_ixc.o pthread.c
+	$(HOSTCC) -Wall -O2 -include test/pthread_ixc.h -I$(INCDIR) -o $@ test/pthread_test.c test/pthread_ixc.o
 test/wcwidth_test: test/wcwidth_test.c wcwidth.c $(VTCON)/engine/vtwidth.h
 	$(HOSTCC) -Wall -O2 -I$(VTCON)/engine -o $@ test/wcwidth_test.c wcwidth.c
 
@@ -293,31 +301,31 @@ test/libm_num: test/libm_num.c libm.a
 	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin $(CPPFLAGS) -o $@ test/libm_num.c libm.a
 
 # <math.h>'s C99 constants (compile only, against the repo's headers)
-test/math_header.o: test/math_header.c ../include/math.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ test/math_header.c
+test/math_header.o: test/math_header.c $(INCDIR)/math.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I$(INCDIR) $(CPPFLAGS) -c -o $@ test/math_header.c
 
 # gcc's own include dir (with gcc's older math-68881.h) ahead of ixemul's, the
 # order any C++ build needs: <math.h> must still bind to ixemul's copy.
 AGCC16 ?= $(HOME)/opt/amiga16/bin/m68k-amigaos-gcc
-test/math_68881_order.o: test/math_68881_order.c ../include/math.h ../include/math-68881.h
-	$(AGCC16) -nostdinc -isystem $$($(AGCC16) -print-file-name=include) -isystem ../include \
+test/math_68881_order.o: test/math_68881_order.c $(INCDIR)/math.h $(INCDIR)/math-68881.h
+	$(AGCC16) -nostdinc -isystem $$($(AGCC16) -print-file-name=include) -isystem $(INCDIR) \
 	  -m68020 -m68881 -O2 -Wall -Werror -c -o $@ test/math_68881_order.c
 
 # <math.h> declares every name in test/libm_names.txt. -I../include comes
 # first, ahead of the installed header; MATH_INC overrides the dir to run the
 # test against another header (the pre-fix one, to see it fail).
-MATH_INC ?= ../include
+MATH_INC ?= $(INCDIR)
 test/math_c99.o: test/math_c99.c test/libm_names.txt $(MATH_INC)/math.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin -std=c99 -Werror=implicit-function-declaration -I$(MATH_INC) $(CPPFLAGS) -c -o $@ test/math_c99.c
 test/math_c99_gnu89.o: test/math_c99.c test/libm_names.txt $(MATH_INC)/math.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -fno-builtin -std=gnu89 -Werror=implicit-function-declaration -I$(MATH_INC) $(CPPFLAGS) -c -o $@ test/math_c99.c
 
 # getopt_long and pselect resolve from libixcompat.a (link only)
-test/ixc_link: test/ixc_link.c libixcompat.a ../include/getopt.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -o $@ test/ixc_link.c libixcompat.a
+test/ixc_link: test/ixc_link.c libixcompat.a $(INCDIR)/getopt.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -I$(INCDIR) $(CPPFLAGS) -o $@ test/ixc_link.c libixcompat.a
 
-test/inttypes_header.o: test/inttypes_header.c ../include/inttypes.h
-	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=format -I../include $(CPPFLAGS) -c -o $@ test/inttypes_header.c
+test/inttypes_header.o: test/inttypes_header.c $(INCDIR)/inttypes.h
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=format -I$(INCDIR) $(CPPFLAGS) -c -o $@ test/inttypes_header.c
 
 spawnprobe: test/spawnprobe test/envprobe
 # libixcompat.a by its path: the driver searches the SDK's lib (an older
@@ -328,15 +336,69 @@ test/spawnprobe: test/spawnprobe.c libixcompat.a
 test/envprobe: test/envprobe.c libixcompat.a
 	$(AGCC) -mcrt=ixemul -O2 -Wall $(CPPFLAGS) -o $@ test/envprobe.c libixcompat.a
 
-install: libixcompat.a libm.a
+# FPU flavour, for programs compiled with -m68881: ixemul.library returns a
+# double in d0/d1 and FPU code reads fp0 (fpret.py says more). fpu/lib holds
+# libixcompat.a and libm.a compiled for the 68881; fpu/<flavour>/libc.a is
+# the SDK's libc.a of that flavour with fpret.py's glue and an FPU rand48.o
+# in place of the soft-float members. Installed in the libm020/libm881
+# directories, which the drivers search for -m68881 and only then (gcc16
+# since its LINK_CPU_SPEC took libm881 away from soft-float -m68040).
+FPUFLAGS = -m68020 -m68881
+FPU_LIBC_abs     = $(SDK)/lib/libc.a
+FPU_LIBC_base16  = $(SDK)/lib/libb/libc.a
+FPU_LIBC_base32  = $(SDK)/lib/libb32/libm020/libc.a
+FPU_FLAGS_base16 = -fbaserel
+FPU_FLAGS_base32 = -fbaserel32
+FPU_DIR_abs      = libm020/libm881
+FPU_DIR_base16   = libb/libm020/libm881
+FPU_DIR_base32   = libb32/libm020/libm881
+FPU_FLAVOURS     = abs base16 base32
+FPRET = AGCC=$(AGCC) INCLUDE=$(INCDIR) python3 -I fpret.py
+
+fpu: $(foreach f,$(FPU_FLAVOURS),fpu/$(f)/libc.a) fpu-lib
+
+fpu/%/libc.a: fpret.py ../static/rand48.c $(INCDIR)/sys/syscall.def $(INCDIR)/math.h $(INCDIR)/stdlib.h $(INCDIR)/time.h
+	rm -rf fpu/$* && mkdir -p fpu/$*/obj
+	$(FPRET) check $(FPU_LIBC_$*)
+	$(FPRET) gen fpu/$*/obj $*
+	for s in fpu/$*/obj/*.s; do $(AGCC) $(FPUFLAGS) -c -o $${s%.s}.o $$s || exit 1; done
+	$(AGCC) -mcrt=ixemul $(FPUFLAGS) $(FPU_FLAGS_$*) -O2 -Wall -I$(INCDIR) $(CPPFLAGS) -c -o fpu/$*/obj/rand48.o ../static/rand48.c
+	cp $(FPU_LIBC_$*) $@.tmp
+	$(XAR) rs $@.tmp fpu/$*/obj/*.o
+	mv $@.tmp $@
+
+# this Makefile again, in fpu/lib, with the 68881 flags and newlib's FPU archives
+fpu-lib:
+	mkdir -p fpu/lib
+	$(MAKE) -C fpu/lib -f $(CURDIR)/Makefile SRCDIR=$(CURDIR) INCDIR=$(abspath $(INCDIR)) VTCON=$(VTCON) \
+	  CPPFLAGS="$(FPUFLAGS) -D__NO_MATH_INLINES -I$(abspath $(INCDIR)) $(CPPFLAGS)" \
+	  NEWLIBM=$(dir $(AGCC))../m68k-amigaos/lib/libm020/libm881/libm.a \
+	  NEWLIBC=$(dir $(AGCC))../m68k-amigaos/lib/libm020/libm881/libc.a libixcompat.a libm.a
+	OBJDUMP=$(dir $(AGCC))m68k-amigaos-objdump python3 -I ../tools/selfcall_check.py fpu/lib/libm.a
+
+# an FPU program's strtod, pow, ldexp, drand48, round ... come from the FPU
+# archives: each linked function hands its result over in fp0 (link only;
+# test/fpret_test runs it on the Amiga). The archives go by path: the driver
+# searches the installed ones first.
+FPRET_FUNCS = strtod atof pow ldexp frexp modf difftime sqrt drand48 erand48 round log2
+test/fpret_test: test/fpret_test.c fpu
+	$(AGCC) -mcrt=ixemul $(FPUFLAGS) -O2 -Wall -fno-builtin $(CPPFLAGS) -o $@ test/fpret_test.c \
+	  fpu/lib/libixcompat.a fpu/lib/libm.a fpu/abs/libc.a
+	@$(dir $(AGCC))m68k-amigaos-objdump -d $@ > $@.dis
+	$(FPRET) verify $@.dis $(FPRET_FUNCS) || { rm -f $@; exit 1; }
+
+install: libixcompat.a libm.a fpu
 	cp libixcompat.a $(SDK)/lib/libixcompat.a
 	cp libm.a $(SDK)/lib/libm.a
+	for f in $(FPU_FLAVOURS); do \
+	  case $$f in abs) d=$(FPU_DIR_abs);; base16) d=$(FPU_DIR_base16);; base32) d=$(FPU_DIR_base32);; esac; \
+	  mkdir -p $(SDK)/lib/$$d && cp fpu/$$f/libc.a fpu/lib/libixcompat.a fpu/lib/libm.a $(SDK)/lib/$$d/ || exit 1; done
 
 clean:
-	rm -rf $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/softcmp_test test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/*_ixc.o test/spawnprobe test/envprobe test/own_c99_link test/math_header.o test/math_68881_order.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
+	rm -rf fpu test/fpret_test test/fpret_test.dis $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/softcmp_test test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/*_ixc.o test/spawnprobe test/envprobe test/own_c99_link test/math_header.o test/math_68881_order.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
 # clean must leave no object behind: a stale libm_sqrtf.o once survived it
 # and kept a self-calling sqrtf in every rebuilt libm.a.
 cleancheck: clean
 	@left=$$(ls *.o test/*.o 2>/dev/null); if [ -n "$$left" ]; then echo "[ERROR] clean left: $$left"; exit 1; fi; echo "[OK] clean removes every object"
 
-.PHONY: tables test spawnprobe install clean selfcall cleancheck
+.PHONY: tables test spawnprobe install clean selfcall cleancheck fpu fpu-lib

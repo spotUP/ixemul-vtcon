@@ -30,3 +30,12 @@ compat/test/statvfs_test
 compat/test/statvfs_link
 compat/test/memstream_test
 compat/test/memstream_link
+compat/fpu/
+compat/test/fpret_test
+compat/test/fpret_test.dis
+compat/libm.a
+compat/test/inet_link
+compat/test/inet_test
+compat/test/libc_gaps_link
+compat/test/libc_gaps_test
+compat/test/libm_link
