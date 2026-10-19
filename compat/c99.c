@@ -152,11 +152,24 @@ fmod(double x, double y)
 #endif
 
 #ifdef C99_log2
-/* base-2 logarithm (C99); libm's log is ixemul's own, no errno detour */
+/* base-2 logarithm (C99); libm's log is ixemul's own, no errno detour.
+ * log(x) / ln 2 rounds twice: log2(8) came out 2.9999999999999996. Split x
+ * into m * 2**e first, m in [sqrt(1/2), sqrt(2)): the exponent is exact and
+ * a power of two leaves m = 1, whose log is exactly 0 */
 double
 log2(double x)
 {
-	return log(x) * 1.44269504088896340736;
+	double m;
+	int e;
+
+	if (!(x > 0.0) || x == HUGE_VAL)	/* NaN, zero, negative, inf: log decides */
+		return log(x) * 1.44269504088896340736;
+	m = frexp(x, &e);
+	if (m < 0.70710678118654752440) {
+		m *= 2.0;
+		e--;
+	}
+	return e + log(m) * 1.44269504088896340736;
 }
 #endif
 
