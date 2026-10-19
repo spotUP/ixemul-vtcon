@@ -9,9 +9,10 @@ CC ?= cc
 CFLAGS = -std=c99 -Wall -Wextra -Werror -g -fsanitize=address,undefined
 OUT = ../../build-host
 
-test: $(OUT)/test_cli_args $(OUT)/test_vol_path
+test: $(OUT)/test_cli_args $(OUT)/test_vol_path $(OUT)/test_memset
 	$(OUT)/test_cli_args
 	$(OUT)/test_vol_path
+	$(OUT)/test_memset
 	python3 -I test_selfcall.py
 
 $(OUT)/test_cli_args: test_cli_args.c ../../library/cli_args.c ../../library/cli_args.h
@@ -21,5 +22,12 @@ $(OUT)/test_cli_args: test_cli_args.c ../../library/cli_args.c ../../library/cli
 $(OUT)/test_vol_path: test_vol_path.c ../../library/vol_path.c ../../library/vol_path.h
 	@mkdir -p $(OUT)
 	$(CC) $(CFLAGS) -o $@ test_vol_path.c ../../library/vol_path.c
+
+# string/memset.c compiled under another name, as a user-space object: the
+# longword fill must match a byte fill for every alignment and length.
+$(OUT)/test_memset: test_memset.c memset_impl.c ../../string/memset.c
+	@mkdir -p $(OUT)
+	$(CC) -O2 -fno-builtin -w -std=gnu89 -c -o $(OUT)/memset_impl.o memset_impl.c
+	$(CC) -std=c99 -Wall -Wextra -Werror -g -o $@ test_memset.c $(OUT)/memset_impl.o
 
 .PHONY: test
