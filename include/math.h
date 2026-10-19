@@ -91,7 +91,7 @@
 #endif
 
 #if (defined(__GNUC__) || defined(__cplusplus)) && defined(__HAVE_68881__)
-#include <math-68881.h>
+#include "math-68881.h"
 #else
 
 #define	HUGE_VAL	1e500			/* IEEE: positive infinity */

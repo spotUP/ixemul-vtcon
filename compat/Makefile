@@ -147,7 +147,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/getopt_bsd_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/getopt_bsd_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/getopt_bsd_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/getopt_bsd_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/math_68881_order.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -296,6 +296,13 @@ test/libm_num: test/libm_num.c libm.a
 test/math_header.o: test/math_header.c ../include/math.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -I../include $(CPPFLAGS) -c -o $@ test/math_header.c
 
+# gcc's own include dir (with gcc's older math-68881.h) ahead of ixemul's, the
+# order any C++ build needs: <math.h> must still bind to ixemul's copy.
+AGCC16 ?= $(HOME)/opt/amiga16/bin/m68k-amigaos-gcc
+test/math_68881_order.o: test/math_68881_order.c ../include/math.h ../include/math-68881.h
+	$(AGCC16) -nostdinc -isystem $$($(AGCC16) -print-file-name=include) -isystem ../include \
+	  -m68020 -m68881 -O2 -Wall -Werror -c -o $@ test/math_68881_order.c
+
 # <math.h> declares every name in test/libm_names.txt. -I../include comes
 # first, ahead of the installed header; MATH_INC overrides the dir to run the
 # test against another header (the pre-fix one, to see it fail).
@@ -326,7 +333,7 @@ install: libixcompat.a libm.a
 	cp libm.a $(SDK)/lib/libm.a
 
 clean:
-	rm -rf $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/softcmp_test test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/*_ixc.o test/spawnprobe test/envprobe test/own_c99_link test/math_header.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
+	rm -rf $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/softcmp_test test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/*_ixc.o test/spawnprobe test/envprobe test/own_c99_link test/math_header.o test/math_68881_order.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
 # clean must leave no object behind: a stale libm_sqrtf.o once survived it
 # and kept a self-calling sqrtf in every rebuilt libm.a.
 cleancheck: clean
