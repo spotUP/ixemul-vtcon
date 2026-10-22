@@ -94,6 +94,45 @@
   (JMP_MAGIC_32 (code) && (code[2] & 0xffff) == OMAGIC)
 
 static int compatible_startup (void *code, int argc, char **argv);
+
+/* The stack a native program's file asks for with a "$STACK: n" cookie, 0
+   if it has none. Copied from vtcon's shell/vsh.c seg_stack(), the scan a
+   Shell does too. Plain loops, no library calls: it runs where ixemul's
+   user data is not reachable. */
+static unsigned long
+seg_stack_cookie (BPTR seg)
+{
+  static const char key[] = "$STACK:";
+
+  for (; seg; seg = *(BPTR *) BADDR (seg))
+    {
+      const unsigned char *p = (const unsigned char *) BADDR (seg) + 4;
+      unsigned long n = ((unsigned long *) BADDR (seg))[-1];
+      const unsigned char *end = (const unsigned char *) BADDR (seg) - 4 + n;
+
+      for (; p + 8 < end; p++)
+        if (*p == '$')
+          {
+            int i;
+
+            for (i = 1; i < 7 && p[i] == (unsigned char) key[i]; i++)
+              ;
+            if (i == 7)
+              {
+                const unsigned char *d = p + 7;
+                unsigned long v = 0;
+
+                while (d < end && *d == ' ')
+                  d++;
+                while (d < end && *d >= '0' && *d <= '9')
+                  v = v * 10 + (*d++ - '0');
+                if (v)
+                  return v;
+              }
+          }
+    }
+  return 0;
+}
 static char *quote (char *orig);
 static void volatile on_real_stack (BPTR *segs, char **argv, char **environ, int omask);
 
@@ -523,6 +562,7 @@ compatible_startup (void *code, int argc, char **argv)
       BPTR old_cis, old_cos, old_ces;
       BPTR dup_cis, dup_cos, dup_ces;
       void *old_trapdata, *old_trapcode;
+      unsigned long cookie_stack;
       int old_flags;
       void *old_launch, *old_switch;
       struct file *f;
@@ -716,6 +756,8 @@ compatible_startup (void *code, int argc, char **argv)
          called any longer until the moment where trapdata is 
          reinstalled !! */
 
+      cookie_stack = seg_stack_cookie (CTOBPTR (code) - 1);
+
       Forbid();
       ixaddtail(&ixemulbase->ix_detached_processes, &u.u_detached_node);
 #ifndef NOTRAP
@@ -729,6 +771,12 @@ compatible_startup (void *code, int argc, char **argv)
       {
 	struct CommandLineInterface *CLI = BTOCPTR (me->pr_CLI);
 	u_int stack_size = CLI ? CLI->cli_DefaultStack * 4 : me->pr_StackSize;
+
+	/* A native program gets at least the stack its file's $STACK:
+	   cookie asks for, as a Shell gives it (else vsh, 262144, ran on
+	   the default 4096 under ptyrun). */
+	if (cookie_stack > stack_size)
+	  stack_size = cookie_stack;
 
 	/* Note: The use of RunCommand() here means, that we *waste* the
 	         entire stack space allocated for this process! If someone
