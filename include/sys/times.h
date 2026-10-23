@@ -1,3 +1,4 @@
+/* Modified 2026-10-23 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -36,12 +37,7 @@
 #ifndef _SYS_TIMES_H
 #define _SYS_TIMES_H
 
-#include <machine/ansi.h>
-
-#ifdef	_CLOCK_T_
-typedef	_CLOCK_T_	clock_t;
-#undef	_CLOCK_T_
-#endif
+#include <sys/types.h>	/* clock_t: machine/ansi.h defines _BSD_CLOCK_T_, not _CLOCK_T_ */
 
 struct tms {
 	clock_t tms_utime;	/* User CPU time */
