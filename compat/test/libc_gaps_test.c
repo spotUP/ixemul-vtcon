@@ -177,6 +177,7 @@ main(void)
 
 #ifdef __amigaos__
 	/* memrchr: declared by <string.h>, linked from libixcompat's strbuiltin.o (link test only) */
+	{ char b[8]; CHECK(stpncpy(b, "ab", 5) == b + 2 && b[4] == 0); }
 	CHECK(memrchr("abcabc", 'b', 6) != NULL && memrchr("abc", 'z', 3) == NULL);
 #endif
 

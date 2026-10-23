@@ -1,4 +1,4 @@
-/* Modified 2026-10-08 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
+/* Modified 2026-10-23 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -77,6 +77,7 @@ size_t	 strlen __P((const char *));
 size_t   strnlen __P((const char *, size_t));
 char    *strtok_r __P((char *, const char *, char **));
 char    *stpcpy __P((char *, const char *));
+char    *stpncpy __P((char *, const char *, size_t));
 char	*strncat __P((char *, const char *, size_t));
 int	 strncmp __P((const char *, const char *, size_t));
 char	*strncpy __P((char *, const char *, size_t));
