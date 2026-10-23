@@ -1,4 +1,4 @@
-/* Modified 2026-10-08 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
+/* Modified 2026-10-23 by spotUP for UP-Term (ixemul-vtcon); see the git history. */
 /*	$NetBSD: mman.h,v 1.11 1995/03/26 20:24:23 jtc Exp $	*/
 
 /*-
@@ -83,6 +83,7 @@
 
 #ifndef _KERNEL
 
+#include <sys/types.h>
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
