@@ -179,6 +179,14 @@ main(void)
 	/* memrchr: declared by <string.h>, linked from libixcompat's strbuiltin.o (link test only) */
 	{ char b[8]; CHECK(stpncpy(b, "ab", 5) == b + 2 && b[4] == 0); }
 	CHECK(memrchr("abcabc", 'b', 6) != NULL && memrchr("abc", 'z', 3) == NULL);
+	{
+		const char *h = "Hello World";
+
+		CHECK(memmem(h, 11, "World", 5) == h + 6 && memmem(h, 11, "world", 5) == NULL);
+		CHECK(memmem(h, 11, "", 0) == h && memmem(h, 3, "Hello", 5) == NULL && memmem(h, 11, "d", 1) == h + 10);
+		CHECK(strcasestr(h, "wORLD") == h + 6 && strcasestr(h, "xyz") == NULL && strcasestr(h, "") == h);
+		CHECK(strcasestr(h, "HELLO W") == h && strcasestr(h, "Worlds") == NULL && strcasestr(h, "D") == h + 10);
+	}
 #endif
 
 	printf("libc_gaps_test: %s\n", fails ? "FAIL" : "ok");

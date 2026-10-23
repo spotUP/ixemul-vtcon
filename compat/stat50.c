@@ -12,12 +12,9 @@
  * it was built, so these four jump through the library base like the glue of gen_glue does (non
  * baserel: movel _ixemulbase,a0; jmp a0@(-(vector + 4) * 6)). A program that calls them needs an
  * ixemul.library with these vectors (vtcon-4 or newer); on an older one the jump lands outside the
- * table. Not for -fbaserel code: _ixemulbase would have to be a4 relative. */
-#define STAT50_STUB(name, vec) \
-	__asm__(".text\n\t.even\n\t.globl " #name "\n" #name ":\n\t" \
-	        "movel _ixemulbase,a0\n\tjmp a0@(-" #vec ":w)\n")
+ * table. Not for -fbaserel code: _ixemulbase would have to be a4 relative.
+ * One object per entry point, so a program (gnulib has its own fstatat) that defines one of them does
+ * not collide with the other three pulled from libixcompat.a. */
+#include "stat50.h"
 
-STAT50_STUB(__stat50, 3966);		/* -(657 + 4) * 6 */
-STAT50_STUB(__fstat50, 3972);		/* 658 */
-STAT50_STUB(__lstat50, 3978);		/* 659 */
-STAT50_STUB(__fstatat50, 3984);		/* 660 */
+STAT50_STUB(__stat50, 3966);

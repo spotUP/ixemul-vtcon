@@ -36,7 +36,7 @@ endif
 LIBFLAGS = -fno-builtin
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
-       getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o stat50.o lockf.o mkdtemp.o statvfs.o memstream.o \
+       getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o stat50.o fstat50.o lstat50.o fstatat50.o lockf.o mkdtemp.o statvfs.o memstream.o \
        strtonum.o reallocarray.o isnormal.o strptime.o pthread.o getline.o inet_pton.o inet_ntop.o \
        stralloc.o strlcpy.o gai.o
 
