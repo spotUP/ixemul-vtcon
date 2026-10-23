@@ -58,4 +58,17 @@ typedef	_BSD_WCHAR_T_	wchar_t;
 
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
 
+/* C11 max_align_t, same definition and guard as the toolchain's own stddef.h (which this header
+ * shadows in the SDK; nnn aligns its context array with it) */
+#if (defined (__STDC_VERSION__) && __STDC_VERSION__ >= 201112L) \
+  || (defined(__cplusplus) && __cplusplus >= 201103L)
+#ifndef _GCC_MAX_ALIGN_T
+#define _GCC_MAX_ALIGN_T
+typedef struct {
+  long long __max_align_ll __attribute__((__aligned__(__alignof__(long long))));
+  long double __max_align_ld __attribute__((__aligned__(__alignof__(long double))));
+} max_align_t;
+#endif
+#endif
+
 #endif /* _STDDEF_H_ */
