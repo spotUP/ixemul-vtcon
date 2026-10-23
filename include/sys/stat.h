@@ -39,29 +39,42 @@
 #include <sys/types.h>
 #include <sys/time.h>
 
-#if later
-struct stat
+/*
+ * Versioned struct stat (ixemul-vtcon, in the style of NetBSD's __stat50).
+ *
+ * The legacy layout above (time_t st_atime and an int spare after each time) is what ixemul.library
+ * and every binary built before the versioned entry points use. It stays the layout of the library
+ * vectors stat, fstat and lstat. New code gets struct stat below: st_atim, st_mtim and st_ctim are
+ * struct timespec (POSIX.1-2008), st_atime, st_mtime and st_ctime are macros onto their tv_sec, and
+ * stat, fstat, lstat and fstatat are renamed by an asm label to __stat50, __fstat50, __lstat50 and
+ * __fstatat50, the library's vectors 657 to 660. The new layout has the same size and the same
+ * offsets for every other field, so a struct stat inside a library structure keeps its place.
+ * ixemul.library itself (library/ixemul.h) defines __IX_OLD_STAT and keeps the legacy layout.
+ * st_amode and st_handler are the Amiga protection bits and the handler task (legacy: spare2/3).
+ */
+#define __IX_STAT50_BODY \
+	dev_t	st_dev; \
+	ino_t	st_ino; \
+	unsigned short st_mode; \
+	short	st_nlink; \
+	uid_t	st_uid; \
+	gid_t	st_gid; \
+	dev_t	st_rdev; \
+	off_t	st_size; \
+	struct timespec st_atim;	/* time of last access */ \
+	struct timespec st_mtim;	/* time of last data modification */ \
+	struct timespec st_ctim;	/* time of last file status change */ \
+	long	st_blksize; \
+	long	st_blocks; \
+	long	st_amode; \
+	long	st_handler;
+
+struct	__ix_stat50
 {
-	dev_t	st_dev;			/* inode's device */
-	ino_t	st_ino;			/* inode's number */
-	mode_t	st_mode;		/* inode protection mode */
-	nlink_t	st_nlink;		/* number of hard links */
-	uid_t	st_uid;			/* user ID of the file's owner */
-	gid_t	st_gid;			/* group ID of the file's group */
-	dev_t	st_rdev;		/* device type */
-	off_t	st_size;		/* file size, in bytes */
-	time_t	st_atime;		/* time of last access */
-	long	st_spare1;
-	time_t	st_mtime;		/* time of last data modification */
-	long	st_spare2;
-	time_t	st_ctime;		/* time of last file status change */
-	long	st_spare3;
-	long	st_blksize;		/* optimal blocksize for I/O */
-	long	st_blocks;		/* blocks allocated for file */
-	u_long	st_flags;		/* user defined flags for file */
-	u_long	st_gen;			/* file generation number */
+	__IX_STAT50_BODY
 };
-#else
+
+#ifdef __IX_OLD_STAT
 struct	stat
 {
 	dev_t	st_dev;
@@ -73,7 +86,7 @@ struct	stat
 	dev_t	st_rdev;
 	off_t	st_size;
 	time_t	st_atime;
-	int	st_spare1;
+	int	st_spare1;	/* library internal: nanoseconds of the DateStamp ticks */
 	time_t	st_mtime;
 	int	st_spare2;
 	time_t	st_ctime;
@@ -82,11 +95,18 @@ struct	stat
 	long	st_blocks;
 	long	st_spare4[2];
 };
-#endif
-
 #ifdef __amigaos__
 #define st_handler st_spare3
 #define st_amode   st_spare2
+#endif
+#else
+struct	stat
+{
+	__IX_STAT50_BODY
+};
+#define st_atime st_atim.tv_sec
+#define st_mtime st_mtim.tv_sec
+#define st_ctime st_ctim.tv_sec
 #endif
 
 #define	S_ISUID	0004000			/* set user id on execution */
@@ -151,14 +171,26 @@ struct	stat
 __BEGIN_DECLS
 mode_t	umask __P((mode_t));
 int	chmod __P((const char *, mode_t));
+#ifdef __IX_OLD_STAT
 int	fstat __P((int, struct stat *));
+#else
+int	fstat __P((int, struct stat *)) __asm("__fstat50");
+#endif
 int	mkdir __P((const char *, mode_t));
 int	mkfifo __P((const char *, mode_t));
+#ifdef __IX_OLD_STAT
 int	stat __P((const char *, struct stat *));
+#else
+int	stat __P((const char *, struct stat *)) __asm("__stat50");
+#endif
 #ifndef _POSIX_SOURCE
 int	fchmod __P((int, mode_t));
+#ifdef __IX_OLD_STAT
 int	lstat __P((const char *, struct stat *));
-int	fstatat __P((int, const char *, struct stat *, int));	/* compat/fstatat.c */
+#else
+int	lstat __P((const char *, struct stat *)) __asm("__lstat50");
+int	fstatat __P((int, const char *, struct stat *, int)) __asm("__fstatat50");
+#endif
 #endif /* not POSIX */
 __END_DECLS
 

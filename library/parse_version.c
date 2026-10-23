@@ -52,7 +52,7 @@ int main(int argc, char **argv)
   /* the vtcon patches (termios by packet, PTY:, job control): tell this
      build from the 80.1 it is based on. The number stays 80.1 (the ABI every
      port is built against); the build number follows. */
-  strcpy(tmp, "vtcon-3");
+  strcpy(tmp, "vtcon-4");
 
 #ifdef NOTRAP
   if (tmp[0])

@@ -26,6 +26,7 @@
 #include "ixnet.h"
 #include "ixprotos.h"
 #include <sys/wait.h>
+#define __IX_OLD_STAT 1	/* the legacy struct stat, as ixemul.library has it */
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <string.h>

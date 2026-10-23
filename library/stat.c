@@ -263,6 +263,8 @@ error:
 		  fib->fib_Date.ds_Days * 24 * 60 * 60 +
 		  fib->fib_Date.ds_Minute * 60 +
 		  fib->fib_Date.ds_Tick/TICKS_PER_SECOND;
+  /* the sub-second part of the DateStamp, for the versioned stat (library/stat50.c) */
+  stb->st_spare1 = (fib->fib_Date.ds_Tick % TICKS_PER_SECOND) * (1000000000 / TICKS_PER_SECOND);
   /* in a try to count the blocks used for filemanagement, we add one for
    * the fileheader. Note, that this is wrong for large files, where there
    * are some extension-blocks as well */

@@ -11,6 +11,7 @@
  *    SIGPIPE behaviour, and ix_exec_entry() structure unchanged.
  */
 
+#define __IX_OLD_STAT 1	/* the legacy struct stat, as ixemul.library has it */
 #include <exec/types.h>
 #include <exec/lists.h>
 #include <exec/ports.h>

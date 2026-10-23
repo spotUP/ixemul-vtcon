@@ -87,6 +87,8 @@
 
 #else  /* C-part */
 
+/* the library keeps the legacy struct stat; the versioned one is library/stat50.c's business */
+#define __IX_OLD_STAT 1
 #include <inline/stubs.h>
 #include <sys/types.h>
 

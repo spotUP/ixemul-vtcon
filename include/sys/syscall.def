@@ -685,3 +685,9 @@ SYSTEM_CALL (strnunvis,654)
 SYSTEM_CALL (strsignal,655)
 /* descriptor polling */
 SYSTEM_CALL (poll,656)
+/* versioned stat (struct stat with struct timespec times; include/sys/stat.h renames stat, fstat,
+   lstat and fstatat to these; library/stat50.c) */
+SYSTEM_CALL (__stat50,657)
+SYSTEM_CALL (__fstat50,658)
+SYSTEM_CALL (__lstat50,659)
+SYSTEM_CALL (__fstatat50,660)
