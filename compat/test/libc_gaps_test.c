@@ -175,6 +175,11 @@ main(void)
 	    NI_NUMERICHOST) == 0 && strcmp(host, "::") == 0);
 	CHECK(getnameinfo((struct sockaddr *)&s6, sizeof s6, NULL, 0, NULL, 0, 0) == EAI_NONAME);
 
+#ifdef __amigaos__
+	/* memrchr: declared by <string.h>, linked from libixcompat's strbuiltin.o (link test only) */
+	CHECK(memrchr("abcabc", 'b', 6) != NULL && memrchr("abc", 'z', 3) == NULL);
+#endif
+
 	printf("libc_gaps_test: %s\n", fails ? "FAIL" : "ok");
 	return fails != 0;
 }
