@@ -158,6 +158,7 @@ int	stat __P((const char *, struct stat *));
 #ifndef _POSIX_SOURCE
 int	fchmod __P((int, mode_t));
 int	lstat __P((const char *, struct stat *));
+int	fstatat __P((int, const char *, struct stat *, int));	/* compat/fstatat.c */
 #endif /* not POSIX */
 __END_DECLS
 

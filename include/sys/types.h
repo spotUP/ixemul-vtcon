@@ -101,6 +101,11 @@ __END_DECLS
 #define	makedev(x,y)	((dev_t)(((x) << 8) | (y)))
 #endif
 
+/* POSIX.1-2008 types (nnn: blkcnt_t for st_blocks sums, useconds_t for usleep); blkcnt_t
+ * matches struct stat's long st_blocks */
+typedef	long		blkcnt_t;
+typedef	unsigned long	useconds_t;
+
 #ifdef	_BSD_CLOCK_T_
 typedef	_BSD_CLOCK_T_	clock_t;
 #undef	_BSD_CLOCK_T_

@@ -92,6 +92,20 @@
 /* defined by POSIX 1003.1; BSD default, so no bit required */
 #define	O_NOCTTY	0		/* don't assign controlling terminal */
 
+/* POSIX.1-2008 open flags ixemul has no bit for, accepted as no-ops (like O_NOCTTY):
+ * O_CLOEXEC: ixemul has no per-descriptor close-on-exec bit; the flag is accepted so
+ *   callers compile and the descriptor stays open across exec (unverified for the
+ *   Amiga-native child case).
+ * O_DIRECTORY: opendir() (library/opendir.c) checks S_ISDIR itself; a plain open()
+ *   with it succeeds on a file instead of failing with ENOTDIR. */
+#define	O_CLOEXEC	0
+#define	O_DIRECTORY	0
+
+/* *at() calls (compat/fstatat.c): dirfd meaning "the current directory", and the
+ * flag that makes fstatat behave like lstat */
+#define	AT_FDCWD		(-100)
+#define	AT_SYMLINK_NOFOLLOW	0x100
+
 /*
  * The O_* flags used to have only F* names, which were used in the kernel
  * and by fcntl.  We retain the F* names for the kernel f_flags field

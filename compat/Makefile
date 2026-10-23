@@ -36,7 +36,7 @@ endif
 LIBFLAGS = -fno-builtin
 HOSTCC ?= cc
 OBJS = poll.o realpath.o time_r.o if_nametoindex.o libgen.o $(C99_OBJS) selfpath.o langinfo.o \
-       getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o lockf.o mkdtemp.o statvfs.o memstream.o \
+       getopt_long.o pselect.o pty.o eprintf.o spawn.o locale.o utf8.o uclass.o wchar.o wctype.o wcwidth.o strbuiltin.o math.o bswap.o wstdio.o nanosleep.o getpgid.o lchown.o fstatat.o lockf.o mkdtemp.o statvfs.o memstream.o \
        strtonum.o reallocarray.o isnormal.o strptime.o pthread.o getline.o inet_pton.o inet_ntop.o \
        stralloc.o strlcpy.o gai.o
 
@@ -155,7 +155,7 @@ tables:
 	python3 gen_uclass.py $(VTCON)/engine/vtwidth.h
 
 # host: the codec and the classes (against Python's unicodedata), wcwidth
-test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/getopt_bsd_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/getopt_bsd_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/math_68881_order.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall test/fpret_test
+test: test/wide_test test/wcwidth_test test/math_test test/getopt_test test/getopt_bsd_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/getopt_bsd_test test/inet_test test/libc_gaps_test test/libc_gaps_link test/fstatat_probe test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/inet_link test/own_c99_link test/ixc_link test/math_header.o test/math_68881_order.o test/inttypes_header.o test/libm_link test/math_c99.o test/math_c99_gnu89.o selfcall test/fpret_test
 	./test/wide_test
 	./test/wide_test dump | python3 test/check_uclass.py \
 	  $$(sed -n 's/^#define IXC_UNICODE_VERSION "\(.*\)"/\1/p' uclass_tab.h)
@@ -328,6 +328,12 @@ test/inttypes_header.o: test/inttypes_header.c $(INCDIR)/inttypes.h
 	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=format -I$(INCDIR) $(CPPFLAGS) -c -o $@ test/inttypes_header.c
 
 spawnprobe: test/spawnprobe test/envprobe
+
+# rig probe for fstatat (run from RAM:); linking it is part of 'make test'
+fstatat_probe: test/fstatat_probe
+
+test/fstatat_probe: test/fstatat_probe.c libixcompat.a
+	$(AGCC) -mcrt=ixemul -O2 -Wall -Werror=implicit-function-declaration $(CPPFLAGS) -o $@ test/fstatat_probe.c libixcompat.a
 # libixcompat.a by its path: the driver searches the SDK's lib (an older
 # copy) before any -L given here
 test/spawnprobe: test/spawnprobe.c libixcompat.a
@@ -395,7 +401,7 @@ install: libixcompat.a libm.a fpu
 	  mkdir -p $(SDK)/lib/$$d && cp fpu/$$f/libc.a fpu/lib/libixcompat.a fpu/lib/libm.a $(SDK)/lib/$$d/ || exit 1; done
 
 clean:
-	rm -rf fpu test/fpret_test test/fpret_test.dis $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/softcmp_test test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/*_ixc.o test/spawnprobe test/envprobe test/own_c99_link test/math_header.o test/math_68881_order.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
+	rm -rf fpu test/fpret_test test/fpret_test.dis $(OBJS) $(LIBM_OBJS) newlibwcs libixcompat.a libm.a newlibm test/libm_link test/softcmp_test test/wide_test test/wcwidth_test test/nums_test test/strptime_test test/pthread_test test/getline_test test/inet_test test/inet_host test/inet_link test/libc_gaps_test test/libc_gaps_link test/lockf_test test/lockf_link test/mkdtemp_test test/mkdtemp_link test/statvfs_test test/statvfs_link test/memstream_test test/memstream_link test/*_ixc.o test/spawnprobe test/envprobe test/fstatat_probe test/own_c99_link test/math_header.o test/math_68881_order.o test/math_c99.o test/math_c99_gnu89.o test/ixc_link test/inttypes_header.o
 # clean must leave no object behind: a stale libm_sqrtf.o once survived it
 # and kept a self-calling sqrtf in every rebuilt libm.a.
 cleancheck: clean

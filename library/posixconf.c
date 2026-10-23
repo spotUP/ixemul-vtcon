@@ -70,6 +70,9 @@ sysconf (int name)
     case _SC_VERSION:
       return _POSIX_VERSION;
       
+    case _SC_NPROCESSORS_ONLN:
+      return 1;
+
     default:
       errno = EINVAL;
       KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));

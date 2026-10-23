@@ -89,5 +89,6 @@
 #define	_SC_JOB_CONTROL		6
 #define	_SC_SAVED_IDS		7
 #define	_SC_VERSION		8
+#define	_SC_NPROCESSORS_ONLN	9	/* always 1: one CPU */
 
 #endif /* !_SYS_UNISTD_H_ */
