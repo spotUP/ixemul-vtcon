@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 static int fails;
 
@@ -186,6 +188,15 @@ main(void)
 		CHECK(memmem(h, 11, "", 0) == h && memmem(h, 3, "Hello", 5) == NULL && memmem(h, 11, "d", 1) == h + 10);
 		CHECK(strcasestr(h, "wORLD") == h + 6 && strcasestr(h, "xyz") == NULL && strcasestr(h, "") == h);
 		CHECK(strcasestr(h, "HELLO W") == h && strcasestr(h, "Worlds") == NULL && strcasestr(h, "D") == h + 10);
+	}
+	{
+		char buf[1024], *a = getcwd(NULL, 0);	/* POSIX 2008: allocates; nnn's abspath needs it */
+		struct timespec ts;
+
+		CHECK(a != NULL && getcwd(buf, sizeof buf) != NULL && strcmp(a, buf) == 0);
+		free(a);
+		CHECK(clock_gettime(CLOCK_REALTIME, &ts) == 0 && ts.tv_sec > 1000000000);
+		CHECK(clock_gettime(CLOCK_MONOTONIC, &ts) == 0);
 	}
 #endif
 

@@ -15,6 +15,6 @@
  * table. Not for -fbaserel code: _ixemulbase would have to be a4 relative.
  * One object per entry point, so a program (gnulib has its own fstatat) that defines one of them does
  * not collide with the other three pulled from libixcompat.a. */
-#include "stat50.h"
+#include "vecstub.h"
 
-STAT50_STUB(__stat50, 3966);
+VEC_STUB(__stat50, 3966);

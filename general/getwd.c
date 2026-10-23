@@ -36,7 +36,7 @@
  *   and fallback path-construction cases.
  * - Fixed slash-translation buffer accounting by reducing buffer_length
  *   after reserving one byte for the leading slash.
- * - Added getcwd(..., 0) rejection with EINVAL.
+ * - Added getcwd(..., 0) rejection with EINVAL (a NULL buffer with size 0 allocates, as in glibc).
  * - Fixed getcwd(NULL, size) error cleanup so internally allocated
  *   buffers are freed if _get_pwd() fails.
  * - Guarded use of pr_CurrentDir to avoid passing a NULL current-directory
@@ -267,6 +267,11 @@ getcwd (char *buffer, size_t buffer_length)
   int allocated = 0;
   char *res;
   usetup;
+
+  /* getcwd (NULL, 0): POSIX 2008 and glibc allocate a buffer big enough.  Programs
+     (nnn's abspath) rely on it.  A zero size with a caller's buffer stays EINVAL.  */
+  if (buffer_length == 0 && buffer == 0L)
+    buffer_length = MAXPATHLEN;
 
   if (buffer_length == 0)
     {
