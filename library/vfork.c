@@ -683,7 +683,6 @@ _vfork (int own_malloc, struct reg_parms rp)
 {
   struct Process *me = (struct Process *) FindTask(0);
   struct user *u_ptr = getuser(me);
-  struct CommandLineInterface *CLI = (void *)(me->pr_CLI);
   u_int stack_size = get_stack_size(me);
   u_int plower, pupper;
   /* those *have* to be in registers to survive the stack deallocation */
@@ -696,7 +695,12 @@ _vfork (int own_malloc, struct reg_parms rp)
     { NP_Entry, (ULONG) launcher },
     { NP_Name, (ULONG) "vfork()'d process" },	/* to be overridden by execve() */
     { NP_StackSize, stack_size },		/* same size we use */
-    { NP_Cli, (ULONG) (CLI ? -1 : 0) },	        /* same thing we are */
+    /* Always a CLI process, whatever the parent is. The child exists to
+       execve(), and execve() runs a native program through RunCommand(),
+       which needs a CLI process: a native program started without one takes
+       itself for a Workbench start and waits on pr_MsgPort for a WBStartup
+       message that never comes (upkg started from Workbench hung this way). */
+    { NP_Cli, TRUE },
     { TAG_END, 0 }
   };
 
