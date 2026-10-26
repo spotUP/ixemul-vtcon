@@ -140,6 +140,7 @@ static int __do_sync_write(struct file *f, const char *buf, int len)
 
   int saved_errno = errno;
   int res = 0;
+  int res_err = 0;
   int omask;
 
   /* Early return for zero-length writes: no I/O, no locks, no syscalls */
@@ -154,6 +155,14 @@ static int __do_sync_write(struct file *f, const char *buf, int len)
 
   omask = syscall (SYS_sigsetmask, ~0);
   __get_file (f);
+
+  if (len > 0 && f->f_seek_pending && __apply_seek_pending (f, &res_err) == -1)
+    {
+      __release_file (f);
+      syscall (SYS_sigsetmask, omask);
+      errno = res_err;
+      return -1;
+    }
 
   if (len > 0)
     {

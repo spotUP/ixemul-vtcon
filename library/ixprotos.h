@@ -34,6 +34,7 @@ void    _psignal(struct Task *t, int sig);
 void    __Close(BPTR fh);
 int     __get_file(struct file *f);
 void    __release_file(struct file *f);
+int     __apply_seek_pending(struct file *f, int *err);
 int     __tioctl(struct file *f, unsigned int cmd, unsigned int inout, unsigned int arglen, unsigned int arg);
 BPTR    __lock(const char *name, int mode);
 BPTR    __llock(const char *name, int mode);

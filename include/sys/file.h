@@ -114,6 +114,9 @@ struct file {
   struct StandardPacket f_select_sp; /* for the select() function */
   struct stat f_stb;    /* file-params at open-time, or after changes to fd */
   int	f_sync_flags;	/* for process synchronization */
+  int	f_seek_pending;	/* 0, or the logical offset after an lseek() past EOF: the file is
+			 * extended only by the next write (__apply_seek_pending), the
+			 * real handle stays at EOF; reads at it return 0 (POSIX) */
 };
 
 

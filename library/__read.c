@@ -260,6 +260,14 @@ int __read(struct file *f, char *buf, int len)
 
   omask = syscall (SYS_sigsetmask, ~0);
   __get_file (f);
+
+  /* after an lseek() past EOF the offset is beyond the data: EOF */
+  if (f->f_seek_pending)
+    {
+      __release_file (f);
+      syscall (SYS_sigsetmask, omask);
+      return 0;
+    }
   
   /* ----------------------------------------------------------------------- */
   /*  Packet?mode pre processing                                             */

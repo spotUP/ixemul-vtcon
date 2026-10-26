@@ -122,6 +122,42 @@ __extend_file (struct file *f, int add_to_eof, int *err)
   return res;
 }
 
+/* A seek past EOF only records the offset (f_seek_pending). The first write
+   (and nothing else) turns it into zeros up to that offset, as POSIX says.
+   Caller holds the file (__get_file). Returns 0, or -1 with *err set. */
+int
+__apply_seek_pending (struct file *f, int *err)
+{
+  int eof, res = 0;
+
+  if (!f->f_seek_pending)
+    return 0;
+
+  eof = Seek(CTOBPTR(f->f_fh), 0, OFFSET_END);
+  if (eof == -1)
+    {
+      *err = __ioerr_to_errno(IoErr());
+      return -1;
+    }
+  /* Seek returns the previous position: ask again for the EOF offset */
+  eof = Seek(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
+  if (eof == -1)
+    {
+      *err = __ioerr_to_errno(IoErr());
+      return -1;
+    }
+  if (eof < f->f_seek_pending)
+    res = __extend_file(f, f->f_seek_pending - eof, err);
+  else if (Seek(CTOBPTR(f->f_fh), f->f_seek_pending, OFFSET_BEGINNING) == -1)
+    {
+      *err = __ioerr_to_errno(IoErr());
+      res = -1;
+    }
+  if (res != -1)
+    f->f_seek_pending = 0;
+  return res == -1 ? -1 : 0;
+}
+
 off_t
 lseek (int fd, off_t off, int dir)
 {
@@ -160,6 +196,12 @@ lseek (int fd, off_t off, int dir)
           /* NEW: fast path for SEEK_CUR + off == 0 */
           if (dir == SEEK_CUR && off == 0)
             {
+              if (f->f_seek_pending)
+                {
+                  res = f->f_seek_pending;
+                  err = 0;
+                  goto done_file;
+                }
               res = FH_SEEK(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
               if (res == -1)
                 err = __seek_errno();
@@ -175,6 +217,11 @@ lseek (int fd, off_t off, int dir)
               break;
 
             case SEEK_CUR:
+              if (f->f_seek_pending)
+                {
+                  previous_pos = f->f_seek_pending;
+                  break;
+                }
               previous_pos = FH_SEEK(CTOBPTR(f->f_fh), 0, OFFSET_CURRENT);
               if (previous_pos == -1)
                 err = __seek_errno();
@@ -208,7 +255,12 @@ lseek (int fd, off_t off, int dir)
             {
               shouldbe_pos = (int)(previous_pos + off);
 
-              res = FH_SEEK(CTOBPTR(f->f_fh), off, dir - 1);
+              /* the real handle sits at EOF while a seek is pending: go absolute */
+              if (f->f_seek_pending)
+                res = FH_SEEK(CTOBPTR(f->f_fh), shouldbe_pos, OFFSET_BEGINNING);
+              else
+                res = FH_SEEK(CTOBPTR(f->f_fh), off, dir - 1);
+              f->f_seek_pending = 0;
               if (res == -1 && IoErr() == ERROR_SEEK_ERROR)
                 res = Seek(CTOBPTR(f->f_fh), 0, OFFSET_END);
 
@@ -226,7 +278,10 @@ lseek (int fd, off_t off, int dir)
 
                       if (res >= 0 && res < shouldbe_pos &&
                           (f->f_flags & FWRITE))
-                        res = __extend_file(f, shouldbe_pos - res, &err);
+                        {
+                          f->f_seek_pending = shouldbe_pos;
+                          res = shouldbe_pos;
+                        }
                     }
                   else
                     res = shouldbe_pos;

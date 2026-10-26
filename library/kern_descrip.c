@@ -631,6 +631,7 @@ slot:
   fp->f_select = 0;
   fp->f_close = 0;
   fp->f_sync_flags = 0;
+  fp->f_seek_pending = 0;
   memset(&fp->f__fh, 0, sizeof(fp->f__fh));
   ix.ix_lastf = fp + 1;
   if (resultfp)

@@ -149,6 +149,13 @@ ftruncate (int fd, off_t len)
                * since the preparatory Seek() may already have moved it.
                * Keep the historical workaround behavior if restoration fails.
                */
+              /* a pending seek past the old EOF is still the file offset
+                 (POSIX: ftruncate keeps it); once the file reaches it, it is a real position */
+              if (res != -1 && f->f_seek_pending && f->f_seek_pending <= len)
+                {
+                  old_pos = f->f_seek_pending;
+                  f->f_seek_pending = 0;
+                }
               Seek(fh, old_pos, OFFSET_BEGINNING);
 
 	      if (res != -1)
