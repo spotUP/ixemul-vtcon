@@ -324,9 +324,16 @@ int __read(struct file *f, char *buf, int len)
       else
         {
           /* Normal blocking read (fast path) */
-	  res = Read(CTOBPTR(f->f_fh), buf, len);
-	  if (res == -1)
-	    err = __ioerr_to_errno(IoErr());
+	  /* lseek() past EOF and no write yet: EOF, nothing moves */
+	  if (__builtin_expect((f->f_seek_pending > 0), 0) &&
+	      __seek_pending_at_eof(f))
+	    res = 0;
+	  else
+	    {
+	      res = Read(CTOBPTR(f->f_fh), buf, len);
+	      if (res == -1)
+	        err = __ioerr_to_errno(IoErr());
+	    }
 	}
    }
 

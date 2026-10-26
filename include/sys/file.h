@@ -114,6 +114,14 @@ struct file {
   struct StandardPacket f_select_sp; /* for the select() function */
   struct stat f_stb;    /* file-params at open-time, or after changes to fd */
   int	f_sync_flags;	/* for process synchronization */
+  /* DTYPE_FILE only: an lseek() target past end of file that the AmigaDOS
+   * handle cannot hold (Seek() past EOF is ERROR_SEEK_ERROR). lseek() leaves
+   * the handle at EOF and keeps the target here; the next write() zero-fills
+   * EOF..target first, read() returns 0 (EOF) meanwhile, and lseek(SEEK_CUR)
+   * counts from it. POSIX: lseek() changes the offset, never the size.
+   * 0 = none (a pending target is always > EOF >= 0, so 0 never is one).
+   * Kept last so f_sp keeps its long alignment (see the WARNING above). */
+  int	f_seek_pending;
 };
 
 

@@ -130,10 +130,28 @@ ftruncate (int fd, off_t len)
 	        }
               else
                 {
-                  if ((LONG)res < old_pos)
+                  /*
+                   * POSIX: ftruncate() does not move the offset. The handle
+                   * can only sit at or before EOF, so an offset now past EOF
+                   * (shrunk below it, or already pending from lseek()) waits
+                   * in f_seek_pending at EOF; one the file now reaches is
+                   * a plain position again.
+                   */
+                  if ((LONG)res >= 0)
                     {
-                      /* The old position no longer exists after truncation. */
-                      old_pos = (LONG)res;
+                      LONG logical = f->f_seek_pending > 0 ?
+                                     f->f_seek_pending : old_pos;
+
+                      if (logical > (LONG)res)
+                        {
+                          f->f_seek_pending = logical;
+                          old_pos = (LONG)res;
+                        }
+                      else
+                        {
+                          f->f_seek_pending = 0;
+                          old_pos = logical;
+                        }
                     }
 
                   if ((off_t)res != len)

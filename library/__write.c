@@ -171,6 +171,8 @@ static int __do_sync_write(struct file *f, const char *buf, int len)
 
       if (__builtin_expect((f->f_flags & FAPPEND), 0))
         {
+          /* append writes at EOF whatever lseek() said */
+          f->f_seek_pending = 0;
           if (Seek(CTOBPTR(f->f_fh), 0, OFFSET_END) == -1)
             {
               /*
@@ -190,6 +192,24 @@ static int __do_sync_write(struct file *f, const char *buf, int len)
                 }
 
               KPRINTF(("append seek failed: IoErr=%ld\n", IoErr()));
+            }
+        }
+
+      /* --- lseek() past EOF ---------------------------------------------- */
+      /*
+       * A position lseek() put past EOF is only recorded (f_seek_pending);
+       * POSIX fills the gap with zeros at the write that lands there.
+       */
+      if (__builtin_expect((f->f_seek_pending > 0), 0))
+        {
+          int fill_errno;
+
+          if (__seek_pending_fill(f, &fill_errno) == -1)
+            {
+              __release_file(f);
+              syscall(SYS_sigsetmask, omask);
+              errno = fill_errno;
+              return -1;
             }
         }
 
