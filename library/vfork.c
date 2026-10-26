@@ -152,7 +152,7 @@ struct death_msg {
 static void
 launcher (void)
 {
-  void *ixb;
+  void *ixb = OpenLibrary ("ixemul.library", IX_VERSION);
   struct Process *me = (struct Process *) FindTask (0);
   struct user *u_ptr = getuser(me);
   struct vfork_msg *vm = NULL;
@@ -166,10 +166,6 @@ launcher (void)
       vm = (struct vfork_msg *) GetMsg (&me->pr_MsgPort);
     }
   while (!vm || vm->vm_self != me);
-
-  /* open the library only after the vfork message is taken: the open may do
-   * DOS packets on this process port, which would swallow the message */
-  ixb = OpenLibrary ("ixemul.library", IX_VERSION);
       
   if (ixb)
     {
