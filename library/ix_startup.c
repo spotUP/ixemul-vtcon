@@ -154,6 +154,20 @@ ix_startup (char *aline, int alen,
    * our task... */
   if (!proc->pr_CLI)
     {
+      /* Like c.o / libnix: give back the CurrentDir we started with. Our own
+       * chdir lock goes first (ix_close would otherwise put wa_Lock back
+       * and unlock it); wa_Lock itself belongs to the launcher, which
+       * UnLocks it after the reply. */
+      if (u.u_startup_cd != (BPTR) -1)
+        {
+          __unlock (CurrentDir (u.u_startup_cd));
+          u.u_startup_cd = (BPTR) -1;
+        }
+      if (u.u_wb_cd_saved)
+        {
+          CurrentDir (u.u_wb_cd);
+          u.u_wb_cd_saved = 0;
+        }
       Forbid ();
       wb_msg = *&wb_msg;  // Work around compiler warning
       ReplyMsg ((struct Message *) wb_msg);

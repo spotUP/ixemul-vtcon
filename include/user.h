@@ -493,6 +493,13 @@ struct user {
 #define MCACHE_DEPTH	64
 	void			*u_mcache[MCACHE_CLASSES];
 	unsigned short		u_mcount[MCACHE_CLASSES];
+
+	/* Workbench start: the CurrentDir the process had before _main moved it
+	   to the program's drawer (wa_Lock). It is put back before the
+	   WBStartup reply, so DOS does not UnLock wa_Lock at process exit while
+	   the launcher still owns and UnLocks it. u_wb_cd_saved: 0 = none. */
+	BPTR			u_wb_cd;
+	char			u_wb_cd_saved;
 };
 
 /* flag codes */
