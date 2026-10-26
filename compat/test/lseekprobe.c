@@ -6,10 +6,15 @@
  *   tell      lseek(fd, 0, SEEK_CUR) is still 24
  *   write     write of 1 byte returns 1
  *   size25    fstat size is 25 and bytes 0..23 are zero, byte 24 is 'X'
+ *   trunc     ftruncate(fd, 40) after lseek 30 past EOF: offset stays 30,
+ *             the next write lands at 30, size stays 40
+ *   append    O_APPEND file, lseek 24 past EOF, write 1 byte: size is 1
+ *             (append writes at EOF and leaves no gap)
  * Each check prints [OK] or [FAIL] and is appended to the log file named by
  * the first argument; the exit status is the number of failures.
  * Build: m68k-amigaos-gcc -mcrt=ixemul -O2 -Wall -o lseekprobe compat/test/lseekprobe.c
- * Old lib: size0 and read FAIL (size is 24 after the lseek). */
+ * Old lib: size0 FAILS (size is 24 after the lseek); read passes there too,
+ * because the old lib had already moved EOF to the offset. */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -50,6 +55,22 @@ int main(int argc, char **argv)
   if (read(fd, buf, 25) != 25) zeros = 0;
   for (i = 0; i < 24; i++) if (buf[i] != 0) zeros = 0;
   check("content", zeros && buf[24] == 'X');
+  close(fd);
+
+  unlink(FILE_NAME);
+  fd = open(FILE_NAME, O_RDWR | O_CREAT | O_TRUNC, 0644);
+  if (fd < 0) { check("open2", 0); return fails + 1; }
+  lseek(fd, 30, SEEK_SET);
+  check("trunc", ftruncate(fd, 40) == 0 && lseek(fd, 0, SEEK_CUR) == 30
+        && write(fd, "Y", 1) == 1 && fstat(fd, &st) == 0 && st.st_size == 40
+        && lseek(fd, 30, SEEK_SET) == 30 && read(fd, buf, 1) == 1 && buf[0] == 'Y');
+  close(fd);
+
+  unlink(FILE_NAME);
+  fd = open(FILE_NAME, O_RDWR | O_CREAT | O_TRUNC | O_APPEND, 0644);
+  if (fd < 0) { check("open3", 0); return fails + 1; }
+  lseek(fd, 24, SEEK_SET);
+  check("append", write(fd, "Z", 1) == 1 && fstat(fd, &st) == 0 && st.st_size == 1);
   close(fd);
   unlink(FILE_NAME);
   return fails;

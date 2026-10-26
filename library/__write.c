@@ -156,6 +156,11 @@ static int __do_sync_write(struct file *f, const char *buf, int len)
   omask = syscall (SYS_sigsetmask, ~0);
   __get_file (f);
 
+  /* append mode writes at EOF whatever the offset (POSIX): a pending seek
+     past EOF leaves no gap there */
+  if (len > 0 && f->f_seek_pending && (f->f_flags & FAPPEND))
+    f->f_seek_pending = 0;
+
   if (len > 0 && f->f_seek_pending && __apply_seek_pending (f, &res_err) == -1)
     {
       __release_file (f);
