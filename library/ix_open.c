@@ -160,6 +160,8 @@ ix_open (struct ixemul_base *ixbase)
       
       /* the CD storage. since 0 is a valid value for a lock, we use -1 */
       ix_u->u_startup_cd = (BPTR)-1;
+      ix_u->u_wb_cd = 0;
+      ix_u->u_wb_cd_saved = 0;
 
       /* support for subprocesses a la Unix */
 

@@ -357,7 +357,8 @@ _main (union { char *_aline; struct WBStartup *_wb_msg; } a1,
        * program lives. */
       if (wb_msg->sm_ArgList)
 	{
-	  CurrentDir (wb_msg->sm_ArgList->wa_Lock);
+	  u.u_wb_cd = CurrentDir (wb_msg->sm_ArgList->wa_Lock);
+	  u.u_wb_cd_saved = 1;
 	  __ix_wb_parse(me, wb_msg, def_window);
 	}
       /* argc==0: this means, that argv is really a WBenchMsg, not a vector */
