@@ -17,6 +17,11 @@
 #include <stdio.h>
 #include <unistd.h>
 
+/* Every Amiga program states its stack: libnix/ixemul startup reads __stack, and
+ * the cookie tells AmigaOS 3.2 and vsh the same (vtcon RULES.md rule 6). */
+unsigned long __stack = 65536;
+const char mkdirprobe_stack_cookie[] = "$STACK: 65536";
+
 #define DIR_NAME "T:mkdirprobe.d"
 static const char *logname;
 static int fails;
