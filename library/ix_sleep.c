@@ -107,7 +107,7 @@ tsleep(caddr_t waitchan, char *wmesg, int timo)
 
   wait_sigs =  (1 << sm.sm_signal) | SIGBREAKF_CTRL_C;
   if (u.u_vtcon)   /* a vtcon console's ^\ and ^Z wake a sleeper too */
-    wait_sigs |= SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F;
+    wait_sigs |= SIGBREAKF_CTRL_D | SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F;
   
   if (timo)
     {

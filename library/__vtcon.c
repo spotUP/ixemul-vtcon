@@ -129,7 +129,7 @@ int __vtcon_pty_mounted(void)
   return 1;
 }
 
-/* The console's ^\ and ^Z arrive as the CTRL_E and CTRL_F breaks (vtcon:
+/* The console's ^\ and ^Z arrive as the CTRL_E and CTRL_F breaks, its window close as CTRL_D (SIGHUP) (vtcon:
  * vtcon_packets.h): SIGQUIT and SIGTSTP for the foreground process group,
  * as CTRL_C is SIGINT. Only for a process on a vtcon console, and not when
  * it catches SIGMSG (then it wants the breaks themselves). Returns the
@@ -139,13 +139,16 @@ unsigned long __vtcon_breaks(unsigned long breaks)
   struct Process *proc;
   usetup;
 
-  breaks &= SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F;
+  breaks &= SIGBREAKF_CTRL_D | SIGBREAKF_CTRL_E | SIGBREAKF_CTRL_F;
   if (!breaks || !u.u_vtcon || (u.p_sigcatch & sigmask(SIGMSG)))
     return 0;
   proc = (struct Process *)(u.u_session ? u.u_session->pgrp : (int)FindTask(0));
   /* whether a process ignores the signal is its own business (_psignal
      asks it): the shell that receives the break ignores SIGTSTP itself,
      and checking its mask here dropped ^Z for every job under tcsh */
+  /* the console window closed: a hang-up, as closing a terminal gives */
+  if (breaks & SIGBREAKF_CTRL_D)
+    _psignalgrp(proc, SIGHUP);
   if (breaks & SIGBREAKF_CTRL_E)
     _psignalgrp(proc, SIGQUIT);
   if (breaks & SIGBREAKF_CTRL_F)
