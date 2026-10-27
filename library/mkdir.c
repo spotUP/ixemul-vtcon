@@ -83,6 +83,7 @@ mkdir (const char *path, mode_t perm)
   BPTR lock;
   int result = -1;
   int omask;
+  int ioerr;
   usetup;
  
   /* protect the obtained lock, we have to free it later */
@@ -103,9 +104,22 @@ mkdir (const char *path, mode_t perm)
             syscall (SYS_chown, path, uid, gid);
         }
     }
+  ioerr = IoErr ();
+
+  /* A volume root, device name, assign or "/" has no parent drawer to
+     create in, so the handler answers ACTION_CREATE_DIR with an error
+     that maps to EIO.  POSIX: mkdir of an existing path is EEXIST.  Only
+     the failure path asks; the success path is untouched. */
+  if (!lock)
+    {
+      struct stat stb;
+
+      if (syscall (SYS_lstat, path, &stb) == 0)
+        ioerr = ERROR_OBJECT_EXISTS;
+    }
   syscall (SYS_sigsetmask, omask);
 
-  errno = __ioerr_to_errno (IoErr ());
+  errno = __ioerr_to_errno (ioerr);
   KPRINTF (("&errno = %lx, errno = %ld\n", &errno, errno));
   return result;
 }
