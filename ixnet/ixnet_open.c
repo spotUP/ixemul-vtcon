@@ -54,6 +54,7 @@
 
 #include <amitcp/socketbasetags.h>
 #include <amitcp/usergroup.h>
+#include <dos/dosextens.h>
 #include <exec/memory.h>
 #include <string.h>
 #include "ixprotos.h"
@@ -163,8 +164,14 @@ ixnet_open (struct ixnet_base *ixbase)
                     (void)TCP_SocketBaseTagList(list);
                   }
 
-                p->u_UserGroupBase =
-                    OpenLibrary("AmiTCP:libs/usergroup.library", 1);
+                /*
+                 * usergroup.library is optional.  Open it by plain name
+                 * only (LIBS:/resident).  No AmiTCP: path: the product has
+                 * no AmiTCP: volume, and the library load runs in ramlib,
+                 * whose own pr_WindowPtr raises "Please insert volume
+                 * AmiTCP:" no matter what this process sets.
+                 */
+                p->u_UserGroupBase = OpenLibrary("usergroup.library", 1);
 
                 if (p->u_UserGroupBase)
                   {
