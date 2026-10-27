@@ -54,6 +54,7 @@
 
 #include <amitcp/socketbasetags.h>
 #include <amitcp/usergroup.h>
+#include <dos/dosextens.h>
 #include <exec/memory.h>
 #include <string.h>
 #include "ixprotos.h"
@@ -163,8 +164,29 @@ ixnet_open (struct ixnet_base *ixbase)
                     (void)TCP_SocketBaseTagList(list);
                   }
 
-                p->u_UserGroupBase =
-                    OpenLibrary("AmiTCP:libs/usergroup.library", 1);
+                /*
+                 * usergroup.library is optional.  Try LIBS:/resident first;
+                 * the AmiTCP: path is only a fallback, and a missing AmiTCP:
+                 * volume must not raise a "Please insert volume" requester
+                 * that blocks the program, so requesters are off around it.
+                 */
+                p->u_UserGroupBase = OpenLibrary("usergroup.library", 1);
+                if (!p->u_UserGroupBase)
+                  {
+                    struct Process *proc = (struct Process *)me;
+                    APTR oldwin = 0;
+                    int is_proc = proc->pr_Task.tc_Node.ln_Type == NT_PROCESS;
+
+                    if (is_proc)
+                      {
+                        oldwin = proc->pr_WindowPtr;
+                        proc->pr_WindowPtr = (APTR)-1;
+                      }
+                    p->u_UserGroupBase =
+                        OpenLibrary("AmiTCP:libs/usergroup.library", 1);
+                    if (is_proc)
+                      proc->pr_WindowPtr = oldwin;
+                  }
 
                 if (p->u_UserGroupBase)
                   {

@@ -14,6 +14,7 @@ test: $(OUT)/test_cli_args $(OUT)/test_vol_path $(OUT)/test_memset
 	$(OUT)/test_vol_path
 	$(OUT)/test_memset
 	python3 -I test_selfcall.py
+	python3 -I test_ixnet_noreq.py
 
 $(OUT)/test_cli_args: test_cli_args.c ../../library/cli_args.c ../../library/cli_args.h
 	@mkdir -p $(OUT)
