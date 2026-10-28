@@ -371,6 +371,46 @@ void ix_get_variables(int from_vfork_setup_child)
               &_res, &_res_socket, NULL);
 }
 
+/* Sets that no linked object contributes to would leave the two list symbols
+   undefined. This absolute-zero element (N_SETA) defines both; the walkers
+   skip NULL entries. */
+asm(".stabs \"___CTOR_LIST__\",20,0,0,0\n"
+    ".stabs \"___DTOR_LIST__\",20,0,0,0\n");
+
+extern long __CTOR_LIST__[];
+extern long __DTOR_LIST__[];
+
+/* Constructors run last element to first, destructors first to last (the
+   order of gcc's own __main / __do_global_dtors). */
+static void
+ix_walk_list(long *list, int forward)
+{
+  long n = list[0];
+  long i;
+
+  if (n == -1)
+    for (n = 0; list[n + 1]; n++)
+      ;
+  for (i = 0; i < n; i++)
+    {
+      void (*fn)(void) = (void (*)(void)) list[forward ? i + 1 : n - i];
+      if (fn)
+        fn();
+    }
+}
+
+static void
+ix_run_ctors(void)
+{
+  ix_walk_list(__CTOR_LIST__, 0);
+}
+
+static void
+ix_run_dtors(void)
+{
+  ix_walk_list(__DTOR_LIST__, 1);
+}
+
 int
 start_stdio(int argc, char **argv, char **env)
 {
@@ -400,6 +440,13 @@ start_stdio(int argc, char **argv, char **env)
     if (!GetProgramName(__progname, 40))
       __progname = "";
   }
+
+  /* a.out set vectors: ld builds ___CTOR_LIST__ / ___DTOR_LIST__ as
+     <count> <entry>... <0> from the N_SETT stabs of every linked object
+     (__attribute__((constructor)), libamisslauto's ___init_amissl). The
+     count is -1 when the linker leaves the list NULL-terminated only. */
+  ix_run_ctors();
+  atexit(ix_run_dtors);
 
   return main(argc, argv, env);
 }
