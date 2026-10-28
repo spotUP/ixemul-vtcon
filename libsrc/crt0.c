@@ -1,3 +1,31 @@
+/*
+ * The entry asm comes before every #include: the fd2inline headers in
+ * build-inlines define static _va wrapper functions, and gcc 2.95 emits
+ * them in source order. Anything ahead of this block would sit at hunk
+ * offset 0, where AmigaOS starts the program and execve() looks for the jra.
+ */
+asm("
+	.text
+
+	jra	_ENTRY		| by default jump to normal AmigaOS startup
+	.align	2		| ensure exec starts at byte offset 4
+
+	| this is a struct exec, for now only OMAGIC is supported
+	.globl	exec
+exec:
+	.word	___machtype	| a_mid
+	.word	0407		| a_magic = OMAGIC
+	.long	___text_size	| a_text
+	.long	___data_size	| a_data
+	.long	___bss_size	| a_bss
+	.long	0		| a_syms
+	.long	_exec_entry	| a_entry
+	.long	0		| a_trsize
+	.long	0		| a_drsize
+
+	| word alignment is guaranteed
+");
+
 #include <exec/types.h>
 #include <exec/libraries.h>
 #include <exec/execbase.h>
@@ -76,27 +104,6 @@ extern int main();
  */
 
 
-asm("
-	.text
-
-	jra	_ENTRY		| by default jump to normal AmigaOS startup
-	.align	2		| ensure exec starts at byte offset 4
-
-	| this is a struct exec, for now only OMAGIC is supported
-	.globl	exec
-exec:
-	.word	___machtype	| a_mid
-	.word	0407		| a_magic = OMAGIC
-	.long	___text_size	| a_text
-	.long	___data_size	| a_data
-	.long	___bss_size	| a_bss
-	.long	0		| a_syms
-	.long	_exec_entry	| a_entry
-	.long	0		| a_trsize
-	.long	0		| a_drsize
-
-	| word alignment is guaranteed
-");
 
 extern  int ix_expand_cmd_line;	/* expand wildcards ? */
 int     h_errno = 0;		/* networking error code */
@@ -371,6 +378,46 @@ void ix_get_variables(int from_vfork_setup_child)
               &_res, &_res_socket, NULL);
 }
 
+/* Sets that no linked object contributes to would leave the two list symbols
+   undefined. This absolute-zero element (N_SETA) defines both; the walkers
+   skip NULL entries. */
+asm(".stabs \"___CTOR_LIST__\",20,0,0,0\n"
+    ".stabs \"___DTOR_LIST__\",20,0,0,0\n");
+
+extern long __CTOR_LIST__[];
+extern long __DTOR_LIST__[];
+
+/* Constructors run last element to first, destructors first to last (the
+   order of gcc's own __main / __do_global_dtors). */
+static void
+ix_walk_list(long *list, int forward)
+{
+  long n = list[0];
+  long i;
+
+  if (n == -1)
+    for (n = 0; list[n + 1]; n++)
+      ;
+  for (i = 0; i < n; i++)
+    {
+      void (*fn)(void) = (void (*)(void)) list[forward ? i + 1 : n - i];
+      if (fn)
+        fn();
+    }
+}
+
+static void
+ix_run_ctors(void)
+{
+  ix_walk_list(__CTOR_LIST__, 0);
+}
+
+static void
+ix_run_dtors(void)
+{
+  ix_walk_list(__DTOR_LIST__, 1);
+}
+
 int
 start_stdio(int argc, char **argv, char **env)
 {
@@ -400,6 +447,13 @@ start_stdio(int argc, char **argv, char **env)
     if (!GetProgramName(__progname, 40))
       __progname = "";
   }
+
+  /* a.out set vectors: ld builds ___CTOR_LIST__ / ___DTOR_LIST__ as
+     <count> <entry>... <0> from the N_SETT stabs of every linked object
+     (__attribute__((constructor)), libamisslauto's ___init_amissl). The
+     count is -1 when the linker leaves the list NULL-terminated only. */
+  ix_run_ctors();
+  atexit(ix_run_dtors);
 
   return main(argc, argv, env);
 }
