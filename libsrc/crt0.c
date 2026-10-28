@@ -1,3 +1,31 @@
+/*
+ * The entry asm comes before every #include: the fd2inline headers in
+ * build-inlines define static _va wrapper functions, and gcc 2.95 emits
+ * them in source order. Anything ahead of this block would sit at hunk
+ * offset 0, where AmigaOS starts the program and execve() looks for the jra.
+ */
+asm("
+	.text
+
+	jra	_ENTRY		| by default jump to normal AmigaOS startup
+	.align	2		| ensure exec starts at byte offset 4
+
+	| this is a struct exec, for now only OMAGIC is supported
+	.globl	exec
+exec:
+	.word	___machtype	| a_mid
+	.word	0407		| a_magic = OMAGIC
+	.long	___text_size	| a_text
+	.long	___data_size	| a_data
+	.long	___bss_size	| a_bss
+	.long	0		| a_syms
+	.long	_exec_entry	| a_entry
+	.long	0		| a_trsize
+	.long	0		| a_drsize
+
+	| word alignment is guaranteed
+");
+
 #include <exec/types.h>
 #include <exec/libraries.h>
 #include <exec/execbase.h>
@@ -76,27 +104,6 @@ extern int main();
  */
 
 
-asm("
-	.text
-
-	jra	_ENTRY		| by default jump to normal AmigaOS startup
-	.align	2		| ensure exec starts at byte offset 4
-
-	| this is a struct exec, for now only OMAGIC is supported
-	.globl	exec
-exec:
-	.word	___machtype	| a_mid
-	.word	0407		| a_magic = OMAGIC
-	.long	___text_size	| a_text
-	.long	___data_size	| a_data
-	.long	___bss_size	| a_bss
-	.long	0		| a_syms
-	.long	_exec_entry	| a_entry
-	.long	0		| a_trsize
-	.long	0		| a_drsize
-
-	| word alignment is guaranteed
-");
 
 extern  int ix_expand_cmd_line;	/* expand wildcards ? */
 int     h_errno = 0;		/* networking error code */

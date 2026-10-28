@@ -15,6 +15,7 @@ import os, subprocess, unittest
 
 CRT0_DIR = os.environ.get("CRT0_DIR", os.path.expanduser("~/opt/amiga/m68k-amigaos/ixemul/lib"))
 NM = os.environ.get("NM", os.path.expanduser("~/opt/amiga/bin/m68k-amigaos-nm"))
+OBJDUMP = os.environ.get("OBJDUMP", os.path.join(os.path.dirname(NM), "m68k-amigaos-objdump"))
 VARIANTS = ("crt0.o", "bcrt0.o", "rcrt0.o", "lcrt0.o", "scrt0.o", "mcrt0.o", "gcrt0.o")
 
 
@@ -38,6 +39,26 @@ class Crt0Ctors(unittest.TestCase):
                 self.assertIn("___DTOR_LIST__", undefined)
                 self.assertEqual(seta, {"___CTOR_LIST__", "___DTOR_LIST__"})
                 self.assertIn("_atexit", undefined)
+
+    # AmigaOS starts a program at the first byte of its first code hunk, and
+    # execve() pattern-matches the same bytes. When crt0.c is compiled with the
+    # fd2inline headers in build-inlines, gcc 2.95 emits their static _va
+    # wrappers (__EasyRequest_va, ...) ahead of the entry asm, so a program
+    # started inside __EasyRequest_va with a garbage a6 and reset the machine.
+    def test_every_variant_starts_with_jump_to_entry(self):
+        for name in VARIANTS:
+            obj = os.path.join(CRT0_DIR, name)
+            if not os.path.exists(obj):
+                continue
+            with self.subTest(variant=name):
+                entry = [int(s[0], 16) for s in symbols(obj) if s[-1] == "_ENTRY"]
+                self.assertEqual(len(entry), 1)
+                dump = subprocess.run([OBJDUMP, "-s", "-j", ".text", obj],
+                                      capture_output=True, text=True, check=True).stdout
+                row = next(l for l in dump.splitlines() if l.startswith(" 0000 "))
+                word0, word1 = int(row[6:10], 16), int(row[10:14], 16)
+                self.assertEqual(word0, 0x6000, "offset 0 is not a bra.w")
+                self.assertEqual(2 + word1, entry[0], "bra.w at offset 0 does not reach _ENTRY")
 
     def test_variants_present(self):
         self.assertTrue(any(os.path.exists(os.path.join(CRT0_DIR, n)) for n in VARIANTS), CRT0_DIR)
