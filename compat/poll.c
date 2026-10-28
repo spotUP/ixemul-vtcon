@@ -1,6 +1,12 @@
 /* poll() on select() for ixemul (libixcompat.a; UP-Term P7). A descriptor
  * that is not open answers POLLNVAL; POLLIN/POLLOUT from select's read
- * and write sets; select's exception set gives POLLPRI. */
+ * and write sets; select's exception set gives POLLPRI.
+ *
+ * ixemul descriptors only: select() here is ixemul's, which knows ixemul
+ * fds. A raw bsdsocket.library descriptor (what a program linked with
+ * -lamisslstubs / AmiSSL holds) is not an ixemul fd and would answer
+ * POLLNVAL or wrong readiness. Such ports must not call poll(): build them
+ * without it (curl: ac_cv_func_poll=no) or use WaitSelect() (lynx, mutt). */
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
