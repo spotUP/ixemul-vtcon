@@ -575,6 +575,17 @@ L_skip%=:\n\
         }
       else if (p->p_stat == SSLEEP || p->p_wchan == (caddr_t) select)
         Signal (t, 1<<p->u_sleep_sig);
+      /* Another task that is in none of ixemul's own waits may be blocked in
+       * a native Wait() (curl's bsdsocket WaitSelect, Curl_amiga_select): it
+       * never runs sig_launch until something in its wait mask arrives, so a
+       * SIGINT from kill() stayed pending while curl waited out a slow server
+       * (RJ.7, 2026-10-29). Such waits break on SIGBREAKF_CTRL_C, and
+       * sig_launch maps that break to the same SIGINT, so a pending, unmasked
+       * SIGINT wakes it exactly as a typed Ctrl-C does. */
+      else if (t != me
+               && (p->p_sig & ~p->p_sigmask & sigmask (SIGINT))
+               && (t->tc_SigWait & SIGBREAKF_CTRL_C))
+        Signal (t, SIGBREAKF_CTRL_C);
         
       Permit();
       return;
