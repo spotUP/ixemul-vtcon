@@ -173,5 +173,11 @@ ix_startup (char *aline, int alen,
       ReplyMsg ((struct Message *) wb_msg);
     }
 
+  /* A program ended by a signal has no exit code: sig_exit stores
+     W_EXITCODE(0, sig), which WEXITSTATUS reads as 0.  Return 128+sig as a
+     shell's $? does, so the AmigaDOS rc is not 0 (SIGTERM 143, SIGINT 130).  */
+  if (WIFSIGNALED(exit_val))
+    return 128 + WTERMSIG(exit_val);
+
   return WEXITSTATUS(exit_val);
 }
