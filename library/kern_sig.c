@@ -446,29 +446,22 @@ pfind (pid_t p)
     {
       /* have to check if the task really exists */
 
-      struct List *exectasklist;
-      struct Node * execnode;
+      struct Node *execnode;
+      int found;
 
+      /* TaskWait, then TaskReady, then the running task (it is in neither
+       * list). A for loop over ln_Succ ends ON the tail node, never on
+       * NULL, so `found` says whether the walk hit p. */
       Disable();
-      exectasklist = &(SysBase->TaskWait);
-      for (execnode = exectasklist->lh_Head; execnode->ln_Succ;
+      found = ((struct Task *) p == SysBase->ThisTask);
+      for (execnode = SysBase->TaskWait.lh_Head; !found && execnode->ln_Succ;
            execnode = execnode->ln_Succ)
-        {
-          if ((pid_t)execnode == p)
-            break;
-        }
-      if (execnode == NULL)
-        {
-          exectasklist = &(SysBase->TaskReady);
-          for (execnode = exectasklist->lh_Head; execnode->ln_Succ;
-               execnode = execnode->ln_Succ)
-            {
-              if ((pid_t)execnode == p)
-                break;
-            }
-        }
+        found = ((pid_t)execnode == p);
+      for (execnode = SysBase->TaskReady.lh_Head; !found && execnode->ln_Succ;
+           execnode = execnode->ln_Succ)
+        found = ((pid_t)execnode == p);
       Enable();
-      if (execnode == NULL)
+      if (!found)
         return 0;
       t = (struct Task *) p;
       if (t->tc_Node.ln_Type == NT_TASK ||
