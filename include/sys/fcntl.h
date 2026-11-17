@@ -80,6 +80,11 @@
 #define	O_CREAT		0x0200		/* create if nonexistant */
 #define	O_TRUNC		0x0400		/* truncate to zero length */
 #define	O_EXCL		0x0800		/* error if already exists */
+#define	O_NOFOLLOW	0x4000		/* do not follow a symlink in the last component
+					   (POSIX.1-2008; 0x4000 collides with no other O_*
+					   or F* bit in this file). open() ignores bits it
+					   does not know, so the flag is accepted and the
+					   link is still followed. */
 #ifdef _KERNEL
 #define FEXTOPEN	0x0010		/* don't close with DOS Close command */
 #define FEXTNAME	0x0020		/* don't free f_name field */
